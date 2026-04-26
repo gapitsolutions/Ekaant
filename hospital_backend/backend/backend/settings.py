@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "django_filters",
+    "hospitals",
     "accounts",
     "patients",
     "visits",
@@ -75,7 +76,7 @@ DATABASES = {
     }
 }
 
-AUTH_USER_MODEL = "accounts.User"
+AUTH_USER_MODEL = "accounts.CustomUser"
 
 AUTH_PASSWORD_VALIDATORS = [
     {

@@ -18,14 +18,14 @@ class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
-        extra_fields.setdefault("role", "reception")
+        extra_fields.setdefault("role", "receptionist")
         extra_fields.setdefault("full_name", email)
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("role", "admin")
+        extra_fields.setdefault("role", "superadmin")
         extra_fields.setdefault(
             "full_name", extra_fields.get("full_name") or "Administrator"
         )
