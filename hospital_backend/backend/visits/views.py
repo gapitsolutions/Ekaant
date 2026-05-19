@@ -19,6 +19,7 @@ from core.exceptions import ConflictError
 from core.pagination import paginate_queryset
 from core.permissions import IsReceptionOrAdmin
 from core.responses import success_response
+from followups.services import reconcile_followup_on_checkin
 from patients.models import Patient, PatientStatus
 
 from .models import CheckinVerificationMethod, VisitSession, VisitStage, VisitStatus
@@ -339,6 +340,7 @@ class CheckinPatientView(APIView):
             verification_photo_captured_at=verification_photo_captured_at
             or (now if verification_method == CheckinVerificationMethod.PHOTO else None),
         )
+        reconcile_followup_on_checkin(patient=patient, checkin_time=now)
 
         if verification_photo_bytes and verification_photo_mime_type:
             extension = "jpg" if verification_photo_mime_type == "image/jpeg" else "png"

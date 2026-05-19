@@ -227,6 +227,7 @@ class PatientLookupSerializer(serializers.ModelSerializer):
             "state",
             "addiction_type",
             "registration_date",
+            "next_followup_date",
             "photo_url",
             "aadhaar_number_last4",
             "created_at",
@@ -321,6 +322,7 @@ class PatientGeneralDataSerializer(serializers.ModelSerializer):
             "previous_treatments",
             "created_at",
             "updated_at",
+            "next_followup_date",
             "has_fingerprint",
             "last_visit_date",
             "days_since_last_visit",
@@ -466,6 +468,17 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
             )
 
         return super().update(instance, validated_data)
+
+
+class PatientFollowUpDateUpdateSerializer(serializers.Serializer):
+    next_followup_date = serializers.DateField(required=False, allow_null=True)
+
+    def validate_next_followup_date(self, value):
+        if value is None:
+            return None
+        if value < timezone.localdate():
+            raise serializers.ValidationError("next_followup_date cannot be in the past.")
+        return value
 
 
 def patient_search_queryset(query: str):

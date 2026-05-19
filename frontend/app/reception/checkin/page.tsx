@@ -69,6 +69,7 @@ interface LookupPatient {
   relative_phone?: string;
   photo?: string;
   fingerprint_template?: string;
+  next_followup_date?: string;
 }
 
 export default function CheckinPage() {
@@ -333,6 +334,10 @@ export default function CheckinPage() {
                 ? patient.relative_phone
                 : undefined,
             photo: photoUrl,
+            next_followup_date:
+              typeof patient.next_followup_date === "string"
+                ? patient.next_followup_date
+                : undefined,
           };
         });
         setSearchResults(mapped);

@@ -15,3 +15,11 @@ class IsReceptionOrAdmin(BasePermission):
 class IsAdminRole(BasePermission):
     def has_permission(self, request, view):
         return _user_has_role(request.user, {"admin"})
+
+
+class IsReceptionAdminOrPharmacist(BasePermission):
+    def has_permission(self, request, view):
+        return _user_has_role(
+            request.user,
+            {"admin", "reception", "receptionist", "pharmacist"},
+        )

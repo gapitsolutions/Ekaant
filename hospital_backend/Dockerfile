@@ -12,9 +12,12 @@ RUN apt-get update \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Source code is mounted as a volume in docker-compose.yml for hot-reload
+COPY backend /app/backend
+COPY scripts /app/scripts
+
+RUN chmod +x /app/scripts/*.sh
+
 WORKDIR /app/backend
 
-EXPOSE 8000
-
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
+CMD ["gunicorn", "backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]

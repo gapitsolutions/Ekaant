@@ -46,6 +46,7 @@ export interface PatientLookupResponse {
   registration_date?: string | null;
   addiction_duration_text?: string | null;
   addiction_duration?: string | null;
+  next_followup_date?: string | null;
   fingerprint_reenrollment_required?: boolean;
   [key: string]: unknown;
 }
@@ -191,6 +192,7 @@ export interface PatientDetailResponse extends PatientGeneralData {
   last_visit_date?: string;
   days_since_last_visit?: number;
   general_data_complete?: boolean;
+  next_followup_date?: string | null;
 }
 
 export interface PatientVisitHistoryItemResponse {
@@ -440,6 +442,24 @@ export async function updatePatientProfile(
     status: "active",
     ...data,
   };
+}
+
+export async function updatePatientNextFollowupDate(
+  patientIdOrToken: string,
+  dataOrPatientId: { next_followup_date?: string | null } | string,
+  maybeData?: { next_followup_date?: string | null },
+): Promise<{ patient_id: string; next_followup_date: string | null }> {
+  const patientId =
+    typeof dataOrPatientId === "string" ? dataOrPatientId : patientIdOrToken;
+  const data =
+    typeof dataOrPatientId === "string" ? maybeData : dataOrPatientId;
+  return apiRequest<{ patient_id: string; next_followup_date: string | null }>(
+    `/api/v1/patients/${patientId}/next-followup-date/`,
+    {
+      method: "PATCH",
+      body: data,
+    },
+  );
 }
 
 export interface ReportPatientSnapshot {
@@ -731,4 +751,87 @@ export async function deletePatient(
   return apiRequest<DeletePatientResponse>(`/api/v1/patients/${patientId}/`, {
     method: "DELETE",
   });
+}
+
+export interface FollowUpItemResponse {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  file_number: string;
+  phone: string;
+  patient_category: PatientCategory;
+  follow_up_date: string;
+  status: "pending" | "completed" | "successful";
+  cycle_number: number;
+  pending_since?: string | null;
+  last_response?:
+    | "confirmed"
+    | "busy_later"
+    | "wrong_number"
+    | "not_reachable"
+    | "other"
+    | null;
+  last_call_date?: string | null;
+  last_call_note?: string | null;
+  next_call_date?: string | null;
+  completed_at?: string | null;
+  successful_at?: string | null;
+}
+
+export interface ReceptionFollowUpListResponse {
+  items: FollowUpItemResponse[];
+  pagination: { page: number; pageSize: number; total: number };
+  counts: {
+    pending: number;
+    completed: number;
+    successful: number;
+    all: number;
+  };
+}
+
+export type FollowUpCallResult =
+  | "confirmed"
+  | "busy_later"
+  | "wrong_number"
+  | "not_reachable"
+  | "other";
+
+export interface CompleteFollowUpCallPayload {
+  call_result: FollowUpCallResult;
+  call_note: string;
+  next_call_date?: string | null;
+}
+
+export async function getReceptionFollowUps(
+  _token?: string,
+  options?: {
+    q?: string;
+    stage?: "pending" | "completed" | "successful" | "all";
+    page?: number;
+    pageSize?: number;
+  },
+): Promise<ReceptionFollowUpListResponse> {
+  const params = new URLSearchParams();
+  if (options?.q) params.set("q", options.q);
+  params.set("stage", options?.stage ?? "pending");
+  params.set("page", String(options?.page ?? 1));
+  params.set("pageSize", String(options?.pageSize ?? 50));
+  return apiRequest<ReceptionFollowUpListResponse>(
+    `/api/v1/receptionist/follow-ups/?${params.toString()}`,
+    {},
+  );
+}
+
+export async function completeReceptionFollowUpCall(
+  _token: string | undefined,
+  ticketId: string,
+  payload: CompleteFollowUpCallPayload,
+): Promise<FollowUpItemResponse> {
+  return apiRequest<FollowUpItemResponse>(
+    `/api/v1/receptionist/follow-ups/${ticketId}/complete-call/`,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
 }

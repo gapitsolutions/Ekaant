@@ -22,6 +22,7 @@ Root router lives in backend/backend/urls.py and mounts:
 
 - accounts.urls under /api/v1/
 - patients.urls under /api/v1/
+- followups.urls under /api/v1/
 - visits.urls under /api/v1/
 
 ### 2.2 Authentication Model
@@ -39,6 +40,7 @@ Behavior:
 
 - IsReceptionOrAdmin: allows roles admin, reception, receptionist
 - IsAdminRole: allows role admin only
+- IsReceptionAdminOrPharmacist: allows roles admin, reception, receptionist, pharmacist
 
 Current API views in this codebase mainly use IsReceptionOrAdmin, while auth views use AllowAny and perform explicit cookie/token checks.
 
@@ -401,6 +403,22 @@ Errors:
 
 - 404 when patient not found
 
+## 5.11 PATCH /api/v1/patients/<patient_id>/next-followup-date/
+
+View: PatientFollowUpDateUpdateView.patch  
+Serializer: PatientFollowUpDateUpdateSerializer  
+Permission: IsReceptionAdminOrPharmacist
+
+Request body:
+
+- next_followup_date (nullable date; optional in body to fetch current value)
+
+Behavior:
+
+- Sets or clears patient.next_followup_date.
+- Rejects past dates.
+- Returns `{ patient_id, next_followup_date }`.
+
 ---
 
 ## 6. Visits API Blueprint
@@ -442,8 +460,13 @@ Detailed flow:
 
 6. Determine visit_type as first_visit or follow_up
 7. Create VisitSession with completed status/stage immediately
-8. If photo mode, save verification photo under patient media directory (patients/<patient_id>/visits/<visit_uid>/...)
-9. Return 201 with session_id, patient details, status/current_stage/completed_at and verification metadata
+8. Reconcile follow-up tickets for this patient:
+
+- pending ticket with no prior call attempt -> deleted
+- completed/pending ticket with call attempt -> marked successful
+
+9. If photo mode, save verification photo under patient media directory (patients/<patient_id>/visits/<visit_uid>/...)
+10. Return 201 with session_id, patient details, status/current_stage/completed_at and verification metadata
 
 Errors:
 
@@ -601,6 +624,44 @@ Response:
 - session_id
 - patient_id
 
+## 6.10 GET /api/v1/receptionist/follow-ups/
+
+View: ReceptionFollowUpListView.get  
+Permission: IsReceptionOrAdmin
+
+Query params:
+
+- q (optional): search by registration number, name, phone
+- stage (optional): pending, completed, successful, success, all (default pending)
+- page (optional, default 1)
+- pageSize (optional, default 50, max 200)
+
+Behavior:
+
+- Runs sync job on request:
+  - creates pending tickets when patient.next_followup_date + 2 days is due
+  - requeues completed unsuccessful calls when next_call_date is due
+  - marks completed callbacks as successful if patient has checked in
+- returns paginated items and stage counts.
+
+## 6.11 POST /api/v1/receptionist/follow-ups/<ticket_id>/complete-call/
+
+View: ReceptionFollowUpCallCompleteView.post  
+Permission: IsReceptionOrAdmin
+
+Request body:
+
+- call_result: confirmed | busy_later | wrong_number | not_reachable | other
+- call_note (required, non-empty)
+- next_call_date (required when call_result is not confirmed; ignored for confirmed)
+
+Behavior:
+
+- Creates FollowUpCallAttempt history row.
+- Marks ticket status = completed.
+- Stores last call metadata on ticket.
+- For unsuccessful calls, schedules retry via next_call_date.
+
 ---
 
 ## 7. Data Model and Enum Blueprint
@@ -634,6 +695,7 @@ Key identity and workflow fields:
 - photo (ImageField)
 - fingerprint_template + fingerprint_enrolled_at
 - status
+- next_followup_date
 
 High-dimensional clinical/social profile fields are also part of this model.
 
@@ -671,6 +733,28 @@ Model classmethods:
 - generate_visit_uid
 - build_month_breakdown
 - build_year_breakdown
+
+## 7.4 followups.FollowUpTicket / followups.FollowUpCallAttempt
+
+FollowUpTicket key fields:
+
+- patient FK
+- cycle_number (unique per patient)
+- follow_up_date
+- status: pending | completed | successful
+- pending_since
+- last_call_result, last_call_note, last_called_at
+- next_call_date
+- completed_at, successful_at
+
+FollowUpCallAttempt key fields:
+
+- ticket FK
+- called_by FK
+- result
+- note
+- next_call_date
+- called_at
 
 ---
 
@@ -713,6 +797,7 @@ Patients:
 - GET /api/v1/patients/<patient_id>/
 - DELETE /api/v1/patients/<patient_id>/
 - PATCH /api/v1/patients/<patient_id>/general/
+- PATCH /api/v1/patients/<patient_id>/next-followup-date/
 - GET /api/v1/patients/<patient_id>/visits/
 - GET /api/v1/receptionist/patients/
 - GET /api/v1/receptionist/patients/summary/
@@ -728,3 +813,8 @@ Visits:
 - GET /api/v1/receptionist/reports/daily/
 - GET /api/v1/receptionist/reports/monthly/
 - GET /api/v1/receptionist/reports/custom-range/
+
+Follow-Ups:
+
+- GET /api/v1/receptionist/follow-ups/
+- POST /api/v1/receptionist/follow-ups/<ticket_id>/complete-call/

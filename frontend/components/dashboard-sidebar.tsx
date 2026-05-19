@@ -13,7 +13,7 @@ import {
   UserPlus,
   Users,
   BarChart3,
-  Hospital,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -46,6 +46,11 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
       title: "Check-in History",
       href: "/reception/queue",
       icon: ClipboardList,
+    },
+    {
+      title: "Follow-Up Calls",
+      href: "/reception/follow-up",
+      icon: Phone,
     },
     { title: "Reports", href: "/reception/reports", icon: BarChart3 },
   ],
@@ -130,16 +135,23 @@ export function DashboardSidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex h-full flex-col">
+        {/* Logo and Hospital Name */}
         <div className="flex h-20 items-center gap-3 border-b border-sidebar-border px-4">
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white/10 shadow-sm transition-colors hover:bg-white/20">
-            <Hospital className="h-6 w-6 text-sidebar-primary" />
+          <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-white/10 p-1">
+            <Image
+              src="/logo.png"
+              alt="Aggarwal Hospital Logo"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold leading-tight text-sidebar-foreground truncate">
-              Help Nasha Mukti
+              Aggarwal Psychiatric
             </span>
             <span className="text-xs text-sidebar-foreground/70 leading-tight">
-              Hospital Samana
+              & De-Addiction Centre
             </span>
           </div>
         </div>
@@ -151,7 +163,7 @@ export function DashboardSidebar() {
               const isActive = item.exact
                 ? currentPath === item.href
                 : currentPath === item.href ||
-                currentPath.startsWith(item.href + "/");
+                  currentPath.startsWith(item.href + "/");
               return (
                 <NavLink key={item.href} href={item.href} isActive={isActive}>
                   <item.icon
@@ -190,23 +202,6 @@ export function DashboardSidebar() {
               <LogOut className="h-4 w-4" />
               <span className="sr-only">Logout</span>
             </Button>
-          </div>
-        </div>
-
-        {/* Developer Branding */}
-        <div className="mt-auto border-t border-sidebar-border/50 bg-sidebar-accent/10 p-4">
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-[8px] uppercase tracking-[0.2em] text-sidebar-foreground/30 font-bold">
-              Powered By
-            </span>
-            <div className="relative h-14 w-full overflow-hidden rounded-md bg-white p-2 transition-all hover:bg-white/90 cursor-pointer flex items-center justify-center shadow-sm">
-              <Image
-                src="/Logo_WBG.png"
-                alt="GAP IT SOLUTIONS"
-                fill
-                className="object-contain"
-              />
-            </div>
           </div>
         </div>
       </div>

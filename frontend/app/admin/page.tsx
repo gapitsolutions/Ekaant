@@ -119,7 +119,7 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Overview of Help Nasha Mukti Hospital Samana operations
+            Overview of Aggarwal Psychiatric & De-Addiction Centre operations
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

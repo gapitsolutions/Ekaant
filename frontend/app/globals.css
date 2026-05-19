@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Help Nasha Mukti Hospital Brand Colors - Teal/Green/Blue theme */
+  /* Aggarwal Hospital Brand Colors - Teal/Green/Blue theme */
   --background: oklch(0.985 0.005 180);
   --foreground: oklch(0.2 0.03 200);
   --card: oklch(1 0 0);
@@ -12,7 +12,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.03 200);
   
-  /* Primary: Teal - matching brand's main color */
+  /* Primary: Teal - matching logo's main color */
   --primary: oklch(0.5 0.14 185);
   --primary-foreground: oklch(1 0 0);
   

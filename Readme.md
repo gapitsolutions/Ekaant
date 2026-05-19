@@ -443,6 +443,20 @@ You should see entries ending with:
 - `backup_postgres.sh >> /var/log/hospital_backup.log 2>&1`
 - `renew_tls_cert.sh >> /var/log/hospital_tls_renew.log 2>&1`
 
+## 10.4 Follow-up sync cron (calling workflow)
+
+Install a cron entry to keep follow-up calling tickets in sync:
+
+```bash
+(crontab -l 2>/dev/null; echo "*/30 * * * * cd /srv/hospital/app/hospital_backend && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend python manage.py sync_followups >> /var/log/hospital_followup_sync.log 2>&1") | crontab -
+```
+
+What sync command does:
+
+- creates pending tickets when `next_followup_date + 2 days` is due
+- requeues unsuccessful completed calls when `next_call_date` is due
+- marks tickets successful when patient has checked in
+
 ---
 
 ## 11) Manual Backup and Restore Operations
@@ -510,6 +524,12 @@ Run ad-hoc migration:
 docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm backend python manage.py migrate
 ```
 
+Run follow-up sync manually:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec backend python manage.py sync_followups
+```
+
 ---
 
 ## 13) Full Verification Checklist (Go-Live)
@@ -525,7 +545,8 @@ After first complete setup:
 7. Static assets load with no 404 regressions.
 8. `backup_postgres.sh` creates a file in `/srv/hospital/backups`.
 9. `crontab -l` includes backup and TLS jobs.
-10. `/var/log/hospital_backup.log` and `/var/log/hospital_tls_renew.log` are writable.
+10. follow-up sync command succeeds (`python manage.py sync_followups`).
+11. `/var/log/hospital_backup.log`, `/var/log/hospital_tls_renew.log`, and `/var/log/hospital_followup_sync.log` are writable.
 
 ---
 
@@ -715,6 +736,12 @@ Install TLS renew cron:
 
 ```bash
 ./scripts/install_tls_renew_cron.sh
+```
+
+Manual follow-up sync:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec backend python manage.py sync_followups
 ```
 
 Manual backup:

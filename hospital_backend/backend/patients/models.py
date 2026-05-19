@@ -108,6 +108,7 @@ class Patient(models.Model):
     allergies = models.TextField(blank=True)
     current_medications = models.TextField(blank=True)
     previous_treatments = models.TextField(blank=True)
+    next_followup_date = models.DateField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -124,6 +125,7 @@ class Patient(models.Model):
             models.Index(fields=["registration_number"]),
             models.Index(fields=["phone_number"]),
             models.Index(fields=["full_name"]),
+            models.Index(fields=["next_followup_date"]),
         ]
 
     def __str__(self):

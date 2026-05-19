@@ -20,6 +20,10 @@ This guide is backend-only. Frontend can remain on Vercel.
 - `.env.prod.example`
 - health endpoints: `/healthz/` and `/api/v1/health/`
 - `seed_hospital` command removed
+- follow-up calling backend:
+  - patient `next_followup_date` support
+  - `/api/v1/receptionist/follow-ups/` and complete-call API
+  - `python manage.py sync_followups` command
 
 ## 2. Persistent Storage Design
 
@@ -175,6 +179,12 @@ Custom schedule:
 CRON_SCHEDULE="15 4 * * *" ./scripts/install_tls_renew_cron.sh
 ```
 
+Follow-up sync cron example (every 30 min):
+
+```bash
+(crontab -l 2>/dev/null; echo "*/30 * * * * cd /srv/hospital/app/hospital_backend && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T backend python manage.py sync_followups >> /var/log/hospital_followup_sync.log 2>&1") | crontab -
+```
+
 ## 10. Restore From Compressed Backup
 
 ```bash
@@ -186,3 +196,4 @@ CRON_SCHEDULE="15 4 * * *" ./scripts/install_tls_renew_cron.sh
 - Media is not served as public `/media` in production debug mode; app serves protected media through authenticated API endpoints.
 - Health endpoints are intentionally unauthenticated for uptime checks.
 - `seed_hospital` command has been removed intentionally.
+- For follow-up workflow reliability, keep `sync_followups` scheduled (cron/systemd timer).

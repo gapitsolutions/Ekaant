@@ -12,13 +12,14 @@ from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 
 from core.pagination import paginate_queryset
-from core.permissions import IsReceptionOrAdmin
+from core.permissions import IsReceptionAdminOrPharmacist, IsReceptionOrAdmin
 from core.responses import success_response
 from visits.models import VisitSession
 
 from .models import Patient
 from .serializers import (
     PatientGeneralDataSerializer,
+    PatientFollowUpDateUpdateSerializer,
     PatientGeneralUpdateSerializer,
     PatientLookupSerializer,
     PatientRegistrationSerializer,
@@ -254,6 +255,33 @@ class PatientGeneralUpdateView(APIView):
                 updated_patient,
                 context={"request": request},
             ).data
+        )
+
+
+class PatientFollowUpDateUpdateView(APIView):
+    permission_classes = [IsReceptionAdminOrPharmacist]
+
+    def patch(self, request, patient_id):
+        patient = get_object_or_404(Patient, pk=patient_id)
+        serializer = PatientFollowUpDateUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if "next_followup_date" not in serializer.validated_data:
+            return success_response(
+                {
+                    "patient_id": str(patient.pk),
+                    "next_followup_date": patient.next_followup_date,
+                }
+            )
+
+        patient.next_followup_date = serializer.validated_data["next_followup_date"]
+        patient.save(update_fields=["next_followup_date", "updated_at"])
+
+        return success_response(
+            {
+                "patient_id": str(patient.pk),
+                "next_followup_date": patient.next_followup_date,
+            }
         )
 
 

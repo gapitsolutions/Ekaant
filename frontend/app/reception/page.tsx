@@ -238,6 +238,15 @@ export default function ReceptionDashboard() {
       iconBg: "bg-indigo-500/15",
       iconColor: "text-indigo-600",
     },
+    {
+      title: "Follow-Up Calls",
+      description: "Track pending, completed and successful follow-ups",
+      href: "/reception/follow-up",
+      icon: Phone,
+      gradient: "from-pink-500/20 to-pink-500/5",
+      iconBg: "bg-pink-500/15",
+      iconColor: "text-pink-600",
+    },
   ];
 
   const statCards = stats

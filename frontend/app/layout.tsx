@@ -5,9 +5,13 @@ import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Help Nasha Mukti Hospital Samana',
-  description: 'Comprehensive patient management system for Help Nasha Mukti Hospital Samana',
+  title: 'Aggarwal Psychiatric & De-Addiction Centre',
+  description: 'Comprehensive patient management system for Aggarwal Psychiatric and De-Addiction Centre',
   generator: 'v0.app',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 }
 
 export const viewport: Viewport = {

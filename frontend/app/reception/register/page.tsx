@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 // Generate registration number locally
 function generateRegistrationNumber(): string {
-  const prefix = "HNM";
+  const prefix = "AGH";
   const year = new Date().getFullYear().toString().slice(-2);
   const random = Math.floor(Math.random() * 10000)
     .toString()
