@@ -2,7 +2,7 @@ from django.urls import path
 
 from .views import (
     CheckinPatientView,
-    ReceptionCheckinHistoryDeleteView,
+    ReceptionCheckinHistoryDetailView,  # CHANGED: replaces ReceptionCheckinHistoryDeleteView (now also handles PATCH)
     ReceptionCheckinHistoryListView,
     ReceptionCheckinHistoryPhotoView,
     ReceptionCustomRangeReportView,
@@ -28,8 +28,8 @@ urlpatterns = [
     ),
     path(
         "receptionist/checkin-history/<uuid:session_id>/",
-        ReceptionCheckinHistoryDeleteView.as_view(),
-        name="receptionist-checkin-history-delete",
+        ReceptionCheckinHistoryDetailView.as_view(),  # CHANGED: now PATCH + DELETE
+        name="receptionist-checkin-history-detail",
     ),
     path(
         "receptionist/reports/daily/",

@@ -23,3 +23,11 @@ class IsReceptionAdminOrPharmacist(BasePermission):
             request.user,
             {"admin", "reception", "receptionist", "pharmacist"},
         )
+
+
+class IsPharmacistOrAdmin(BasePermission):  # NEW
+    """Restricts mutating pharmacy actions (medicine CRUD, dispense, audit removal,
+    purchase invoice, cancel) to pharmacist + admin only."""
+
+    def has_permission(self, request, view):
+        return _user_has_role(request.user, {"admin", "pharmacist"})

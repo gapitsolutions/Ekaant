@@ -43,6 +43,7 @@ class VisitSession(models.Model):
     )
     visit_date = models.DateField(default=timezone.localdate)
     visit_type = models.CharField(max_length=32, default="follow_up")
+    file_number = models.CharField(max_length=32, blank=True, default="")  # NEW: snapshot of patient.registration_number at check-in
     checkin_time = models.DateTimeField(default=timezone.now)
     completed_time = models.DateTimeField(blank=True, null=True)
     status = models.CharField(

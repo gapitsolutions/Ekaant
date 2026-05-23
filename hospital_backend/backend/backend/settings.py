@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "patients",
     "followups",
     "visits",
+    "pharmacy",  # NEW
 ]
 
 MIDDLEWARE = [
