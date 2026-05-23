@@ -28,6 +28,9 @@ function mapBackendRole(role: string): UserRole {
   if (role === "admin") return "admin";
   if (role === "reception") return "reception";
   if (role === "receptionist") return "reception";
+  if (role === "pharmacist") return "pharmacist";
+  if (role === "counsellor") return "counsellor";
+  if (role === "doctor") return "doctor";
   return "reception";
 }
 
@@ -169,4 +172,5 @@ export function hasRole(user: User | null, allowedRoles: UserRole[]): boolean {
 export const roleRoutes: Partial<Record<UserRole, string>> = {
   admin: "/admin",
   reception: "/reception",
+  pharmacist: "/pharmacy",
 };

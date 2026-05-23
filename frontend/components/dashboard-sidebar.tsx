@@ -14,6 +14,9 @@ import {
   Users,
   BarChart3,
   Phone,
+  Pill,
+  Package,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -56,7 +59,34 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
   ],
   counsellor: [],
   doctor: [],
-  pharmacist: [],
+  pharmacist: [
+    {
+      title: "Dashboard",
+      href: "/pharmacy",
+      icon: LayoutDashboard,
+      exact: true,
+    },
+    {
+      title: "Prescription Queue",
+      href: "/pharmacy/prescription-queue",
+      icon: ClipboardList,
+    },
+    {
+      title: "Inventory",
+      href: "/pharmacy/inventory",
+      icon: Package,
+    },
+    {
+      title: "Invoice History",
+      href: "/pharmacy/dispense-data",
+      icon: FileText,
+    },
+    {
+      title: "Reports",
+      href: "/pharmacy/reports",
+      icon: BarChart3,
+    },
+  ],
 };
 
 // Navigation link component that uses regular anchor tags
