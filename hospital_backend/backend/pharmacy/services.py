@@ -33,6 +33,7 @@ from .models import (
     RemovalReason,
     StockAuditRemoval,
     StockMovement,
+    Supplier,
 )
 
 logger = logging.getLogger("pharmacy")
@@ -82,9 +83,13 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
     if PurchaseInvoice.objects.filter(invoice_number=invoice_number).exists():
         raise ConflictError("Invoice number already exists.")
 
+    # The serializer already validates that the supplier exists and is
+    # active, but re-fetch here so the .save() below has a model instance.
+    supplier = Supplier.objects.get(pk=data["supplier_id"])
+
     invoice = PurchaseInvoice.objects.create(
         invoice_number=invoice_number,
-        supplier=data["supplier"],
+        supplier=supplier,
         invoice_date=data["invoice_date"],
         delivery_date=data.get("delivery_date"),
         notes=data.get("notes", ""),
@@ -382,7 +387,6 @@ def process_dispense(*, data: dict, user) -> DispenseInvoice:
 
     invoice = DispenseInvoice.objects.create(
         invoice_number=DispenseInvoice.generate_invoice_number(),
-        display_invoice_number=data.get("display_invoice_number", "") or "",
         visit_session=session,
         patient=session.patient,
         dispensed_by=user,
@@ -468,7 +472,7 @@ def process_dispense(*, data: dict, user) -> DispenseInvoice:
     logger.info(
         "DISPENSE: %s | patient=%s | amount=%s | items=%d | by=%s",
         invoice.invoice_number,
-        invoice.patient.registration_number,
+        invoice.patient.file_number,
         invoice.net_payable,
         len(line_items),
         getattr(user, "full_name", "?"),

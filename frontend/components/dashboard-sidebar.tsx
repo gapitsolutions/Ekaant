@@ -17,6 +17,7 @@ import {
   Pill,
   Package,
   FileText,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -75,6 +76,11 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
       title: "Inventory",
       href: "/pharmacy/inventory",
       icon: Package,
+    },
+    {
+      title: "Suppliers",
+      href: "/pharmacy/suppliers",
+      icon: Building2,
     },
     {
       title: "Invoice History",

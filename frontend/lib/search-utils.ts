@@ -8,7 +8,7 @@ export function searchPatients(patients: Patient[], query: string): Patient[] {
   const q = query.toLowerCase();
   return patients.filter(p =>
     p.full_name.toLowerCase().includes(q) ||
-    p.registration_number.toLowerCase().includes(q) ||
+    p.file_number.toLowerCase().includes(q) ||
     p.phone.includes(q) ||
     p.email?.toLowerCase().includes(q)
   );

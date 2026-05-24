@@ -115,7 +115,6 @@ export default function InvoiceHistoryPage() {
     if (items.length === 0) return;
     const header = [
       "Invoice #",
-      "Display Invoice",
       "Patient",
       "File No.",
       "Date",
@@ -127,9 +126,8 @@ export default function InvoiceHistoryPage() {
     ];
     const rows = items.map((it) => [
       it.invoice_number,
-      it.display_invoice_number || "",
       it.patient,
-      it.file_number || it.registration_number || "",
+      it.file_number || "",
       it.date,
       it.time,
       it.amount,
@@ -352,18 +350,13 @@ export default function InvoiceHistoryPage() {
                         <div className="font-mono text-xs">
                           {it.invoice_number}
                         </div>
-                        {it.display_invoice_number ? (
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {it.display_invoice_number}
-                          </div>
-                        ) : null}
                       </TableCell>
                       <TableCell className="font-medium">
                         {it.patient}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-mono">
-                          {it.file_number || it.registration_number || "—"}
+                          {it.file_number || "—"}
                         </Badge>
                       </TableCell>
                       <TableCell>

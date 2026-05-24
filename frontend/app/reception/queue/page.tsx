@@ -420,7 +420,7 @@ export default function ReceptionQueuePage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-mono">
-                          {visit.patient.registration_number}
+                          {visit.patient.file_number}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium">
@@ -483,7 +483,7 @@ export default function ReceptionQueuePage() {
                                         <p className="font-medium">
                                           {
                                             selectedVisit.patient
-                                              .registration_number
+                                              .file_number
                                           }
                                         </p>
                                       </div>

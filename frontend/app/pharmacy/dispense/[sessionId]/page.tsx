@@ -45,7 +45,6 @@ import {
   createDispense,
   cancelDispense,
   parseDoseToNumeric,
-  generateInvoiceNumber,
   BUP_STRENGTHS,
   type Medicine,
   type MedicineBatch,
@@ -82,7 +81,6 @@ export default function DispenseWorkstationPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [invoiceNo] = useState(() => generateInvoiceNumber());
 
   // Form state
   const [formCategory, setFormCategory] = useState<MedicineCategory>("BUP");
@@ -365,7 +363,6 @@ export default function DispenseWorkstationPage() {
     try {
       await createDispense({
         session_id: sessionId,
-        display_invoice_number: invoiceNo,
         line_items: lineItems.map((li) => ({
           medicine_id: li.medicineId,
           batch_number: li.batchNumber,
@@ -467,8 +464,7 @@ export default function DispenseWorkstationPage() {
               Dispense Medicines &amp; Bill
             </h1>
             <p className="text-muted-foreground">
-              Invoice #{" "}
-              <span className="font-mono text-primary">{invoiceNo}</span>
+              Invoice number will be assigned on save.
             </p>
           </div>
         </div>
@@ -516,9 +512,7 @@ export default function DispenseWorkstationPage() {
                       {patient?.phone_number || queueItem.patient?.phone || "—"}
                     </span>
                     <Badge variant="outline" className="font-mono">
-                      {queueItem.patient?.file_number ||
-                        queueItem.patient?.registration_number ||
-                        "—"}
+                      {queueItem.patient?.file_number || "—"}
                     </Badge>
                   </div>
                 </div>

@@ -15,11 +15,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FieldError } from "@/components/ui/field-error";
+import type { ApiFieldErrors } from "@/lib/api-client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ApiFieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
@@ -27,6 +30,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setFieldErrors({});
 
     const result = await login(email, password);
 
@@ -36,6 +40,7 @@ export default function LoginPage() {
         roleRoutes[role as keyof typeof roleRoutes] || "/reception";
     } else {
       setError(result.error || "Login failed");
+      if (result.fields) setFieldErrors(result.fields);
     }
 
     setIsLoading(false);
@@ -89,6 +94,7 @@ export default function LoginPage() {
                   className="h-11"
                   required
                 />
+                <FieldError message={fieldErrors.email?.[0]} />
               </div>
 
               <div className="space-y-2">
@@ -102,6 +108,7 @@ export default function LoginPage() {
                   className="h-11"
                   required
                 />
+                <FieldError message={fieldErrors.password?.[0]} />
               </div>
 
               {error && (

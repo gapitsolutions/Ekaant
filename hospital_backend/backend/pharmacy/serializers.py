@@ -4,6 +4,8 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
 
+from core.exceptions import ConflictError
+
 from .models import (
     BupStrength,
     DispenseInvoice,
@@ -13,7 +15,12 @@ from .models import (
     MedicineCategory,
     PaymentMethod,
     RemovalReason,
+    Supplier,
 )
+
+
+def _digits_only(value: str) -> str:
+    return "".join(ch for ch in value if ch.isdigit())
 
 
 # ────────────────────────────────────────────────────────────
@@ -117,6 +124,150 @@ class MedicineDeleteSerializer(serializers.Serializer):
 
 
 # ────────────────────────────────────────────────────────────
+# Supplier
+# ────────────────────────────────────────────────────────────
+
+
+class SupplierReadSerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    invoice_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Supplier
+        fields = (
+            "id",
+            "company_name",
+            "contact_person",
+            "mobile_number",
+            "email",
+            "full_address",
+            "gst_number",
+            "drug_license_number",
+            "categories",
+            "is_active",
+            "invoice_count",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_id(self, obj):
+        return str(obj.pk)
+
+    def get_invoice_count(self, obj):
+        # Populated by view via .annotate(_invoice_count=Count(...)) so that
+        # large supplier lists don't trigger N+1. Falls back to a fresh query
+        # for one-off reads.
+        annotated = getattr(obj, "_invoice_count", None)
+        if annotated is not None:
+            return annotated
+        return obj.purchase_invoices.count()
+
+
+class SupplierEmbeddedSerializer(serializers.Serializer):
+    """Compact supplier representation embedded in PurchaseInvoice responses.
+
+    Trades schema flexibility for one less round-trip on invoice list pages.
+    """
+
+    @classmethod
+    def from_supplier(cls, supplier: Supplier | None) -> dict | None:
+        if supplier is None:
+            return None
+        return {
+            "id": str(supplier.pk),
+            "company_name": supplier.company_name,
+            "mobile_number": supplier.mobile_number,
+        }
+
+
+class SupplierWriteSerializer(serializers.ModelSerializer):
+    """Used for both POST (create) and PATCH (partial update).
+
+    ``mobile_number`` is required at this layer even though the underlying
+    column is nullable (legacy / seeded rows may have NULL). The model-level
+    case-insensitive uniqueness is mirrored in ``validate_company_name`` so
+    we can raise the canonical ConflictError envelope rather than the raw
+    IntegrityError.
+    """
+
+    class Meta:
+        model = Supplier
+        fields = (
+            "company_name",
+            "contact_person",
+            "mobile_number",
+            "email",
+            "full_address",
+            "gst_number",
+            "drug_license_number",
+            "categories",
+            "is_active",
+        )
+        extra_kwargs = {
+            "contact_person": {"required": False, "allow_blank": True, "default": ""},
+            "email": {"required": False, "allow_null": True, "allow_blank": True},
+            "full_address": {"required": False, "allow_blank": True, "default": ""},
+            "gst_number": {"required": False, "allow_null": True, "allow_blank": True},
+            "drug_license_number": {
+                "required": False,
+                "allow_null": True,
+                "allow_blank": True,
+            },
+            "categories": {"required": False, "default": list},
+            "is_active": {"required": False, "default": True},
+        }
+
+    def validate_company_name(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Company name is required.")
+        qs = Supplier.objects.filter(company_name__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ConflictError(
+                "A supplier with this company name already exists."
+            )
+        return value
+
+    def validate_mobile_number(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Mobile number is required.")
+        digits = _digits_only(value)
+        if len(digits) < 7:
+            raise serializers.ValidationError("Mobile number looks too short.")
+        if len(digits) > 15:
+            raise serializers.ValidationError("Mobile number looks too long.")
+        return digits
+
+    def validate_email(self, value):
+        return (value or "").strip().lower() or None
+
+    def validate_gst_number(self, value):
+        return (value or "").strip().upper() or None
+
+    def validate_drug_license_number(self, value):
+        return (value or "").strip().upper() or None
+
+    def validate_categories(self, value):
+        if value is None:
+            return []
+        valid = set(MedicineCategory.values)
+        normalised: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            if item not in valid:
+                raise serializers.ValidationError(
+                    f"Unknown category '{item}'. Allowed: {sorted(valid)}."
+                )
+            if item not in seen:
+                normalised.append(item)
+                seen.add(item)
+        return normalised
+
+
+# ────────────────────────────────────────────────────────────
 # Purchase Invoice
 # ────────────────────────────────────────────────────────────
 
@@ -145,7 +296,7 @@ class PurchaseInvoiceItemWriteSerializer(serializers.Serializer):
 
 class PurchaseInvoiceCreateSerializer(serializers.Serializer):
     invoice_number = serializers.CharField(max_length=50)
-    supplier = serializers.CharField(max_length=255)
+    supplier_id = serializers.UUIDField()
     invoice_date = serializers.DateField()
     delivery_date = serializers.DateField(required=False, allow_null=True)
     invoice_photo_base64 = serializers.CharField(
@@ -161,6 +312,17 @@ class PurchaseInvoiceCreateSerializer(serializers.Serializer):
         if value > timezone.localdate():
             raise serializers.ValidationError(
                 "Invoice date cannot be in the future."
+            )
+        return value
+
+    def validate_supplier_id(self, value):
+        try:
+            supplier = Supplier.objects.get(pk=value)
+        except Supplier.DoesNotExist as exc:
+            raise serializers.ValidationError("Supplier not found.") from exc
+        if not supplier.is_active:
+            raise serializers.ValidationError(
+                "This supplier has been deactivated and cannot accept new invoices."
             )
         return value
 
@@ -228,9 +390,6 @@ class PaymentWriteSerializer(serializers.Serializer):
 
 class DispenseCreateSerializer(serializers.Serializer):
     session_id = serializers.UUIDField()
-    display_invoice_number = serializers.CharField(
-        max_length=50, required=False, allow_blank=True, default=""
-    )
     line_items = DispenseLineItemWriteSerializer(many=True, min_length=1)
     payment = PaymentWriteSerializer()
     next_followup_date = serializers.DateField(required=False, allow_null=True)
@@ -279,14 +438,10 @@ class DispenseInvoiceListItemSerializer(serializers.Serializer):
         return {
             "id": str(invoice.id),
             "invoice_number": invoice.invoice_number,
-            "display_invoice_number": invoice.display_invoice_number,
             "patient": invoice.patient.full_name if invoice.patient_id else "",
             "patient_id": str(invoice.patient_id),
             "file_number": invoice.visit_session.file_number
             if invoice.visit_session_id
-            else "",
-            "registration_number": invoice.patient.registration_number
-            if invoice.patient_id
             else "",
             "amount": invoice.net_payable,
             "date": invoice.dispense_date,

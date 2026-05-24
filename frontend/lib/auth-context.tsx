@@ -7,18 +7,28 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { registerAuthFailureHandler } from "./api-client";
+import {
+  isApiError,
+  registerAuthFailureHandler,
+  type ApiFieldErrors,
+} from "./api-client";
 import { getSession, login as apiLogin, logout as apiLogout } from "./hms-api";
 import type { User, UserRole } from "./types";
+
+export interface LoginResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+  fields?: ApiFieldErrors;
+  code?: string;
+  status?: number;
+}
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   accessToken: string | null;
-  login: (
-    email: string,
-    password: string,
-  ) => Promise<{ success: boolean; error?: string; user?: User }>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
 }
 
@@ -27,7 +37,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function mapBackendRole(role: string): UserRole {
   if (role === "admin") return "admin";
   if (role === "reception") return "reception";
-  if (role === "receptionist") return "reception";
   if (role === "pharmacist") return "pharmacist";
   if (role === "counsellor") return "counsellor";
   if (role === "doctor") return "doctor";
@@ -110,13 +119,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [isMounted]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<LoginResult> => {
     try {
       const result = await apiLogin(email, password);
       const mappedUser = mapBackendUser(result.user);
       setUser(mappedUser);
       return { success: true, user: mappedUser };
     } catch (error) {
+      if (isApiError(error)) {
+        return {
+          success: false,
+          error: error.message,
+          fields: error.fields,
+          code: error.code,
+          status: error.status,
+        };
+      }
       const message = error instanceof Error ? error.message : "Login failed";
       return { success: false, error: message };
     }

@@ -139,17 +139,23 @@ export interface PurchaseInvoiceItemPayload {
 
 export interface PurchaseInvoicePayload {
   invoice_number: string;
-  supplier: string;
+  supplier_id: string;
   invoice_date: string;
   delivery_date?: string | null;
   notes?: string;
   items: PurchaseInvoiceItemPayload[];
 }
 
+export interface PurchaseInvoiceSupplierSnapshot {
+  id: string;
+  company_name: string;
+  mobile_number?: string | null;
+}
+
 export interface PurchaseInvoiceResponse {
   id: string;
   invoice_number: string;
-  supplier: string;
+  supplier: PurchaseInvoiceSupplierSnapshot | null;
   items_loaded: number;
   total_amount: string;
 }
@@ -239,7 +245,6 @@ export interface PharmacyQueueItem {
   outstanding_debt: string | number;
   patient: {
     file_number?: string | null;
-    registration_number?: string | null;
     phone?: string | null;
     date_of_birth?: string | null;
     sex?: "male" | "female" | "other" | null;
@@ -281,7 +286,6 @@ export interface DispensePaymentPayload {
 
 export interface DispenseCreatePayload {
   session_id: string;
-  display_invoice_number: string;
   line_items: DispenseLineItemPayload[];
   payment: DispensePaymentPayload;
   next_followup_date?: string | null;
@@ -290,7 +294,6 @@ export interface DispenseCreatePayload {
 export interface DispenseCreateResponse {
   id: string;
   invoice_number: string;
-  display_invoice_number: string;
   session_id: string;
   patient_id: string;
   patient_name: string;
@@ -344,11 +347,9 @@ export async function cancelDispense(
 export interface DispenseHistoryItem {
   id: string;
   invoice_number: string;
-  display_invoice_number?: string | null;
   patient: string;
   patient_id: string;
   file_number?: string | null;
-  registration_number?: string | null;
   amount: string;
   date: string;
   time: string;
@@ -518,19 +519,99 @@ export async function getExpiryReport(): Promise<ExpiryReportResponse> {
   );
 }
 
+// ── Suppliers ──
+export type SupplierCategory = MedicineCategory;
+
+export interface Supplier {
+  id: string;
+  company_name: string;
+  contact_person: string;
+  mobile_number: string | null;
+  email: string | null;
+  full_address: string;
+  gst_number: string | null;
+  drug_license_number: string | null;
+  categories: SupplierCategory[];
+  is_active: boolean;
+  invoice_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierListResponse {
+  items: Supplier[];
+  pagination: { page: number; pageSize: number; total: number };
+}
+
+export interface SupplierListQuery {
+  q?: string;
+  is_active?: boolean;
+  category?: SupplierCategory;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function listSuppliers(
+  query: SupplierListQuery = {},
+): Promise<SupplierListResponse> {
+  const params = new URLSearchParams();
+  if (query.q) params.set("q", query.q);
+  if (query.is_active !== undefined)
+    params.set("is_active", String(query.is_active));
+  if (query.category) params.set("category", query.category);
+  if (query.page) params.set("page", String(query.page));
+  if (query.pageSize) params.set("pageSize", String(query.pageSize));
+  const qs = params.toString();
+  return apiRequest<SupplierListResponse>(
+    `/api/v1/pharmacy/suppliers/${qs ? `?${qs}` : ""}`,
+    {},
+  );
+}
+
+export interface SupplierWritePayload {
+  company_name: string;
+  mobile_number: string;
+  contact_person?: string;
+  email?: string | null;
+  full_address?: string;
+  gst_number?: string | null;
+  drug_license_number?: string | null;
+  categories?: SupplierCategory[];
+  is_active?: boolean;
+}
+
+export async function createSupplier(
+  payload: SupplierWritePayload,
+): Promise<Supplier> {
+  return apiRequest<Supplier>("/api/v1/pharmacy/suppliers/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateSupplier(
+  supplierId: string,
+  payload: Partial<SupplierWritePayload>,
+): Promise<Supplier> {
+  return apiRequest<Supplier>(`/api/v1/pharmacy/suppliers/${supplierId}/`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function deactivateSupplier(
+  supplierId: string,
+): Promise<{ deactivated: boolean; supplier_id: string; is_active: boolean }> {
+  return apiRequest(`/api/v1/pharmacy/suppliers/${supplierId}/`, {
+    method: "DELETE",
+  });
+}
+
+export async function getSupplier(supplierId: string): Promise<Supplier> {
+  return apiRequest<Supplier>(`/api/v1/pharmacy/suppliers/${supplierId}/`, {});
+}
+
 // ── Utilities ──
-export const SUPPLIER_COMPANIES = [
-  "Abbott Healthcare Ltd",
-  "Cipla Ltd",
-  "Sun Pharmaceutical Industries Ltd",
-  "Zydus Lifesciences Ltd",
-  "Lupin Ltd",
-  "Pfizer Ltd",
-  "GlaxoSmithKline Pharmaceuticals",
-  "Alkem Laboratories Ltd",
-  "Sanofi India Ltd",
-  "Quantumcure Lifesciences Wholesale",
-];
 
 export const BUP_STRENGTHS: BupStrength[] = [
   "0.4mg + 0.1mg",
@@ -547,9 +628,3 @@ export function parseDoseToNumeric(dose: string): number {
     .reduce((sum, n) => sum + n, 0);
 }
 
-export function generateInvoiceNumber(): string {
-  const now = new Date();
-  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  const rand = Math.floor(Math.random() * 9000 + 1000);
-  return `INV-${ymd}-${rand}`;
-}

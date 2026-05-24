@@ -46,9 +46,9 @@ Behavior:
 
 ### 2.3 Permission Model
 
-- `IsReceptionOrAdmin`: allows roles `admin`, `reception`, `receptionist`
+- `IsReceptionOrAdmin`: allows roles `admin`, `reception`
 - `IsAdminRole`: allows role `admin` only
-- `IsReceptionAdminOrPharmacist`: allows roles `admin`, `reception`, `receptionist`, `pharmacist`
+- `IsReceptionAdminOrPharmacist`: allows roles `admin`, `reception`, `pharmacist`
 - `IsPharmacistOrAdmin`: allows roles `admin`, `pharmacist`
 
 Pharmacy mutating endpoints (medicine CRUD, purchase invoice, audit removal, dispense, cancel, revenue/consumption reports) use `IsPharmacistOrAdmin`. Read-heavy pharmacy endpoints (queue, inventory list, low-stock/expiry, dispense history, product dispense history, inventory stats) use `IsReceptionAdminOrPharmacist`.
@@ -149,7 +149,7 @@ Working flow:
 Response data:
 
 - `expires_in` (access token lifetime in seconds)
-- `user` (`id`, `full_name`, `email`, `role`, `hospital_id`)
+- `user` (`id`, `full_name`, `email`, `role`)
 
 Errors:
 
@@ -211,7 +211,7 @@ Permission: `IsReceptionOrAdmin`
 Request body (core required fields):
 
 - `patient_category`
-- `file_number` (optional; auto-generated if missing)
+- `file_number` (required; user-supplied; format `^[A-Za-z0-9-]+$`, max 32 chars)
 - `full_name`
 - `phone_number`
 - `date_of_birth`
@@ -231,11 +231,20 @@ Working flow:
    - photo fields must be provided together
    - allowed photo MIME only: `image/jpeg`, `image/png`
    - max photo size: 2 MB after decode
+   - `file_number` is required, must match `^[A-Za-z0-9-]+$`, and must be unique
 2. Create patient record, set `fingerprint_enrolled_at`
 3. Save decoded photo to `ImageField` when present
 4. Serialize result using `PatientLookupSerializer`
 5. Add `fingerprint_reenrollment_required=false` flag
 6. Return 201 success
+
+Errors:
+
+- 400 validation errors
+- 409 file_number collision — error envelope includes `last_file_number` (the
+  most recently created patient's file_number) so the front-end can suggest
+  the next available value:
+  `{"success": false, "error": {"message": "This file number already exists.", "last_file_number": "A47"}}`
 
 ### 5.2 `GET /api/v1/patients/lookup/`
 
@@ -244,10 +253,10 @@ Permission: `IsReceptionOrAdmin`
 
 Query params:
 
-- `registration_number` (exact match path)
+- `file_number` (exact match path)
 - `q` (broad search path)
 
-Searches by registration_number, full_name, phone_number, aadhaar_number (digit-aware icontains).
+Searches by file_number, full_name, phone_number, aadhaar_number (digit-aware icontains).
 
 ### 5.3 `GET /api/v1/patients/<patient_id>/fingerprint-template/`
 
@@ -285,7 +294,7 @@ Serializer: `PatientSummarySerializer`
 
 Lightweight paginated list for patient cards/listing UI.
 
-Summary item fields: `patient_id`, `registration_number`, `hdams_id`, `full_name`, `phone_number`, `date_of_birth`, `sex`, `status`, `photo_url`.
+Summary item fields: `patient_id`, `file_number`, `hdams_id`, `full_name`, `phone_number`, `date_of_birth`, `sex`, `status`, `photo_url`.
 
 ### 5.7 `GET /api/v1/patients/<patient_id>/`
 
@@ -372,7 +381,7 @@ Request body:
   - `status = in_progress`
   - `current_stage = pharmacy`
   - `completed_time = null`
-  - `file_number = patient.registration_number` (denormalized snapshot)
+  - `file_number = patient.file_number` (denormalized snapshot)
 
 Detailed flow:
 
@@ -449,7 +458,7 @@ Each item contains:
 - `status`
 - `current_stage`
 - `outstanding_debt`
-- `patient` (`file_number`, `registration_number`)
+- `patient` (`file_number`)
 
 ### 6.4 `GET /api/v1/receptionist/reports/daily/`
 
@@ -464,7 +473,7 @@ Response:
 - `total_checkins`
 - `active_checkins`
 - `completed_checkins`
-- `items[]` (with patient snapshot: `registration_number`, `full_name`, `date_of_birth`, `gender`, `phone`, `patient_category`)
+- `items[]` (with patient snapshot: `file_number`, `full_name`, `date_of_birth`, `gender`, `phone`, `patient_category`)
 
 ### 6.5 `GET /api/v1/receptionist/reports/monthly/`
 
@@ -512,7 +521,7 @@ Response item fields:
 - `checked_in_by_name`, `outstanding_debt_at_checkin`
 - `verification_method`, `verification_photo_captured_at`
 - `verification_photo_available`, `verification_photo_url`
-- `patient` snapshot (registration_number, full_name, date_of_birth, gender, phone, patient_category, address_line1, relative_phone, blood_group, addiction_type, addiction_duration)
+- `patient` snapshot (file_number, full_name, date_of_birth, gender, phone, patient_category, address_line1, relative_phone, blood_group, addiction_type, addiction_duration)
 
 Plus `pagination: {page, pageSize, total}`.
 
@@ -747,7 +756,7 @@ Request body:
 ```json
 {
   "invoice_number": "SUP-2026-0042",
-  "supplier": "Abbott Healthcare Ltd",
+  "supplier_id": "supplier-uuid",
   "invoice_date": "2026-05-20",
   "delivery_date": "2026-05-22",
   "notes": "",
@@ -769,6 +778,7 @@ Request body:
 Validation:
 
 - `invoice_number` globally unique
+- `supplier_id` references an existing, active Supplier (see §7.20)
 - `invoice_date` not in the future
 - `delivery_date ≥ invoice_date` if provided
 - ≥ 1 item; each item references an active medicine; `expiry_date` in the future; `quantity > 0`; `0 ≤ gst_percentage ≤ 100`
@@ -791,14 +801,18 @@ Response (201):
   "data": {
     "id": "uuid",
     "invoice_number": "SUP-2026-0042",
-    "supplier": "Abbott Healthcare Ltd",
+    "supplier": {
+      "id": "supplier-uuid",
+      "company_name": "Abbott Healthcare Ltd",
+      "mobile_number": "9876543210"
+    },
     "items_loaded": 1,
     "total_amount": "179200.00"
   }
 }
 ```
 
-Errors: 400 validation, 409 duplicate invoice number, 404 medicine not found.
+Errors: 400 validation, 404 supplier or medicine not found, 409 duplicate invoice number.
 
 ### 7.10 `POST /api/v1/pharmacy/inventory/audit-removal/`
 
@@ -895,7 +909,6 @@ Response item shape:
   "outstanding_debt": "0.00",
   "patient": {
     "file_number": "AGH260523123",
-    "registration_number": "AGH260523123",
     "phone": "9876543210",
     "date_of_birth": "1990-04-12",
     "sex": "male"
@@ -918,7 +931,6 @@ Request body:
 ```json
 {
   "session_id": "uuid",
-  "display_invoice_number": "INV-234567",
   "line_items": [
     {
       "medicine_id": "uuid",
@@ -977,7 +989,6 @@ Response (201):
   "data": {
     "id": "uuid",
     "invoice_number": "INV-20260523-0001",
-    "display_invoice_number": "INV-234567",
     "session_id": "uuid",
     "patient_id": "uuid",
     "patient_name": "Rahul Sharma",
@@ -1055,7 +1066,7 @@ Permission: `IsReceptionAdminOrPharmacist`
 
 Query params:
 
-- `q` (optional): search by patient name, registration number, invoice number, or display invoice number
+- `q` (optional): search by patient name, file number, or invoice number
 - `page` (default 1), `pageSize` (default 50, max 200)
 - `start_date`, `end_date` (optional, YYYY-MM-DD): dispense_date range
 - `status` (optional): `success` or `cancelled`
@@ -1067,11 +1078,9 @@ Response item shape:
 {
   "id": "uuid",
   "invoice_number": "INV-20260523-0001",
-  "display_invoice_number": "INV-234567",
   "patient": "Rahul Sharma",
   "patient_id": "uuid",
   "file_number": "AGH260523123",
-  "registration_number": "AGH260523123",
   "amount": "7980.00",
   "date": "2026-05-23",
   "time": "10:30 AM",
@@ -1228,6 +1237,59 @@ Response:
 }
 ```
 
+### 7.20 Suppliers
+
+The pharmacy module owns a first-class `Supplier` entity. Every
+`PurchaseInvoice.supplier` is a FK to a Supplier row (`on_delete=PROTECT`).
+Soft-delete is supported via `is_active=False`; suppliers with invoices
+cannot be hard-deleted.
+
+Fields:
+
+- `id` (UUID), `company_name` (case-insensitive unique),
+- `contact_person`, `mobile_number`, `email`, `full_address`,
+- `gst_number`, `drug_license_number`,
+- `categories` (PostgreSQL array of `MedicineCategory` values: `BUP`, `Rx`, `NRx`),
+- `is_active`, `invoice_count` (annotated), `created_at`, `updated_at`.
+
+Validation (on create/update):
+
+- `company_name` required, trimmed, case-insensitively unique → 409 on collision.
+- `mobile_number` required at the API layer (column is nullable to accommodate
+  legacy / seeded rows that pre-date this entity). 7–15 digits after stripping.
+- `email` lowercased; blank → `null`.
+- `gst_number` / `drug_license_number` uppercased; blank → `null`.
+- `categories` deduplicated; values restricted to `MedicineCategory`.
+
+#### `GET /api/v1/pharmacy/suppliers/`
+
+Permission: `IsReceptionAdminOrPharmacist` (broadly readable so any picker can populate).
+
+Query params: `q` (search company / contact / GST / drug license / mobile),
+`is_active` (`true`/`false`), `category` (one of `BUP`, `Rx`, `NRx`),
+`page` (default 1), `pageSize` (default 50, max 200).
+
+Response: `{ items: Supplier[], pagination: { page, pageSize, total } }`.
+
+#### `POST /api/v1/pharmacy/suppliers/`
+
+Permission: `IsPharmacistOrAdmin`. Returns the created Supplier (201).
+
+#### `GET /api/v1/pharmacy/suppliers/<supplier_id>/`
+
+Permission: `IsReceptionAdminOrPharmacist`. Returns the Supplier.
+
+#### `PATCH /api/v1/pharmacy/suppliers/<supplier_id>/`
+
+Permission: `IsPharmacistOrAdmin`. Partial update.
+
+#### `DELETE /api/v1/pharmacy/suppliers/<supplier_id>/`
+
+Permission: `IsPharmacistOrAdmin`. **Soft-delete only** — sets `is_active=False`.
+Returns `{ deactivated: true, supplier_id, is_active: false }`.
+
+To reactivate, send `PATCH` with `{ "is_active": true }`.
+
 ---
 
 ## 8. Follow-Ups API Blueprint
@@ -1279,17 +1341,17 @@ Behavior:
 
 ### 9.1 `accounts.User`
 
-Key fields: `email` (unique, login ID), `username` (auto-filled from email if blank), `full_name`, `role`, `hospital_id`.
+Key fields: `email` (unique, login ID), `username` (auto-filled from email if blank), `full_name`, `role`.
 
-`UserRole`: `admin`, `reception`, `receptionist`, `counsellor`, `doctor`, `pharmacist`.
+`UserRole`: `admin`, `reception`, `counsellor`, `doctor`, `pharmacist`.
 
 ### 9.2 `patients.Patient`
 
-Key identity and workflow fields: `registration_number` (unique), `hdams_id` (nullable unique), `patient_category`, `full_name`, `date_of_birth`, `sex`, `phone_number`, `aadhaar_number` (nullable conditional unique), `photo`, `fingerprint_template` + `fingerprint_enrolled_at`, `status`, `outstanding_debt`, `next_followup_date`.
+Key identity and workflow fields: `file_number` (unique, user-supplied, format `^[A-Za-z0-9-]+$`), `hdams_id` (nullable unique), `patient_category`, `full_name`, `date_of_birth`, `sex`, `phone_number`, `aadhaar_number` (nullable conditional unique), `photo`, `fingerprint_template` + `fingerprint_enrolled_at`, `status`, `outstanding_debt`, `next_followup_date`.
 
 High-dimensional clinical/social profile fields are also part of this model.
 
-Methods/properties: `general_data_complete` property, `generate_registration_number` classmethod.
+Methods/properties: `general_data_complete` property, `latest_file_number` classmethod (returns the most recent patient's `file_number` for 409 collision hints).
 
 ### 9.3 `visits.VisitSession`
 
@@ -1300,7 +1362,7 @@ Key fields:
 - `checked_in_by` FK
 - `visit_date`
 - `visit_type`
-- `file_number` — denormalized snapshot of `patient.registration_number` set at check-in
+- `file_number` — denormalized snapshot of `patient.file_number` set at check-in
 - `checkin_time`, `completed_time`
 - `status`
 - `current_stage`
@@ -1340,6 +1402,7 @@ See §7 for full model definitions. Summary of relationships:
 | `MedicineBatch` | `DispenseInvoiceItem` | 1-to-Many | `batch_id` | — |
 | `MedicineBatch` | `StockAuditRemoval` | 1-to-Many | `batch_id` | — |
 | `MedicineBatch` | `StockMovement` | 1-to-Many | `batch_id` | — |
+| `Supplier` | `PurchaseInvoice` | 1-to-Many | `supplier_id` | PROTECT — soft-delete via `is_active` |
 | `PurchaseInvoice` | `PurchaseInvoiceItem` | 1-to-Many | `purchase_invoice_id` | CASCADE delete |
 | `DispenseInvoice` | `DispenseInvoiceItem` | 1-to-Many | `dispense_invoice_id` | CASCADE delete |
 | `VisitSession` | `DispenseInvoice` | **OneToOne** | `visit_session_id` | Unique |
@@ -1425,6 +1488,11 @@ Stock movement type reference:
 
 **Pharmacy:**
 
+- `GET    /api/v1/pharmacy/suppliers/`
+- `POST   /api/v1/pharmacy/suppliers/`
+- `GET    /api/v1/pharmacy/suppliers/<supplier_id>/`
+- `PATCH  /api/v1/pharmacy/suppliers/<supplier_id>/`
+- `DELETE /api/v1/pharmacy/suppliers/<supplier_id>/` (soft-delete)
 - `GET    /api/v1/pharmacy/inventory/medicines/`
 - `POST   /api/v1/pharmacy/inventory/medicines/`
 - `GET    /api/v1/pharmacy/inventory/medicines/<id>/`

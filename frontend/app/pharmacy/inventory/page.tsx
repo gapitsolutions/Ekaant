@@ -52,18 +52,23 @@ import {
   FileWarning,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
+import { FieldError } from "@/components/ui/field-error";
+import { toastApiError, useApiErrors } from "@/lib/api-errors";
 import {
   getInventoryMedicines,
   addInventoryMedicine,
   deleteInventoryMedicine,
   submitPurchaseInvoice,
   auditStockRemoval,
+  listSuppliers,
+  createSupplier,
   BUP_STRENGTHS,
-  SUPPLIER_COMPANIES,
   type Medicine,
   type MedicineCategory,
   type BupStrength,
   type RemovalReason,
+  type Supplier,
+  type SupplierCategory,
 } from "@/lib/pharmacy-api";
 
 type TabValue = "list" | "invoice" | "audit";
@@ -79,6 +84,15 @@ export default function InventoryWorkstationPage() {
   const [bupFilter, setBupFilter] = useState<BupStrength | "all">("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Medicine | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  const loadSuppliers = useCallback(() => {
+    return listSuppliers({ is_active: true, pageSize: 200 })
+      .then((data) => setSuppliers(data.items || []))
+      .catch(() => {
+        /* non-fatal — the dropdown shows an empty state */
+      });
+  }, []);
 
   const loadMedicines = useCallback(() => {
     setIsLoading(true);
@@ -97,7 +111,8 @@ export default function InventoryWorkstationPage() {
 
   useEffect(() => {
     loadMedicines();
-  }, [loadMedicines]);
+    loadSuppliers();
+  }, [loadMedicines, loadSuppliers]);
 
   const filteredMedicines = useMemo(() => {
     let list = medicines;
@@ -518,6 +533,8 @@ export default function InventoryWorkstationPage() {
         <TabsContent value="invoice" className="mt-4">
           <PurchaseInvoiceForm
             medicines={medicines}
+            suppliers={suppliers}
+            onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
             onSuccess={() => {
               loadMedicines();
               setTab("list");
@@ -912,13 +929,18 @@ interface InvoiceItemDraft {
 
 function PurchaseInvoiceForm({
   medicines,
+  suppliers,
+  onSupplierCreated,
   onSuccess,
 }: {
   medicines: Medicine[];
+  suppliers: Supplier[];
+  onSupplierCreated: (s: Supplier) => void;
   onSuccess: () => void;
 }) {
   const [invoiceNo, setInvoiceNo] = useState("");
-  const [supplier, setSupplier] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -929,6 +951,7 @@ function PurchaseInvoiceForm({
   const [selectDialogOpen, setSelectDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiErrors = useApiErrors();
 
   const handleConfirmSelection = () => {
     const newDrafts: InvoiceItemDraft[] = selectedIds
@@ -988,7 +1011,7 @@ function PurchaseInvoiceForm({
       toast.error("Invoice number is required");
       return;
     }
-    if (!supplier) {
+    if (!supplierId) {
       toast.error("Supplier is required");
       return;
     }
@@ -1007,11 +1030,12 @@ function PurchaseInvoiceForm({
       }
     }
 
+    apiErrors.clear();
     setIsSubmitting(true);
     try {
       await submitPurchaseInvoice({
         invoice_number: invoiceNo.trim(),
-        supplier,
+        supplier_id: supplierId,
         invoice_date: invoiceDate,
         delivery_date: deliveryDate || null,
         items: items.map((i) => ({
@@ -1027,13 +1051,12 @@ function PurchaseInvoiceForm({
       });
       toast.success("Purchase invoice submitted successfully");
       setInvoiceNo("");
-      setSupplier("");
+      setSupplierId("");
       setItems([]);
       onSuccess();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to submit invoice",
-      );
+      apiErrors.setFromError(error);
+      toastApiError(error, "Failed to submit invoice");
     } finally {
       setIsSubmitting(false);
     }
@@ -1056,23 +1079,54 @@ function PurchaseInvoiceForm({
               placeholder="SUP-2026-0042"
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("invoice_number")} />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">
               Supplier Company
             </Label>
-            <Select value={supplier} onValueChange={setSupplier}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPLIER_COMPANIES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2 mt-1">
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.length === 0 ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      No active suppliers yet.
+                    </div>
+                  ) : (
+                    suppliers
+                      .filter((s) => s.is_active)
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.company_name}
+                          {!s.mobile_number ? " (needs mobile)" : ""}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setSupplierDialogOpen(true)}
+                title="Add new supplier"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <SupplierCreateDialog
+              open={supplierDialogOpen}
+              onOpenChange={setSupplierDialogOpen}
+              onCreated={(s) => {
+                onSupplierCreated(s);
+                setSupplierId(s.id);
+                setSupplierDialogOpen(false);
+              }}
+            />
+            <FieldError message={apiErrors.get("supplier_id")} />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">
@@ -1084,6 +1138,7 @@ function PurchaseInvoiceForm({
               onChange={(e) => setInvoiceDate(e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("invoice_date")} />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">
@@ -1095,6 +1150,7 @@ function PurchaseInvoiceForm({
               onChange={(e) => setDeliveryDate(e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("delivery_date")} />
           </div>
         </div>
 
@@ -1345,6 +1401,7 @@ function AuditRemovalView({
   const [reason, setReason] = useState<RemovalReason>("destroyed");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiErrors = useApiErrors();
 
   const selectedMed = medicines.find((m) => m.id === selectedMedId) || null;
   const batches = selectedMed?.batches || [];
@@ -1355,6 +1412,7 @@ function AuditRemovalView({
       toast.error("Select a medicine and batch");
       return;
     }
+    apiErrors.clear();
     setIsSubmitting(true);
     try {
       await auditStockRemoval({
@@ -1371,9 +1429,8 @@ function AuditRemovalView({
       setNotes("");
       onSuccess();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to remove stock",
-      );
+      apiErrors.setFromError(error);
+      toastApiError(error, "Failed to remove stock");
     } finally {
       setIsSubmitting(false);
     }
@@ -1408,6 +1465,7 @@ function AuditRemovalView({
                 ))}
               </SelectContent>
             </Select>
+            <FieldError message={apiErrors.get("medicine_id")} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1437,6 +1495,7 @@ function AuditRemovalView({
                   )}
                 </SelectContent>
               </Select>
+              <FieldError message={apiErrors.get("batch_number")} />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">
@@ -1563,5 +1622,205 @@ function AuditRemovalView({
         </Card>
       </div>
     </div>
+  );
+}
+
+
+const SUPPLIER_CATEGORY_OPTIONS: SupplierCategory[] = ["BUP", "Rx", "NRx"];
+
+
+function SupplierCreateDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (supplier: Supplier) => void;
+}) {
+  const [companyName, setCompanyName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
+  const [email, setEmail] = useState("");
+  const [fullAddress, setFullAddress] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [drugLicenseNumber, setDrugLicenseNumber] = useState("");
+  const [categories, setCategories] = useState<SupplierCategory[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiErrors = useApiErrors();
+
+  const reset = () => {
+    apiErrors.clear();
+    setCompanyName("");
+    setMobileNumber("");
+    setContactPerson("");
+    setEmail("");
+    setFullAddress("");
+    setGstNumber("");
+    setDrugLicenseNumber("");
+    setCategories([]);
+  };
+
+  const toggleCategory = (cat: SupplierCategory) => {
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!companyName.trim()) {
+      toast.error("Company name is required");
+      return;
+    }
+    if (!mobileNumber.trim()) {
+      toast.error("Mobile number is required");
+      return;
+    }
+    apiErrors.clear();
+    setIsSubmitting(true);
+    try {
+      const created = await createSupplier({
+        company_name: companyName.trim(),
+        mobile_number: mobileNumber.trim(),
+        contact_person: contactPerson.trim(),
+        email: email.trim() || null,
+        full_address: fullAddress.trim(),
+        gst_number: gstNumber.trim() || null,
+        drug_license_number: drugLicenseNumber.trim() || null,
+        categories,
+      });
+      toast.success(`Supplier "${created.company_name}" added.`);
+      reset();
+      onCreated(created);
+    } catch (error) {
+      apiErrors.setFromError(error);
+      toastApiError(error, "Failed to add supplier");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) reset();
+        onOpenChange(o);
+      }}
+    >
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add Supplier</DialogTitle>
+          <DialogDescription>
+            New suppliers become immediately available in the picker.
+            Required: company name & mobile number.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label>Company name *</Label>
+            <Input
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="e.g. Abbott Healthcare Ltd"
+              className="mt-1"
+            />
+            <FieldError message={apiErrors.get("company_name")} />
+          </div>
+          <div>
+            <Label>Mobile number *</Label>
+            <Input
+              value={mobileNumber}
+              onChange={(e) => setMobileNumber(e.target.value)}
+              placeholder="10-digit mobile"
+              className="mt-1"
+            />
+            <FieldError message={apiErrors.get("mobile_number")} />
+          </div>
+          <div>
+            <Label>Contact person</Label>
+            <Input
+              value={contactPerson}
+              onChange={(e) => setContactPerson(e.target.value)}
+              className="mt-1"
+            />
+            <FieldError message={apiErrors.get("contact_person")} />
+          </div>
+          <div>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1"
+            />
+            <FieldError message={apiErrors.get("email")} />
+          </div>
+          <div>
+            <Label>GST number</Label>
+            <Input
+              value={gstNumber}
+              onChange={(e) => setGstNumber(e.target.value)}
+              className="mt-1"
+            />
+            <FieldError message={apiErrors.get("gst_number")} />
+          </div>
+          <div>
+            <Label>Drug license number</Label>
+            <Input
+              value={drugLicenseNumber}
+              onChange={(e) => setDrugLicenseNumber(e.target.value)}
+              className="mt-1"
+            />
+            <FieldError message={apiErrors.get("drug_license_number")} />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Full address</Label>
+            <Textarea
+              value={fullAddress}
+              onChange={(e) => setFullAddress(e.target.value)}
+              className="mt-1"
+              rows={2}
+            />
+            <FieldError message={apiErrors.get("full_address")} />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Categories supplied</Label>
+            <div className="flex gap-3 mt-2">
+              {SUPPLIER_CATEGORY_OPTIONS.map((cat) => (
+                <label
+                  key={cat}
+                  className="flex items-center gap-2 text-sm cursor-pointer"
+                >
+                  <Checkbox
+                    checked={categories.includes(cat)}
+                    onCheckedChange={() => toggleCategory(cat)}
+                  />
+                  {cat}
+                </label>
+              ))}
+            </div>
+            <FieldError message={apiErrors.get("categories")} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4 mr-2" />
+            )}
+            Add supplier
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

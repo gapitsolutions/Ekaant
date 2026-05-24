@@ -319,7 +319,7 @@ export default function PharmacyDashboard() {
                       <div>
                         <p className="font-medium">{item.patient_name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {item.patient?.file_number || item.patient?.registration_number || "—"}
+                          {item.patient?.file_number || "—"}
                           {" · "}
                           Checked in at {formatTime(item.checked_in_at)}
                         </p>

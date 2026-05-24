@@ -143,7 +143,7 @@ class CheckinHistoryQuerySerializer(serializers.Serializer):
 
 def _report_patient_payload(patient: Patient):
     return {
-        "registration_number": patient.registration_number,
+        "file_number": patient.file_number,
         "full_name": patient.full_name,
         "date_of_birth": patient.date_of_birth,
         "gender": patient.sex,
@@ -157,15 +157,14 @@ def _queue_item_payload(session: VisitSession):
         "session_id": str(session.pk),
         "patient_id": str(session.patient_id),
         "patient_name": session.patient.full_name,
-        "file_number": session.file_number,  # NEW
+        "file_number": session.file_number,
         "checked_in_at": session.checkin_time,
         "checked_in_by_name": session.checked_in_by.full_name,
         "status": session.status,
         "current_stage": session.current_stage,
         "outstanding_debt": session.outstanding_debt_at_checkin,
         "patient": {
-            "file_number": session.file_number,  # NEW (matches pharmacy queue contract in blueprint §5.6)
-            "registration_number": session.patient.registration_number,
+            "file_number": session.patient.file_number,
         },
     }
 
@@ -290,7 +289,7 @@ def _checkin_history_session_payload(session: VisitSession, request):
         "verification_photo_available": bool(session.verification_photo),
         "verification_photo_url": verification_photo_url,
         "patient": {
-            "registration_number": session.patient.registration_number,
+            "file_number": session.patient.file_number,
             "full_name": session.patient.full_name,
             "date_of_birth": session.patient.date_of_birth,
             "gender": session.patient.sex,
@@ -340,7 +339,7 @@ class CheckinPatientView(APIView):
             patient=patient,
             checked_in_by=request.user,
             visit_type="first_visit" if prior_visits == 0 else "follow_up",
-            file_number=patient.registration_number,  # NEW: denormalized snapshot at check-in
+            file_number=patient.file_number,  # denormalized snapshot of patient.file_number at check-in
             outstanding_debt_at_checkin=patient.outstanding_debt,
             status=VisitStatus.IN_PROGRESS,  # CHANGED: was COMPLETED — visit now enters pipeline
             current_stage=VisitStage.PHARMACY,  # CHANGED: was COMPLETED — routed to pharmacy queue
@@ -478,7 +477,7 @@ class ReceptionCheckinHistoryListView(APIView):
         if query:
             queryset = queryset.filter(
                 Q(visit_uid__icontains=query)
-                | Q(patient__registration_number__icontains=query)
+                | Q(patient__file_number__icontains=query)
                 | Q(patient__full_name__icontains=query)
                 | Q(patient__phone_number__icontains=query)
             )

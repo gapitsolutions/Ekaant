@@ -9,7 +9,7 @@ def _user_has_role(user, allowed_roles: set[str]) -> bool:
 
 class IsReceptionOrAdmin(BasePermission):
     def has_permission(self, request, view):
-        return _user_has_role(request.user, {"admin", "reception", "receptionist"})
+        return _user_has_role(request.user, {"admin", "reception"})
 
 
 class IsAdminRole(BasePermission):
@@ -21,7 +21,7 @@ class IsReceptionAdminOrPharmacist(BasePermission):
     def has_permission(self, request, view):
         return _user_has_role(
             request.user,
-            {"admin", "reception", "receptionist", "pharmacist"},
+            {"admin", "reception", "pharmacist"},
         )
 
 

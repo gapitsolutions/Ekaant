@@ -62,7 +62,7 @@ interface StatData {
 }
 
 interface DashboardVisitItem extends QueueItem {
-  registration_number?: string;
+  file_number?: string;
   date_of_birth?: string;
   gender?: "male" | "female" | "other";
   phone?: string;
@@ -101,7 +101,7 @@ export default function ReceptionDashboard() {
               status: item.status || "completed",
               current_stage: item.current_stage || "completed",
               outstanding_debt: 0,
-              registration_number: item.patient?.registration_number || "",
+              file_number: item.patient?.file_number || "",
               date_of_birth: item.patient?.date_of_birth || "",
               gender: (item.patient?.gender || "other") as
                 | "male"
@@ -164,7 +164,7 @@ export default function ReceptionDashboard() {
       patient: {
         id: q.patient_id,
         full_name: q.patient_name,
-        registration_number: q.registration_number || "",
+        file_number: q.file_number || "",
         phone: q.phone || "",
         date_of_birth: q.date_of_birth || "",
         gender: (q.gender || "male") as "male" | "female" | "other",
@@ -532,7 +532,7 @@ export default function ReceptionDashboard() {
                     {selectedStat?.patients.map(({ patient, visit }) => (
                       <TableRow key={patient.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium text-primary">
-                          {patient.registration_number}
+                          {patient.file_number}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -642,7 +642,7 @@ export default function ReceptionDashboard() {
                       {selectedPatient.full_name}
                     </h3>
                     <p className="text-primary font-medium">
-                      {selectedPatient.registration_number}
+                      {selectedPatient.file_number}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {calculateAge(selectedPatient.date_of_birth)} years,{" "}

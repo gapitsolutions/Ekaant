@@ -3,6 +3,18 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Suppliers
+    path(
+        "pharmacy/suppliers/",
+        views.SupplierListCreateView.as_view(),
+        name="pharmacy-supplier-list-create",
+    ),
+    path(
+        "pharmacy/suppliers/<uuid:supplier_id>/",
+        views.SupplierDetailView.as_view(),
+        name="pharmacy-supplier-detail",
+    ),
+
     # Medicine CRUD
     path(
         "pharmacy/inventory/medicines/",

@@ -19,12 +19,65 @@ export interface ApiRequestOptions {
   suppressAuthRedirect?: boolean;
 }
 
+// Per-field validation errors keyed by the backend's flattened DRF path
+// (e.g. ``email`` or ``items.0.quantity``). Each value is the ordered list
+// of messages the backend produced for that field.
+export type ApiFieldErrors = Record<string, string[]>;
+
+interface ApiErrorBody {
+  message?: string;
+  fields?: ApiFieldErrors;
+  code?: string;
+  // Extras like ``last_file_number`` flow through here.
+  [key: string]: unknown;
+}
+
 interface ApiEnvelope<T> {
   success?: boolean;
   data?: T;
-  error?: {
-    message?: string;
-  };
+  error?: ApiErrorBody;
+}
+
+/** Strongly-typed error thrown for every non-success API response.
+ *
+ * Existing call sites that only read ``.message`` continue to work — this
+ * class extends ``Error``. Forms that want per-input error rendering can
+ * use ``error.fields`` (see ``useApiErrors`` in ``./api-errors``).
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly fields?: ApiFieldErrors;
+  readonly code?: string;
+  readonly payload?: ApiErrorBody;
+
+  constructor(
+    message: string,
+    options: {
+      status: number;
+      fields?: ApiFieldErrors;
+      code?: string;
+      payload?: ApiErrorBody;
+    },
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = options.status;
+    this.fields = options.fields;
+    this.code = options.code;
+    this.payload = options.payload;
+  }
+
+  hasFieldErrors(): boolean {
+    return !!this.fields && Object.keys(this.fields).length > 0;
+  }
+
+  fieldError(field: string): string | undefined {
+    return this.fields?.[field]?.[0];
+  }
+}
+
+export function isApiError(value: unknown): value is ApiError {
+  return value instanceof ApiError;
 }
 
 function buildApiUrl(path: string): string {
@@ -190,8 +243,14 @@ export async function apiRequest<T>(
       authFailureHandler();
     }
 
-    const message = payload?.error?.message || "Request failed";
-    throw new Error(message);
+    const errorBody = payload?.error ?? {};
+    const message = errorBody.message || "Request failed";
+    throw new ApiError(message, {
+      status: response.status,
+      fields: errorBody.fields,
+      code: errorBody.code,
+      payload: errorBody,
+    });
   }
 
   return payload.data as T;

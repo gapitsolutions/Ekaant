@@ -29,6 +29,7 @@ from .models import (
     MedicineBatch,
     MedicineCategory,
     PaymentMethod,
+    Supplier,
 )
 from .serializers import (
     AuditRemovalCreateSerializer,
@@ -39,10 +40,135 @@ from .serializers import (
     MedicineReadSerializer,
     MedicineWriteSerializer,
     PurchaseInvoiceCreateSerializer,
+    SupplierEmbeddedSerializer,
+    SupplierReadSerializer,
+    SupplierWriteSerializer,
 )
 
 
 NEAR_EXPIRY_DAYS = 180
+
+
+# ────────────────────────────────────────────────────────────
+# Supplier CRUD
+# ────────────────────────────────────────────────────────────
+
+
+def _supplier_queryset_with_invoice_count():
+    return Supplier.objects.annotate(
+        _invoice_count=Count("purchase_invoices", distinct=True)
+    )
+
+
+class SupplierListCreateView(APIView):
+    """List + create suppliers.
+
+    GET is broadly readable (reception + pharmacy + admin) so any supplier
+    selector across the app can populate without a role escalation; POST is
+    pharmacist/admin only since it mutates the master data.
+    """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsReceptionAdminOrPharmacist()]
+        return [IsPharmacistOrAdmin()]
+
+    def get(self, request):
+        queryset = _supplier_queryset_with_invoice_count().order_by("company_name")
+
+        q = (request.query_params.get("q") or "").strip()
+        if q:
+            # Search company / contact / GST / drug license / mobile.
+            queryset = queryset.filter(
+                Q(company_name__icontains=q)
+                | Q(contact_person__icontains=q)
+                | Q(gst_number__icontains=q)
+                | Q(drug_license_number__icontains=q)
+                | Q(mobile_number__icontains=q)
+            )
+
+        is_active_raw = (request.query_params.get("is_active") or "").strip().lower()
+        if is_active_raw in {"true", "1", "yes"}:
+            queryset = queryset.filter(is_active=True)
+        elif is_active_raw in {"false", "0", "no"}:
+            queryset = queryset.filter(is_active=False)
+
+        category = (request.query_params.get("category") or "").strip()
+        if category:
+            if category not in set(MedicineCategory.values):
+                raise drf_serializers.ValidationError(
+                    {"category": f"Unknown category '{category}'."}
+                )
+            queryset = queryset.filter(categories__contains=[category])
+
+        try:
+            page = int(request.query_params.get("page", 1))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = int(request.query_params.get("pageSize", 50))
+        except (TypeError, ValueError):
+            page_size = 50
+
+        paginated_queryset, pagination = paginate_queryset(queryset, page, page_size)
+        items = SupplierReadSerializer(paginated_queryset, many=True).data
+        return success_response({"items": items, "pagination": pagination})
+
+    def post(self, request):
+        serializer = SupplierWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        supplier = serializer.save(created_by=request.user, updated_by=request.user)
+        # Re-fetch with annotation so the response shape matches list rows.
+        annotated = _supplier_queryset_with_invoice_count().get(pk=supplier.pk)
+        return success_response(
+            SupplierReadSerializer(annotated).data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class SupplierDetailView(APIView):
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsReceptionAdminOrPharmacist()]
+        return [IsPharmacistOrAdmin()]
+
+    def _get(self, pk):
+        return get_object_or_404(_supplier_queryset_with_invoice_count(), pk=pk)
+
+    def get(self, request, supplier_id):
+        supplier = self._get(supplier_id)
+        return success_response(SupplierReadSerializer(supplier).data)
+
+    def patch(self, request, supplier_id):
+        supplier = self._get(supplier_id)
+        serializer = SupplierWriteSerializer(
+            supplier, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(updated_by=request.user)
+        annotated = _supplier_queryset_with_invoice_count().get(pk=supplier.pk)
+        return success_response(SupplierReadSerializer(annotated).data)
+
+    def delete(self, request, supplier_id):
+        """Soft-delete: flip ``is_active`` to False.
+
+        We never hard-delete: PROTECT on PurchaseInvoice.supplier would refuse
+        anyway when the supplier has invoices, and deactivation preserves the
+        historical relationship while removing the supplier from active
+        dropdowns/lists.
+        """
+        supplier = self._get(supplier_id)
+        if supplier.is_active:
+            supplier.is_active = False
+            supplier.updated_by = request.user
+            supplier.save(update_fields=["is_active", "updated_by", "updated_at"])
+        return success_response(
+            {
+                "deactivated": True,
+                "supplier_id": str(supplier.pk),
+                "is_active": supplier.is_active,
+            }
+        )
 
 
 # ────────────────────────────────────────────────────────────
@@ -214,7 +340,9 @@ class PurchaseInvoiceCreateView(APIView):
             {
                 "id": str(invoice.id),
                 "invoice_number": invoice.invoice_number,
-                "supplier": invoice.supplier,
+                "supplier": SupplierEmbeddedSerializer.from_supplier(
+                    invoice.supplier
+                ),
                 "items_loaded": invoice.items_count,
                 "total_amount": invoice.total_amount,
             },
@@ -337,7 +465,6 @@ class PharmacyQueueView(APIView):
                 "outstanding_debt": s.outstanding_debt_at_checkin,
                 "patient": {
                     "file_number": s.file_number,
-                    "registration_number": s.patient.registration_number,
                     "phone": s.patient.phone_number,
                     "date_of_birth": s.patient.date_of_birth,
                     "sex": s.patient.sex,
@@ -366,7 +493,6 @@ class DispenseCreateView(APIView):
             {
                 "id": str(invoice.id),
                 "invoice_number": invoice.invoice_number,
-                "display_invoice_number": invoice.display_invoice_number,
                 "session_id": str(invoice.visit_session_id),
                 "patient_id": str(invoice.patient_id),
                 "patient_name": invoice.patient.full_name,
@@ -443,9 +569,8 @@ class DispenseHistoryListView(APIView):
         if q:
             queryset = queryset.filter(
                 Q(patient__full_name__icontains=q)
-                | Q(patient__registration_number__icontains=q)
+                | Q(patient__file_number__icontains=q)
                 | Q(invoice_number__icontains=q)
-                | Q(display_invoice_number__icontains=q)
             )
         if start_date:
             queryset = queryset.filter(dispense_date__gte=start_date)

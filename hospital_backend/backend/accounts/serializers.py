@@ -8,7 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "full_name", "email", "role", "hospital_id")
+        fields = ("id", "full_name", "email", "role")
 
     def get_id(self, obj):
         return str(obj.pk)

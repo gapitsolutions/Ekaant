@@ -186,9 +186,7 @@ export default function PrescriptionQueuePage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="font-mono">
-                            {item.patient?.file_number ||
-                              item.patient?.registration_number ||
-                              "—"}
+                            {item.patient?.file_number || "—"}
                           </Badge>
                         </TableCell>
                         <TableCell>

@@ -92,7 +92,7 @@ export type SubstanceType =
 
 export interface Patient {
   id: string;
-  registration_number: string; // File Number
+  file_number: string; // user-entered patient file number, e.g. "A1"
   hdams_id?: string; // HDAMS unique ID
   patient_category: PatientCategory; // Psychiatric or De-Addiction
 

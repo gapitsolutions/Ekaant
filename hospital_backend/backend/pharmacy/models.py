@@ -2,8 +2,11 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.db.models import CheckConstraint, F, Index, Q, UniqueConstraint
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -102,6 +105,8 @@ class Medicine(models.Model):
 
     class Meta:
         ordering = ["name"]
+        verbose_name = "Medicine"
+        verbose_name_plural = "Medicines"
         constraints = [
             UniqueConstraint(
                 fields=["name", "category", "bup_category"],
@@ -143,6 +148,8 @@ class MedicineBatch(models.Model):
 
     class Meta:
         ordering = ["expiry_date"]  # FEFO ordering
+        verbose_name = "Medicine Batch"
+        verbose_name_plural = "Medicine Batches"
         constraints = [
             UniqueConstraint(
                 fields=["medicine", "batch_number"],
@@ -171,10 +178,85 @@ class MedicineBatch(models.Model):
         return (self.expiry_date - timezone.localdate()).days
 
 
+class Supplier(models.Model):
+    """Pharmaceutical supplier / wholesaler entity.
+
+    Owns the supplier-side relationships for PurchaseInvoice. Treated as a
+    core business entity: full CRUD, soft-delete via ``is_active``, and
+    referenced (PROTECT) from PurchaseInvoice so accidentally removing a
+    supplier with active invoices is rejected by the database.
+
+    Design notes:
+
+    * ``company_name`` is uniquely-constrained case-insensitively via a
+      functional UniqueConstraint over ``Lower("company_name")``.
+    * ``mobile_number`` is nullable at the DB layer to accommodate legacy
+      / migrated rows that pre-date this model; serializers enforce its
+      presence for create/update.
+    * ``categories`` reuses :class:`MedicineCategory` and is stored as a
+      PostgreSQL array so queries like "suppliers that stock BUP" can be
+      satisfied with a GIN-indexed ``categories__contains`` predicate.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company_name = models.CharField(max_length=255)
+    contact_person = models.CharField(max_length=255, blank=True, default="")
+    mobile_number = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    full_address = models.TextField(blank=True, default="")
+    gst_number = models.CharField(max_length=20, blank=True, null=True)
+    drug_license_number = models.CharField(max_length=50, blank=True, null=True)
+    categories = ArrayField(
+        base_field=models.CharField(max_length=10, choices=MedicineCategory.choices),
+        default=list,
+        blank=True,
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="suppliers_created",
+        blank=True,
+        null=True,
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="suppliers_updated",
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        ordering = ["company_name"]
+        verbose_name = "Supplier"
+        verbose_name_plural = "Suppliers"
+        constraints = [
+            UniqueConstraint(
+                Lower("company_name"),
+                name="pharmacy_supplier_company_name_ci_unique",
+            ),
+        ]
+        indexes = [
+            Index(fields=["is_active"]),
+            Index(fields=["company_name"]),
+            GinIndex(fields=["categories"], name="pharmacy_supplier_categories"),
+        ]
+
+    def __str__(self):
+        return self.company_name
+
+
 class PurchaseInvoice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_number = models.CharField(max_length=50, unique=True)
-    supplier = models.CharField(max_length=255)
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.PROTECT,
+        related_name="purchase_invoices",
+    )
     invoice_date = models.DateField()
     delivery_date = models.DateField(blank=True, null=True)
     invoice_photo = models.FileField(
@@ -195,6 +277,8 @@ class PurchaseInvoice(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "Purchase Invoice"
+        verbose_name_plural = "Purchase Invoices"
         indexes = [
             Index(fields=["supplier"]),
             Index(fields=["invoice_date"]),
@@ -223,6 +307,8 @@ class PurchaseInvoiceItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = "Purchase Invoice Line Item"
+        verbose_name_plural = "Purchase Invoice Line Items"
         indexes = [
             Index(fields=["purchase_invoice"]),
             Index(fields=["medicine"]),
@@ -232,7 +318,6 @@ class PurchaseInvoiceItem(models.Model):
 class DispenseInvoice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_number = models.CharField(max_length=30, unique=True)
-    display_invoice_number = models.CharField(max_length=50, blank=True, default="")
     visit_session = models.OneToOneField(
         "visits.VisitSession",
         on_delete=models.PROTECT,
@@ -278,6 +363,8 @@ class DispenseInvoice(models.Model):
 
     class Meta:
         ordering = ["-dispense_time"]
+        verbose_name = "Dispense Invoice"
+        verbose_name_plural = "Dispense Invoices"
         constraints = [
             CheckConstraint(
                 condition=Q(discount_percentage__gte=0, discount_percentage__lte=100),
@@ -342,6 +429,8 @@ class DispenseInvoiceItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = "Dispense Invoice Line Item"
+        verbose_name_plural = "Dispense Invoice Line Items"
         indexes = [
             Index(fields=["dispense_invoice"]),
             Index(fields=["medicine", "-created_at"]),
@@ -369,6 +458,8 @@ class StockAuditRemoval(models.Model):
 
     class Meta:
         ordering = ["-removed_at"]
+        verbose_name = "Stock Audit Removal"
+        verbose_name_plural = "Stock Audit Removals"
         indexes = [
             Index(fields=["medicine"]),
             Index(fields=["batch"]),
@@ -401,6 +492,8 @@ class StockMovement(models.Model):
 
     class Meta:
         ordering = ["-performed_at"]
+        verbose_name = "Stock Movement (Ledger Entry)"
+        verbose_name_plural = "Stock Movements (Ledger)"
         indexes = [
             Index(fields=["medicine", "-performed_at"]),
             Index(fields=["batch", "-performed_at"]),
