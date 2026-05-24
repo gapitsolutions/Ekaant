@@ -41,3 +41,4 @@ media/
 *.swo
 *~
 
+Pipfile.lock

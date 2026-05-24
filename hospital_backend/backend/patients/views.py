@@ -209,7 +209,7 @@ class ReceptionistPatientSummaryListView(APIView):
 
 
 class PatientDetailView(APIView):
-    permission_classes = [IsReceptionOrAdmin]
+    permission_classes = [IsReceptionAdminOrPharmacist]
 
     def get(self, request, patient_id):
         patient = get_object_or_404(Patient, pk=patient_id)

@@ -124,7 +124,7 @@ class MedicineDeleteSerializer(serializers.Serializer):
 class PurchaseInvoiceItemWriteSerializer(serializers.Serializer):
     medicine_id = serializers.UUIDField()
     category = serializers.CharField(required=False, allow_blank=True, default="")
-    subcategory = serializers.CharField(required=False, allow_blank=True, default="")
+    subcategory = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
     batch_number = serializers.CharField(max_length=50)
     expiry_date = serializers.DateField()
     quantity = serializers.IntegerField(min_value=1)
