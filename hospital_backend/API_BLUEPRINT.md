@@ -70,10 +70,28 @@ Error envelope (`core.exceptions.api_exception_handler`):
 {
   "success": false,
   "error": {
-    "message": "..."
+    "message": "...",
+    "fields": {
+      "<field path>": ["<msg>", "..."]
+    },
+    "code": "<exception code>",
+    "...": "<extras>"
   }
 }
 ```
+
+* `message` is always present — older clients that only read it continue to work.
+* `fields` is added whenever the underlying DRF error carries per-field
+  structure (e.g. serializer ValidationError). Nested errors inside
+  `many=True` serializers are flattened to dot/index paths (`items.0.quantity`)
+  so the front-end can address them directly. Omitted for non-validation
+  errors and when the only field is the implicit `non_field_errors`.
+* `code` exposes the exception's `default_code` (`conflict`,
+  `not_authenticated`, `permission_denied`, `internal_error`, …) so clients
+  can branch on machine-readable identifiers.
+* Subclasses can attach an `extra` dict that is merged verbatim into
+  `error`. Today `ConflictError` ships `last_file_number` here after a
+  patient registration collision (see §5.1).
 
 Important behavior:
 

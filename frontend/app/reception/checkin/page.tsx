@@ -35,6 +35,7 @@ import {
 } from "@/lib/biometric";
 import { navigate } from "@/lib/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { toastApiError } from "@/lib/api-errors";
 import { toast } from "sonner";
 import {
   Fingerprint,
@@ -463,7 +464,7 @@ export default function CheckinPage() {
       setBiometricVerified(false);
       setVerificationStep("search");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Check-in failed");
+      toastApiError(error, "Check-in failed");
     } finally {
       setIsCheckingIn(false);
     }

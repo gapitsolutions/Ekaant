@@ -57,6 +57,8 @@ import {
   type SupplierCategory,
   type SupplierWritePayload,
 } from "@/lib/pharmacy-api";
+import { toastApiError, useApiErrors } from "@/lib/api-errors";
+import { FieldError } from "@/components/ui/field-error";
 
 
 const CATEGORY_OPTIONS: SupplierCategory[] = ["BUP", "Rx", "NRx"];
@@ -430,8 +432,10 @@ function SupplierFormDialog({
     categories: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiErrors = useApiErrors();
 
   useEffect(() => {
+    apiErrors.clear();
     if (existing) {
       setForm({
         company_name: existing.company_name,
@@ -455,6 +459,9 @@ function SupplierFormDialog({
         categories: [],
       });
     }
+    // apiErrors is stable across renders via useCallback; we only re-run on
+    // open/existing changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing, open]);
 
   const set = useCallback(
@@ -485,6 +492,7 @@ function SupplierFormDialog({
       toast.error("Mobile number is required");
       return;
     }
+    apiErrors.clear();
     setIsSubmitting(true);
     try {
       if (isEdit && existing) {
@@ -514,12 +522,10 @@ function SupplierFormDialog({
       }
       onSaved();
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : isEdit
-            ? "Failed to update supplier"
-            : "Failed to add supplier",
+      apiErrors.setFromError(error);
+      toastApiError(
+        error,
+        isEdit ? "Failed to update supplier" : "Failed to add supplier",
       );
     } finally {
       setIsSubmitting(false);
@@ -544,6 +550,7 @@ function SupplierFormDialog({
               onChange={(e) => set("company_name", e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("company_name")} />
           </div>
           <div>
             <Label>Mobile number *</Label>
@@ -552,6 +559,7 @@ function SupplierFormDialog({
               onChange={(e) => set("mobile_number", e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("mobile_number")} />
           </div>
           <div>
             <Label>Contact person</Label>
@@ -560,6 +568,7 @@ function SupplierFormDialog({
               onChange={(e) => set("contact_person", e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("contact_person")} />
           </div>
           <div>
             <Label>Email</Label>
@@ -569,6 +578,7 @@ function SupplierFormDialog({
               onChange={(e) => set("email", e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("email")} />
           </div>
           <div>
             <Label>GST number</Label>
@@ -577,6 +587,7 @@ function SupplierFormDialog({
               onChange={(e) => set("gst_number", e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("gst_number")} />
           </div>
           <div>
             <Label>Drug license number</Label>
@@ -585,6 +596,7 @@ function SupplierFormDialog({
               onChange={(e) => set("drug_license_number", e.target.value)}
               className="mt-1"
             />
+            <FieldError message={apiErrors.get("drug_license_number")} />
           </div>
           <div className="md:col-span-2">
             <Label>Full address</Label>
@@ -594,6 +606,7 @@ function SupplierFormDialog({
               className="mt-1"
               rows={2}
             />
+            <FieldError message={apiErrors.get("full_address")} />
           </div>
           <div className="md:col-span-2">
             <Label>Categories supplied</Label>
@@ -611,6 +624,7 @@ function SupplierFormDialog({
                 </label>
               ))}
             </div>
+            <FieldError message={apiErrors.get("categories")} />
           </div>
         </div>
         <DialogFooter>

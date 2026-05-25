@@ -1539,6 +1539,7 @@ function AuditRemovalView({
                 }
                 className="mt-1"
               />
+              <FieldError message={apiErrors.get("quantity")} />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">
@@ -1558,6 +1559,7 @@ function AuditRemovalView({
                   <SelectItem value="defect">Manufacturing Defect</SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError message={apiErrors.get("reason")} />
             </div>
           </div>
 

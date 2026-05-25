@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { getPatientById, type PatientDetailResponse } from "@/lib/hms-api";
+import { toastApiError, useApiErrors } from "@/lib/api-errors";
+import { FieldError } from "@/components/ui/field-error";
 import {
   getInventoryMedicines,
   getPharmacyQueue,
@@ -109,6 +111,7 @@ export default function DispenseWorkstationPage() {
 
   // Save state
   const [isSaving, setIsSaving] = useState(false);
+  const apiErrors = useApiErrors();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
@@ -359,6 +362,7 @@ export default function DispenseWorkstationPage() {
       return;
     }
 
+    apiErrors.clear();
     setIsSaving(true);
     try {
       await createDispense({
@@ -383,9 +387,8 @@ export default function DispenseWorkstationPage() {
       toast.success("Dispense invoice saved successfully");
       window.setTimeout(() => navigate("/pharmacy/prescription-queue"), 600);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save invoice",
-      );
+      apiErrors.setFromError(error);
+      toastApiError(error, "Failed to save invoice");
     } finally {
       setIsSaving(false);
     }
@@ -403,9 +406,7 @@ export default function DispenseWorkstationPage() {
       toast.success("Prescription cancelled");
       window.setTimeout(() => navigate("/pharmacy/prescription-queue"), 600);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to cancel prescription",
-      );
+      toastApiError(error, "Failed to cancel prescription");
     } finally {
       setIsCancelling(false);
       setCancelDialogOpen(false);
@@ -843,6 +844,7 @@ export default function DispenseWorkstationPage() {
                   onChange={(e) => handleNextVisitDateChange(e.target.value)}
                   className="mt-1"
                 />
+                <FieldError message={apiErrors.get("next_followup_date")} />
               </div>
             </div>
 
@@ -884,6 +886,12 @@ export default function DispenseWorkstationPage() {
                   <SelectItem value="Split">Split</SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError
+                message={apiErrors.get("payment.payment_method")}
+              />
+              <FieldError
+                message={apiErrors.get("payment.non_field_errors")}
+              />
             </div>
 
             <div>
@@ -903,6 +911,7 @@ export default function DispenseWorkstationPage() {
                 }
                 className="mt-1"
               />
+              <FieldError message={apiErrors.get("payment.discount")} />
             </div>
 
             {paymentMethod === "Split" ? (
@@ -987,6 +996,33 @@ export default function DispenseWorkstationPage() {
                 </span>
               </div>
             </div>
+
+            {/* Surface line-item and any other backend errors not paired
+                with a dedicated FieldError, so the pharmacist always sees
+                why a save failed even when the underlying field is buried
+                inside the line-item editor. */}
+            {(() => {
+              const surfaceableKeys = Object.keys(apiErrors.fields).filter(
+                (k) =>
+                  ![
+                    "payment.payment_method",
+                    "payment.discount",
+                    "payment.non_field_errors",
+                    "next_followup_date",
+                  ].includes(k),
+              );
+              if (surfaceableKeys.length === 0) return null;
+              return (
+                <div className="border border-rose-200 bg-rose-50 rounded-md p-3 text-xs space-y-1">
+                  {surfaceableKeys.map((key) => (
+                    <div key={key} className="text-rose-700">
+                      <span className="font-mono">{key}</span>:{" "}
+                      {apiErrors.fields[key].join("; ")}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             <Button
               className="w-full"
