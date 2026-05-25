@@ -12,7 +12,7 @@ from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -87,14 +87,19 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
     # active, but re-fetch here so the .save() below has a model instance.
     supplier = Supplier.objects.get(pk=data["supplier_id"])
 
-    invoice = PurchaseInvoice.objects.create(
-        invoice_number=invoice_number,
-        supplier=supplier,
-        invoice_date=data["invoice_date"],
-        delivery_date=data.get("delivery_date"),
-        notes=data.get("notes", ""),
-        created_by=user,
-    )
+    try:
+        invoice = PurchaseInvoice.objects.create(
+            invoice_number=invoice_number,
+            supplier=supplier,
+            invoice_date=data["invoice_date"],
+            delivery_date=data.get("delivery_date"),
+            notes=data.get("notes", ""),
+            created_by=user,
+        )
+    except IntegrityError as exc:
+        # Race: the pre-check above lost to a concurrent insert of the same
+        # invoice_number. Surface the same 409 envelope the pre-check uses.
+        raise ConflictError("Invoice number already exists.") from exc
 
     total_amount = Decimal("0")
     items_count = 0
@@ -385,23 +390,28 @@ def process_dispense(*, data: dict, user) -> DispenseInvoice:
 
     totals = _build_payment_totals(line_items, payment)
 
-    invoice = DispenseInvoice.objects.create(
-        invoice_number=DispenseInvoice.generate_invoice_number(),
-        visit_session=session,
-        patient=session.patient,
-        dispensed_by=user,
-        dispense_date=timezone.localdate(),
-        subtotal=totals["subtotal"],
-        discount_percentage=totals["discount_percentage"],
-        discount_amount=totals["discount_amount"],
-        net_payable=totals["net_payable"],
-        payment_method=payment["payment_method"],
-        cash_amount=totals["cash_amount"],
-        online_amount=totals["online_amount"],
-        notes=payment.get("notes", "") or "",
-        next_followup_date=data.get("next_followup_date"),
-        status=DispenseStatus.SUCCESS,
-    )
+    try:
+        invoice = DispenseInvoice.objects.create(
+            invoice_number=DispenseInvoice.generate_invoice_number(),
+            visit_session=session,
+            patient=session.patient,
+            dispensed_by=user,
+            dispense_date=timezone.localdate(),
+            subtotal=totals["subtotal"],
+            discount_percentage=totals["discount_percentage"],
+            discount_amount=totals["discount_amount"],
+            net_payable=totals["net_payable"],
+            payment_method=payment["payment_method"],
+            cash_amount=totals["cash_amount"],
+            online_amount=totals["online_amount"],
+            notes=payment.get("notes", "") or "",
+            next_followup_date=data.get("next_followup_date"),
+            status=DispenseStatus.SUCCESS,
+        )
+    except IntegrityError as exc:
+        # Race: the .exists() pre-check above lost to a concurrent dispense for
+        # the same visit_session (OneToOneField). Same 409 either way.
+        raise ConflictError("A dispense invoice already exists for this visit.") from exc
 
     # Persist line items + deduct stock + log movements.
     for entry in resolved:
@@ -588,7 +598,7 @@ def cancel_dispense_for_session(*, session_id, reason: str, user) -> DispenseInv
 
     session.medicines_total = Decimal("0")
     session.current_stage = VisitStage.COMPLETED
-    session.status = VisitStatus.COMPLETED
+    session.status = VisitStatus.CANCELLED
     if session.completed_time is None:
         session.completed_time = now
     session.save(

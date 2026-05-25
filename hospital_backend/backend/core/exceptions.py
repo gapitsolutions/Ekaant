@@ -27,8 +27,11 @@ Every error response that flows through DRF returns the canonical shape:
 
 from collections.abc import Iterable
 
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
+from rest_framework import exceptions as drf_exceptions
 from rest_framework import status
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
@@ -44,6 +47,16 @@ class ConflictError(APIException):
         (e.g. ``last_file_number`` after a file number collision)."""
         super().__init__(detail=detail, code=code)
         self.extra: dict | None = extra
+
+
+class AuthFailedClearCookies(AuthenticationFailed):
+    """401 that signals the handler to also clear auth cookies on the response.
+
+    Used by the cookie-based auth views (session probe, refresh) so a stale
+    or tampered JWT does not keep being re-sent on every request.
+    """
+
+    clear_auth_cookies = True
 
 
 # Field name DRF uses for serializer-level (non-field) ValidationError items.
@@ -114,6 +127,15 @@ def _flatten_field_errors(data, prefix: str = "") -> dict[str, list[str]]:
 
 
 def api_exception_handler(exc, context):
+    # DRF's exception_handler rebinds Http404 / Django PermissionDenied to
+    # their APIException equivalents *locally*, so the rebinding never reaches
+    # us. Mirror it here so ``exc.default_code`` resolves to ``"not_found"`` /
+    # ``"permission_denied"`` for the ``code`` field below.
+    if isinstance(exc, Http404):
+        exc = drf_exceptions.NotFound()
+    elif isinstance(exc, DjangoPermissionDenied):
+        exc = drf_exceptions.PermissionDenied()
+
     response = drf_exception_handler(exc, context)
 
     if response is None:
@@ -149,4 +171,12 @@ def api_exception_handler(exc, context):
         "success": False,
         "error": error_body,
     }
+
+    if getattr(exc, "clear_auth_cookies", False):
+        # Local import avoids a module-load cycle: responses imports settings,
+        # which imports nothing from this module.
+        from .responses import clear_auth_cookies
+
+        clear_auth_cookies(response)
+
     return response

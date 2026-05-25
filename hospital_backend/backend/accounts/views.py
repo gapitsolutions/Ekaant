@@ -1,12 +1,13 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.middleware.csrf import get_token
-from rest_framework import status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from core.authentication import CookieJWTAuthentication, enforce_csrf
+from core.exceptions import AuthFailedClearCookies
 from core.responses import clear_auth_cookies, set_auth_cookies, success_response
 
 from .serializers import LoginSerializer, UserSerializer
@@ -23,20 +24,6 @@ def _auth_payload(user):
         "expires_in": _access_expires_in_seconds(),
         "user": UserSerializer(user).data,
     }
-
-
-def _error_response(message: str, request):
-    response = success_response(
-        {"message": message},
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        request=request,
-    )
-    response.data = {
-        "success": False,
-        "error": {"message": message},
-    }
-    clear_auth_cookies(response)
-    return response
 
 
 def _authenticate_from_cookie(request):
@@ -67,10 +54,10 @@ class LoginView(APIView):
 
         user = User.objects.filter(email__iexact=email).first()
         if not user or not user.check_password(password):
-            return _error_response("Invalid email or password", request)
+            raise AuthenticationFailed("Invalid email or password")
 
         if not user.is_active:
-            return _error_response("Account is inactive", request)
+            raise AuthenticationFailed("Account is inactive")
 
         refresh = RefreshToken.for_user(user)
         response = success_response(_auth_payload(user), request=request)
@@ -94,10 +81,16 @@ class SessionView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    def get_authenticate_header(self, request):
+        # Without this, DRF downgrades 401 → 403 because no auth classes are
+        # registered (no WWW-Authenticate header to suggest). Returning a
+        # value keeps AuthenticationFailed at its declared 401.
+        return 'Bearer realm="api"'
+
     def get(self, request):
         user = _authenticate_from_cookie(request)
         if not user:
-            return _error_response("Not authenticated", request)
+            raise AuthFailedClearCookies("Not authenticated")
         return success_response(_auth_payload(user), request=request)
 
 
@@ -105,18 +98,22 @@ class RefreshView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    def get_authenticate_header(self, request):
+        # See SessionView.get_authenticate_header.
+        return 'Bearer realm="api"'
+
     def post(self, request):
         enforce_csrf(request)
         raw_refresh = request.COOKIES.get(settings.SIMPLE_JWT["AUTH_COOKIE_REFRESH"])
         if not raw_refresh:
-            return _error_response("Refresh token missing", request)
+            raise AuthFailedClearCookies("Refresh token missing")
 
         try:
             refresh = RefreshToken(raw_refresh)
             user = User.objects.get(pk=refresh["user_id"])
             access_token = str(refresh.access_token)
         except (TokenError, User.DoesNotExist, KeyError):
-            return _error_response("Invalid refresh token", request)
+            raise AuthFailedClearCookies("Invalid refresh token")
 
         response = success_response(
             {"refreshed": True, "expires_in": _access_expires_in_seconds()},

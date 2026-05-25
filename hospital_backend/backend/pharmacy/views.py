@@ -7,6 +7,7 @@ in services. Read endpoints query directly because they don't mutate state.
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from django.db import IntegrityError
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404
@@ -15,6 +16,7 @@ from rest_framework import serializers as drf_serializers
 from rest_framework import status
 from rest_framework.views import APIView
 
+from core.exceptions import ConflictError
 from core.pagination import paginate_queryset
 from core.permissions import IsPharmacistOrAdmin, IsReceptionAdminOrPharmacist
 from core.responses import success_response
@@ -117,7 +119,13 @@ class SupplierListCreateView(APIView):
     def post(self, request):
         serializer = SupplierWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        supplier = serializer.save(created_by=request.user, updated_by=request.user)
+        try:
+            supplier = serializer.save(created_by=request.user, updated_by=request.user)
+        except IntegrityError as exc:
+            # Race vs. validate_company_name's case-insensitive uniqueness check.
+            raise ConflictError(
+                "A supplier with this company name already exists."
+            ) from exc
         # Re-fetch with annotation so the response shape matches list rows.
         annotated = _supplier_queryset_with_invoice_count().get(pk=supplier.pk)
         return success_response(
@@ -145,7 +153,12 @@ class SupplierDetailView(APIView):
             supplier, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save(updated_by=request.user)
+        try:
+            serializer.save(updated_by=request.user)
+        except IntegrityError as exc:
+            raise ConflictError(
+                "A supplier with this company name already exists."
+            ) from exc
         annotated = _supplier_queryset_with_invoice_count().get(pk=supplier.pk)
         return success_response(SupplierReadSerializer(annotated).data)
 

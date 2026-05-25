@@ -97,6 +97,22 @@ Important behavior:
 
 - `success_response` can also attach a CSRF cookie when `request` is passed.
 - `ConflictError` maps to HTTP 409 with the standard error envelope.
+- `AuthFailedClearCookies` (subclass of `AuthenticationFailed`) maps to HTTP 401
+  AND instructs the handler to clear both auth cookies on the response. Used by
+  the cookie-auth session/refresh views so stale JWTs stop being re-sent.
+
+Enforcement rules:
+
+- **Views never construct error `Response`s by hand.** Every non-2xx path raises
+  an exception (`ValidationError`, `NotFound`, `PermissionDenied`,
+  `ConflictError`, `AuthenticationFailed`, …). The handler wired in
+  `REST_FRAMEWORK["EXCEPTION_HANDLER"]` is the single place that builds error
+  bodies.
+- The handler explicitly strips DRF's `detail` key from `error.fields` so the
+  401/403/404 message never appears twice in the payload.
+- Top-level `non_field_errors` is collapsed into `message`. Nested
+  `non_field_errors` (e.g. `payment.non_field_errors`) is kept because it is
+  distinct from the summary.
 
 ---
 
@@ -123,9 +139,18 @@ Important behavior:
 
 ### 3.3 `core.exceptions`
 
-- `ConflictError` — `APIException` subclass with HTTP 409.
+- `ConflictError` — `APIException` subclass with HTTP 409. Accepts an
+  `extra=` dict that the handler merges into `error` as siblings of
+  `message`/`code` (e.g. `last_file_number` on a file-number collision).
+- `AuthFailedClearCookies` — `AuthenticationFailed` subclass that carries a
+  `clear_auth_cookies = True` marker. The handler recognises this and wipes
+  both auth cookies on the 401 response.
 - `_coerce_message(data)` — extracts human-readable message from nested DRF error structures.
-- `api_exception_handler(exc, context)` — converts all handled exceptions to standardized error envelope; returns 500 with "Internal server error" when DRF gives no response.
+- `_flatten_field_errors(data)` — flattens nested DRF validation errors into
+  dot/index paths (`items.0.expiry_date`).
+- `api_exception_handler(exc, context)` — converts all handled exceptions to
+  the standardized error envelope; returns 500 with `"internal_error"` when
+  DRF gives no response.
 
 ### 3.4 `core.pagination`
 
