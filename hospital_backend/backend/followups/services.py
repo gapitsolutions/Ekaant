@@ -174,7 +174,7 @@ def followup_queryset(*, query: str = "", stage: str = ""):
 
     if query:
         queryset = queryset.filter(
-            Q(patient__registration_number__icontains=query)
+            Q(patient__file_number__icontains=query)
             | Q(patient__full_name__icontains=query)
             | Q(patient__phone_number__icontains=query)
         )

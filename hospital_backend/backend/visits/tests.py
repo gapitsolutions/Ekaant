@@ -41,7 +41,7 @@ class CheckinAutoCompleteTests(APITestCase):
         self.client.force_authenticate(user=self.user)
 
         self.patient = Patient.objects.create(
-            registration_number="AGH260300",
+            file_number="AGH260300",
             patient_category="deaddiction",
             full_name="Queue Patient",
             date_of_birth=timezone.localdate(),
@@ -172,7 +172,7 @@ class ReceptionCheckinHistoryEndpointTests(APITestCase):
         self.client.force_authenticate(user=self.user)
 
         self.patient_one = Patient.objects.create(
-            registration_number="AGH260401",
+            file_number="AGH260401",
             patient_category="deaddiction",
             full_name="History One",
             date_of_birth=timezone.localdate() - timedelta(days=9000),
@@ -183,7 +183,7 @@ class ReceptionCheckinHistoryEndpointTests(APITestCase):
             addiction_duration="4 years",
         )
         self.patient_two = Patient.objects.create(
-            registration_number="AGH260402",
+            file_number="AGH260402",
             patient_category="psychiatric",
             full_name="History Two",
             date_of_birth=timezone.localdate() - timedelta(days=8000),
@@ -260,7 +260,7 @@ class ReceptionCheckinHistoryEndpointTests(APITestCase):
         search_items = search_response.data["data"]["items"]
         self.assertEqual(len(search_items), 1)
         self.assertEqual(
-            search_items[0]["patient"]["registration_number"],
+            search_items[0]["patient"]["file_number"],
             "AGH260401",
         )
 
@@ -310,7 +310,7 @@ class ReceptionReportEndpointTests(APITestCase):
         self.client.force_authenticate(user=self.user)
 
         self.patient_one = Patient.objects.create(
-            registration_number="AGH260301",
+            file_number="AGH260301",
             patient_category="deaddiction",
             full_name="Daily One",
             date_of_birth=timezone.localdate() - timedelta(days=10000),
@@ -319,7 +319,7 @@ class ReceptionReportEndpointTests(APITestCase):
             address_line1="Address 1",
         )
         self.patient_two = Patient.objects.create(
-            registration_number="AGH260302",
+            file_number="AGH260302",
             patient_category="psychiatric",
             full_name="Daily Two",
             date_of_birth=timezone.localdate() - timedelta(days=9000),
@@ -356,7 +356,7 @@ class ReceptionReportEndpointTests(APITestCase):
         self.assertEqual(str(payload["date"]), target_date.isoformat())
         self.assertEqual(payload["total_checkins"], 1)
         self.assertEqual(len(payload["items"]), 1)
-        self.assertEqual(payload["items"][0]["patient"]["registration_number"], "AGH260301")
+        self.assertEqual(payload["items"][0]["patient"]["file_number"], "AGH260301")
 
     def test_monthly_report_endpoint_filters_by_year_and_month(self):
         today = timezone.localdate()

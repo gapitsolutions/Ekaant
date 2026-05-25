@@ -20,7 +20,7 @@ class FollowUpWorkflowTests(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.patient = Patient.objects.create(
-            registration_number="AGH260500",
+            file_number="AGH260500",
             patient_category="deaddiction",
             full_name="Followup Patient",
             date_of_birth=timezone.localdate() - timedelta(days=10000),

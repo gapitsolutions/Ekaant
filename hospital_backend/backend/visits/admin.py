@@ -11,7 +11,7 @@ from .models import VisitSession
 
 VISIT_EXPORT_FIELD_CHOICES = (
     ("visit_uid", "Visit UID"),
-    ("patient_registration_number", "Patient Registration Number"),
+    ("patient_file_number", "Patient File Number"),
     ("patient_name", "Patient Name"),
     ("checked_in_by_email", "Checked In By (Email)"),
     ("visit_date", "Visit Date"),
@@ -35,7 +35,7 @@ class VisitSessionAdmin(admin.ModelAdmin):
 
     list_display = ("visit_uid", "patient", "visit_date", "status", "current_stage")
     list_filter = ("status", "current_stage", "visit_date")
-    search_fields = ("visit_uid", "patient__registration_number", "patient__full_name")
+    search_fields = ("visit_uid", "patient__file_number", "patient__full_name")
 
     default_export_fields = tuple(VISIT_EXPORT_FIELD_KEYS)
 
@@ -92,8 +92,8 @@ class VisitSessionAdmin(admin.ModelAdmin):
         return response
 
     def _extract_field_value(self, visit, field):
-        if field == "patient_registration_number":
-            return visit.patient.registration_number
+        if field == "patient_file_number":
+            return visit.patient.file_number
         if field == "patient_name":
             return visit.patient.full_name
         if field == "checked_in_by_email":

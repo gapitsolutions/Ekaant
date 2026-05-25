@@ -94,17 +94,17 @@ class PatientLookupView(APIView):
 
     def get(self, request):
         query = request.query_params.get("q", "").strip()
-        registration_number = request.query_params.get("registration_number", "").strip()
+        file_number = request.query_params.get("file_number", "").strip()
 
-        if registration_number:
-            queryset = Patient.objects.filter(registration_number__iexact=registration_number)
+        if file_number:
+            queryset = Patient.objects.filter(file_number__iexact=file_number)
         elif query:
             queryset = patient_search_queryset(query)
         else:
             return success_response({"items": [], "total": 0})
 
         items = PatientLookupSerializer(
-            queryset.order_by("registration_number"),
+            queryset.order_by("file_number"),
             many=True,
             context={"request": request},
         ).data
@@ -162,9 +162,9 @@ class ReceptionistPatientListView(APIView):
         except (TypeError, ValueError):
             page_size = 100
 
-        queryset = Patient.objects.all().order_by("registration_number")
+        queryset = Patient.objects.all().order_by("file_number")
         if query:
-            queryset = patient_search_queryset(query).order_by("registration_number")
+            queryset = patient_search_queryset(query).order_by("file_number")
 
         queryset = _apply_reception_list_filters(request, queryset)
 
@@ -192,9 +192,9 @@ class ReceptionistPatientSummaryListView(APIView):
         except (TypeError, ValueError):
             page_size = 100
 
-        queryset = Patient.objects.all().order_by("registration_number")
+        queryset = Patient.objects.all().order_by("file_number")
         if query:
-            queryset = patient_search_queryset(query).order_by("registration_number")
+            queryset = patient_search_queryset(query).order_by("file_number")
 
         queryset = _apply_reception_list_filters(request, queryset)
 
@@ -209,7 +209,7 @@ class ReceptionistPatientSummaryListView(APIView):
 
 
 class PatientDetailView(APIView):
-    permission_classes = [IsReceptionOrAdmin]
+    permission_classes = [IsReceptionAdminOrPharmacist]
 
     def get(self, request, patient_id):
         patient = get_object_or_404(Patient, pk=patient_id)

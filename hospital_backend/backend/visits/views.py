@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from core.exceptions import ConflictError
 from core.pagination import paginate_queryset
-from core.permissions import IsReceptionOrAdmin
+from core.permissions import IsReceptionAdminOrPharmacist, IsReceptionOrAdmin
 from core.responses import success_response
 from followups.services import reconcile_followup_on_checkin
 from patients.models import Patient, PatientStatus
@@ -128,8 +128,10 @@ class CheckinHistoryQuerySerializer(serializers.Serializer):
         required=False,
     )
     status = serializers.ChoiceField(choices=VisitStatus.choices, required=False)
+    current_stage = serializers.ChoiceField(choices=VisitStage.choices, required=False)  # NEW
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
+    today_only = serializers.BooleanField(required=False, default=False)  # NEW: shortcut for "dispensed today" view
 
     def validate(self, attrs):
         start_date = attrs.get("start_date")
@@ -141,7 +143,7 @@ class CheckinHistoryQuerySerializer(serializers.Serializer):
 
 def _report_patient_payload(patient: Patient):
     return {
-        "registration_number": patient.registration_number,
+        "file_number": patient.file_number,
         "full_name": patient.full_name,
         "date_of_birth": patient.date_of_birth,
         "gender": patient.sex,
@@ -155,11 +157,15 @@ def _queue_item_payload(session: VisitSession):
         "session_id": str(session.pk),
         "patient_id": str(session.patient_id),
         "patient_name": session.patient.full_name,
+        "file_number": session.file_number,
         "checked_in_at": session.checkin_time,
         "checked_in_by_name": session.checked_in_by.full_name,
         "status": session.status,
         "current_stage": session.current_stage,
         "outstanding_debt": session.outstanding_debt_at_checkin,
+        "patient": {
+            "file_number": session.patient.file_number,
+        },
     }
 
 
@@ -271,6 +277,7 @@ def _checkin_history_session_payload(session: VisitSession, request):
         "patient_id": str(session.patient_id),
         "visit_date": session.visit_date,
         "visit_type": session.visit_type,
+        "file_number": session.file_number,  # NEW
         "checkin_time": session.checkin_time,
         "completed_time": session.completed_time,
         "status": session.status,
@@ -282,7 +289,7 @@ def _checkin_history_session_payload(session: VisitSession, request):
         "verification_photo_available": bool(session.verification_photo),
         "verification_photo_url": verification_photo_url,
         "patient": {
-            "registration_number": session.patient.registration_number,
+            "file_number": session.patient.file_number,
             "full_name": session.patient.full_name,
             "date_of_birth": session.patient.date_of_birth,
             "gender": session.patient.sex,
@@ -332,10 +339,11 @@ class CheckinPatientView(APIView):
             patient=patient,
             checked_in_by=request.user,
             visit_type="first_visit" if prior_visits == 0 else "follow_up",
+            file_number=patient.file_number,  # denormalized snapshot of patient.file_number at check-in
             outstanding_debt_at_checkin=patient.outstanding_debt,
-            status=VisitStatus.COMPLETED,
-            current_stage=VisitStage.COMPLETED,
-            completed_time=now,
+            status=VisitStatus.IN_PROGRESS,  # CHANGED: was COMPLETED — visit now enters pipeline
+            current_stage=VisitStage.PHARMACY,  # CHANGED: was COMPLETED — routed to pharmacy queue
+            completed_time=None,  # CHANGED: completed_time set later by dispense flow
             verification_method=verification_method,
             verification_photo_captured_at=verification_photo_captured_at
             or (now if verification_method == CheckinVerificationMethod.PHOTO else None),
@@ -353,10 +361,11 @@ class CheckinPatientView(APIView):
                 "session_id": str(session.pk),
                 "patient_id": str(patient.pk),
                 "patient_name": patient.full_name,
+                "file_number": session.file_number,  # NEW
                 "checked_in_by_name": request.user.full_name,
                 "checked_in_at": session.checkin_time,
-                "status": VisitStatus.COMPLETED,
-                "current_stage": VisitStage.COMPLETED,
+                "status": session.status,  # CHANGED: now reflects actual session state
+                "current_stage": session.current_stage,  # CHANGED: now reflects actual stage
                 "completed_at": session.completed_time,
                 "outstanding_debt_at_checkin": session.outstanding_debt_at_checkin,
                 "verification_method": session.verification_method,
@@ -385,16 +394,22 @@ class DashboardStatsView(APIView):
 
 
 class QueueStatusView(APIView):
-    permission_classes = [IsReceptionOrAdmin]
+    # CHANGED: pharmacy queue now needs reception OR pharmacist access; using existing broader permission.
+    permission_classes = [IsReceptionAdminOrPharmacist]
 
     def get(self, request):
         today = timezone.localdate()
-        sessions = (
+        # CHANGED: queue now returns in-progress sessions (the new check-in default).
+        # Optional ?current_stage=<stage> filter; defaults to no stage filter (returns all in-progress today).
+        queryset = (
             VisitSession.objects.select_related("patient", "checked_in_by")
-            .filter(visit_date=today, status=VisitStatus.COMPLETED)
+            .filter(visit_date=today, status=VisitStatus.IN_PROGRESS)
             .order_by("-checkin_time")
         )
-        items = [_queue_item_payload(session) for session in sessions]
+        stage_filter = (request.query_params.get("current_stage") or "").strip()
+        if stage_filter:
+            queryset = queryset.filter(current_stage=stage_filter)
+        items = [_queue_item_payload(session) for session in queryset]
         return success_response({"items": items, "total": len(items)})
 
 
@@ -450,8 +465,10 @@ class ReceptionCheckinHistoryListView(APIView):
         page_size = serializer.validated_data["pageSize"]
         verification_method = serializer.validated_data.get("verification_method")
         status_filter = serializer.validated_data.get("status")
+        current_stage_filter = serializer.validated_data.get("current_stage")  # NEW
         start_date = serializer.validated_data.get("start_date")
         end_date = serializer.validated_data.get("end_date")
+        today_only = serializer.validated_data.get("today_only") or False  # NEW
 
         queryset = VisitSession.objects.select_related("patient", "checked_in_by").order_by(
             "-checkin_time"
@@ -460,7 +477,7 @@ class ReceptionCheckinHistoryListView(APIView):
         if query:
             queryset = queryset.filter(
                 Q(visit_uid__icontains=query)
-                | Q(patient__registration_number__icontains=query)
+                | Q(patient__file_number__icontains=query)
                 | Q(patient__full_name__icontains=query)
                 | Q(patient__phone_number__icontains=query)
             )
@@ -470,6 +487,12 @@ class ReceptionCheckinHistoryListView(APIView):
 
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+
+        if current_stage_filter:  # NEW
+            queryset = queryset.filter(current_stage=current_stage_filter)
+
+        if today_only:  # NEW: "dispensed today" — used by pharmacy frontend when listing today's completed visits
+            queryset = queryset.filter(visit_date=timezone.localdate())
 
         if start_date:
             queryset = queryset.filter(visit_date__gte=start_date)
@@ -499,8 +522,73 @@ class ReceptionCheckinHistoryPhotoView(APIView):
         return response
 
 
-class ReceptionCheckinHistoryDeleteView(APIView):
+class VisitSessionUpdateSerializer(serializers.Serializer):  # NEW
+    """Partial update serializer for visit session.
+
+    External clients (e.g. reception UI) may PATCH a visit's status/stage/file_number.
+    The pharmacy dispense flow bypasses this endpoint and updates the model directly
+    inside its atomic transaction, so this serializer is intentionally lenient.
+    """
+
+    status = serializers.ChoiceField(choices=VisitStatus.choices, required=False)
+    current_stage = serializers.ChoiceField(choices=VisitStage.choices, required=False)
+    completed_time = serializers.DateTimeField(required=False, allow_null=True)
+    file_number = serializers.CharField(
+        required=False, allow_blank=True, max_length=32
+    )
+    medicines_total = serializers.DecimalField(
+        required=False, max_digits=10, decimal_places=2, min_value=0
+    )
+
+
+class ReceptionCheckinHistoryDetailView(APIView):  # CHANGED: renamed and extended (was DeleteView)
+    """Handles PATCH (update) and DELETE on a single visit session.
+
+    Reception or admin can edit visit metadata; same role can delete the session.
+    """
+
     permission_classes = [IsReceptionOrAdmin]
+
+    def patch(self, request, session_id):  # NEW
+        session = get_object_or_404(VisitSession, pk=session_id)
+        serializer = VisitSessionUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        update_fields: list[str] = []
+        for field in ("status", "current_stage", "file_number", "medicines_total"):
+            if field in data:
+                setattr(session, field, data[field])
+                update_fields.append(field)
+
+        if "completed_time" in data:
+            session.completed_time = data["completed_time"]
+            update_fields.append("completed_time")
+
+        # If status flipped to completed and no completed_time supplied, stamp it.
+        if (
+            data.get("status") == VisitStatus.COMPLETED
+            and session.completed_time is None
+        ):
+            session.completed_time = timezone.now()
+            if "completed_time" not in update_fields:
+                update_fields.append("completed_time")
+
+        if update_fields:
+            update_fields.append("updated_at")
+            session.save(update_fields=update_fields)
+
+        return success_response(
+            {
+                "session_id": str(session.pk),
+                "patient_id": str(session.patient_id),
+                "status": session.status,
+                "current_stage": session.current_stage,
+                "completed_time": session.completed_time,
+                "file_number": session.file_number,
+                "medicines_total": session.medicines_total,
+            }
+        )
 
     def delete(self, request, session_id):
         session = get_object_or_404(VisitSession, pk=session_id)

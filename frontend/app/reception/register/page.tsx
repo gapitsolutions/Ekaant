@@ -22,14 +22,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 // Generate registration number locally
-function generateRegistrationNumber(): string {
-  const prefix = "AGH";
-  const year = new Date().getFullYear().toString().slice(-2);
-  const random = Math.floor(Math.random() * 10000)
-    .toString()
-    .padStart(4, "0");
-  return `${prefix}${year}${random}`;
-}
+// File numbers are entered by the receptionist (e.g. "A1", "A2", ...) and
+// validated for uniqueness server-side. There is no auto-generation.
+const FILE_NUMBER_REGEX = /^[A-Za-z0-9-]+$/;
 import {
   captureFingerprint,
   checkRDService,
@@ -39,6 +34,9 @@ import { getIndiaCitiesByStateName, getIndiaStates } from "@/lib/address-data";
 import type { Gender, PatientCategory } from "@/lib/types";
 import { registerPatientTier1 } from "@/lib/hms-api";
 import { useAuth } from "@/lib/auth-context";
+import { isApiError } from "@/lib/api-client";
+import { toastApiError, useApiErrors } from "@/lib/api-errors";
+import { FieldError } from "@/components/ui/field-error";
 import { toast } from "sonner";
 import {
   User,
@@ -64,6 +62,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { navigate } from "@/lib/navigation";
 
 export default function RegisterPatientPage() {
+  const apiErrors = useApiErrors();
   const { accessToken } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCapturingFingerprint, setIsCapturingFingerprint] = useState(false);
@@ -112,14 +111,6 @@ export default function RegisterPatientPage() {
     [instantFormData.state],
   );
 
-  // Generate file number on mount
-  useEffect(() => {
-    setInstantFormData((prev) => ({
-      ...prev,
-      file_number: generateRegistrationNumber(),
-    }));
-  }, []);
-
   const refreshFingerprintService = async () => {
     setIsCheckingFingerprintService(true);
     try {
@@ -140,21 +131,8 @@ export default function RegisterPatientPage() {
     setInstantFormData({ ...instantFormData, [e.target.name]: e.target.value });
   };
 
-  const generateNewFileNumber = () => {
-    setInstantFormData((prev) => ({
-      ...prev,
-      file_number: generateRegistrationNumber(),
-    }));
-    toast.success("New file number generated");
-  };
-
-  // Check if file number already exists
-  const isFileNumberUnique = (fileNumber: string): boolean => {
-    return !!fileNumber;
-  };
-
-  // Check if Aadhaar number already exists
-  const isAadhaarUnique = (aadhaar: string): boolean => {
+  // Check Aadhaar uniqueness — placeholder, real check is server-side.
+  const isAadhaarUnique = (_aadhaar: string): boolean => {
     return true;
   };
 
@@ -352,6 +330,7 @@ export default function RegisterPatientPage() {
 
   const handleInstantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    apiErrors.clear();
 
     // Validation
     if (!instantFormData.patient_category) {
@@ -381,10 +360,17 @@ export default function RegisterPatientPage() {
       return;
     }
 
-    // Check file number uniqueness
-    if (!isFileNumberUnique(instantFormData.file_number)) {
+    // File number is required and must match the server-side regex; the
+    // backend additionally enforces uniqueness and returns 409 + the most
+    // recently used file_number on collision.
+    const fileNumber = instantFormData.file_number.trim();
+    if (!fileNumber) {
+      toast.error("File number is required.");
+      return;
+    }
+    if (!FILE_NUMBER_REGEX.test(fileNumber)) {
       toast.error(
-        "This file number already exists. Please generate a new one.",
+        "File number may only contain letters, digits and hyphens.",
       );
       return;
     }
@@ -441,15 +427,24 @@ export default function RegisterPatientPage() {
         photo_mime_type: parsedPhoto?.mimeType,
       });
 
-      setNewRegistrationNumber(result.registration_number);
+      setNewRegistrationNumber(result.file_number);
       setRegistrationComplete(true);
       toast.success(
-        `Patient registered successfully! File No: ${result.registration_number}`,
+        `Patient registered successfully! File No: ${result.file_number}`,
       );
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Registration failed",
-      );
+      apiErrors.setFromError(error);
+      if (isApiError(error) && error.status === 409) {
+        const hint =
+          (error.payload?.last_file_number as string | undefined) ?? undefined;
+        toast.error(
+          hint
+            ? `File number "${fileNumber}" is already in use. Most recent file number is "${hint}".`
+            : `File number "${fileNumber}" is already in use. Please choose another.`,
+        );
+      } else {
+        toastApiError(error, "Registration failed");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -459,7 +454,7 @@ export default function RegisterPatientPage() {
     setInstantFormData({
       patient_category: "",
       full_name: "",
-      file_number: generateRegistrationNumber(),
+      file_number: "",
       aadhaar_number: "",
       date_of_birth: "",
       sex: "",
@@ -721,28 +716,22 @@ export default function RegisterPatientPage() {
                       <Hash className="h-4 w-4 text-teal-600" />
                       File Number <span className="text-destructive">*</span>
                     </Label>
-                    <div className="flex gap-2 mt-1.5">
+                    <div className="mt-1.5">
                       <Input
                         id="file_number"
                         name="file_number"
                         value={instantFormData.file_number}
                         onChange={handleInstantChange}
-                        placeholder="File number"
+                        placeholder="e.g. A1"
                         className="font-mono text-lg font-semibold"
                         required
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={generateNewFileNumber}
-                        title="Generate new file number"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
                     </div>
+                    <FieldError message={apiErrors.get("file_number")} />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Auto-generated unique number. You can modify if needed.
+                      Letters, digits and hyphens only. Uniqueness is verified
+                      on save — if the number is already taken the most
+                      recently used one will be shown.
                     </p>
                   </div>
 
@@ -767,6 +756,7 @@ export default function RegisterPatientPage() {
                       className="mt-1.5 font-mono tracking-wider"
                       maxLength={14}
                     />
+                    <FieldError message={apiErrors.get("aadhaar_number")} />
                     <p className="text-xs text-muted-foreground mt-1">
                       12-digit Aadhaar number. Used as unique patient
                       identifier.
@@ -791,6 +781,7 @@ export default function RegisterPatientPage() {
                       className="mt-1.5"
                       required
                     />
+                    <FieldError message={apiErrors.get("full_name")} />
                   </div>
 
                   {/* Date of Birth */}
@@ -811,6 +802,7 @@ export default function RegisterPatientPage() {
                       className="mt-1.5"
                       required
                     />
+                    <FieldError message={apiErrors.get("date_of_birth")} />
                   </div>
 
                   {/* Sex */}
@@ -860,6 +852,7 @@ export default function RegisterPatientPage() {
                         className="mt-1.5"
                         required
                       />
+                      <FieldError message={apiErrors.get("phone_number")} />
                     </div>
 
                     <div>
@@ -881,6 +874,7 @@ export default function RegisterPatientPage() {
                         className="mt-1.5"
                         required
                       />
+                      <FieldError message={apiErrors.get("relative_phone")} />
                     </div>
                   </div>
 
@@ -902,6 +896,7 @@ export default function RegisterPatientPage() {
                       className="mt-1.5 min-h-[80px]"
                       required
                     />
+                    <FieldError message={apiErrors.get("address_line1")} />
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">

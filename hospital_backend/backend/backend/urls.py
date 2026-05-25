@@ -28,6 +28,7 @@ urlpatterns = [
     path("api/v1/", include("patients.urls")),
     path("api/v1/", include("followups.urls")),
     path("api/v1/", include("visits.urls")),
+    path("api/v1/", include("pharmacy.urls")),  # NEW
 ]
 
 if settings.DEBUG:

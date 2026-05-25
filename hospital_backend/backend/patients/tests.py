@@ -82,7 +82,7 @@ class PatientRegistrationPhotoTests(APITestCase):
         self.assertIn("/api/v1/patients/", photo_url)
         self.assertIn("/photo/", photo_url)
 
-        patient = Patient.objects.get(registration_number="AGH260124")
+        patient = Patient.objects.get(file_number="AGH260124")
         self.assertTrue(patient.photo)
         self.assertTrue(patient.photo.name.startswith("patients/"))
 
@@ -200,7 +200,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_receptionist_patient_summary_endpoint_returns_compact_data(self):
         Patient.objects.create(
-            registration_number="AGH260200",
+            file_number="AGH260200",
             hdams_id="HDAMS-0001",
             patient_category="psychiatric",
             full_name="Summary Patient",
@@ -217,7 +217,7 @@ class PatientRegistrationPhotoTests(APITestCase):
         self.assertGreaterEqual(len(response.data["data"]["items"]), 1)
         first = response.data["data"]["items"][0]
         self.assertIn("patient_id", first)
-        self.assertIn("registration_number", first)
+        self.assertIn("file_number", first)
         self.assertIn("hdams_id", first)
         self.assertEqual(first["hdams_id"], "HDAMS-0001")
         self.assertIn("full_name", first)
@@ -228,7 +228,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_patient_visits_endpoint_returns_visit_stage_fields(self):
         patient = Patient.objects.create(
-            registration_number="AGH260201",
+            file_number="AGH260201",
             patient_category="deaddiction",
             full_name="Visit Patient",
             date_of_birth=timezone.localdate(),
@@ -259,7 +259,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_patient_general_patch_persists_profile_changes(self):
         patient = Patient.objects.create(
-            registration_number="AGH260202",
+            file_number="AGH260202",
             patient_category="psychiatric",
             full_name="Original Name",
             date_of_birth=timezone.localdate(),
@@ -298,7 +298,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_patient_general_patch_status_only_update(self):
         patient = Patient.objects.create(
-            registration_number="AGH260203",
+            file_number="AGH260203",
             patient_category="deaddiction",
             full_name="Status Patient",
             date_of_birth=timezone.localdate(),
@@ -323,7 +323,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_patient_general_patch_can_recapture_fingerprint(self):
         patient = Patient.objects.create(
-            registration_number="AGH260204",
+            file_number="AGH260204",
             patient_category="psychiatric",
             full_name="Fingerprint Patient",
             date_of_birth=timezone.localdate(),
@@ -359,7 +359,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_patient_general_patch_can_clear_fingerprint(self):
         patient = Patient.objects.create(
-            registration_number="AGH260205",
+            file_number="AGH260205",
             patient_category="deaddiction",
             full_name="Clear Fingerprint",
             date_of_birth=timezone.localdate(),
@@ -389,7 +389,7 @@ class PatientRegistrationPhotoTests(APITestCase):
 
     def test_patient_delete_endpoint_cascades_visits_and_media(self):
         patient = Patient.objects.create(
-            registration_number="AGH260206",
+            file_number="AGH260206",
             patient_category="deaddiction",
             full_name="Delete Me",
             date_of_birth=timezone.localdate(),
@@ -425,15 +425,15 @@ class PatientRegistrationPhotoTests(APITestCase):
         self.assertFalse(VisitSession.objects.filter(patient_id=patient.id).exists())
         self.assertFalse(os.path.exists(patient_media_dir))
 
-    def test_patient_delete_endpoint_allows_receptionist_role(self):
-        receptionist = User.objects.create_user(
-            email="receptionist@example.com",
+    def test_patient_delete_endpoint_allows_reception_role(self):
+        reception = User.objects.create_user(
+            email="reception@example.com",
             password="test-password",
-            role="receptionist",
-            full_name="Receptionist User",
+            role="reception",
+            full_name="Reception User",
         )
         patient = Patient.objects.create(
-            registration_number="AGH260207",
+            file_number="AGH260207",
             patient_category="psychiatric",
             full_name="Protected Patient",
             date_of_birth=timezone.localdate(),
@@ -442,7 +442,7 @@ class PatientRegistrationPhotoTests(APITestCase):
             address_line1="Address",
         )
 
-        self.client.force_authenticate(user=receptionist)
+        self.client.force_authenticate(user=reception)
         response = self.client.delete(f"/api/v1/patients/{patient.id}/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

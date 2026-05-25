@@ -10,7 +10,7 @@ from .models import Patient
 
 
 PATIENT_EXPORT_FIELD_CHOICES = (
-    ("registration_number", "Registration Number"),
+    ("file_number", "File Number"),
     ("hdams_id", "HDAMS ID"),
     ("full_name", "Full Name"),
     ("patient_category", "Patient Category"),
@@ -34,7 +34,7 @@ class PatientAdmin(admin.ModelAdmin):
     actions = ("export_selected_patients_csv",)
 
     list_display = (
-        "registration_number",
+        "file_number",
         "full_name",
         "patient_category",
         "phone_number",
@@ -43,7 +43,7 @@ class PatientAdmin(admin.ModelAdmin):
     )
     list_filter = ("patient_category", "status", "sex")
     search_fields = (
-        "registration_number",
+        "file_number",
         "full_name",
         "phone_number",
         "aadhaar_number",

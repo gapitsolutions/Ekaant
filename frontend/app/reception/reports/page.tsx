@@ -84,7 +84,7 @@ function exportVisitsToCSV(items: ReportVisitItem[], filename: string) {
   ];
 
   const rows = items.map((item) => [
-    item.patient.registration_number,
+    item.patient.file_number,
     item.patient.full_name,
     item.patient.phone,
     item.patient.patient_category,
@@ -419,7 +419,7 @@ export default function ReportsPage() {
                         <TableRow key={item.id}>
                           <TableCell>
                             <Badge variant="outline" className="font-mono">
-                              {item.patient.registration_number}
+                              {item.patient.file_number}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-medium">
@@ -631,7 +631,7 @@ export default function ReportsPage() {
                         <TableRow key={item.id}>
                           <TableCell>
                             <Badge variant="outline" className="font-mono">
-                              {item.patient.registration_number}
+                              {item.patient.file_number}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-medium">
@@ -822,7 +822,7 @@ export default function ReportsPage() {
                             <TableRow key={item.id}>
                               <TableCell>
                                 <Badge variant="outline" className="font-mono">
-                                  {item.patient.registration_number}
+                                  {item.patient.file_number}
                                 </Badge>
                               </TableCell>
                               <TableCell className="font-medium">

@@ -7,7 +7,6 @@ from .managers import UserManager
 class UserRole(models.TextChoices):
     ADMIN = "admin", "Admin"
     RECEPTION = "reception", "Reception"
-    RECEPTIONIST = "receptionist", "Receptionist"
     COUNSELLOR = "counsellor", "Counsellor"
     DOCTOR = "doctor", "Doctor"
     PHARMACIST = "pharmacist", "Pharmacist"
@@ -22,7 +21,6 @@ class User(AbstractUser):
         choices=UserRole.choices,
         default=UserRole.RECEPTION,
     )
-    hospital_id = models.CharField(max_length=64, blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []

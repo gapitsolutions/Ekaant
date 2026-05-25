@@ -31,7 +31,7 @@ export default function AdminDashboard() {
       .then((data) => {
         const mapped = data.items.map((item: any) => ({
           id: item.id || item._id,
-          registration_number: item.registration_number || '',
+          file_number: item.file_number || '',
           patient_category: item.patient_category || 'deaddiction',
           full_name: item.full_name || '',
           date_of_birth: item.date_of_birth || item.dob || '',
@@ -298,7 +298,7 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="font-mono">{patient.registration_number}</Badge>
+                  <Badge variant="outline" className="font-mono">{patient.file_number}</Badge>
                 </div>
               ))}
               {patients.length === 0 && (

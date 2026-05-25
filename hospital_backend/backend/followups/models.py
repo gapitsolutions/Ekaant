@@ -60,7 +60,7 @@ class FollowUpTicket(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.patient.registration_number}#{self.cycle_number}"
+        return f"{self.patient.file_number}#{self.cycle_number}"
 
 
 class FollowUpCallAttempt(models.Model):

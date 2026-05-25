@@ -35,6 +35,7 @@ import {
 } from "@/lib/biometric";
 import { navigate } from "@/lib/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { toastApiError } from "@/lib/api-errors";
 import { toast } from "sonner";
 import {
   Fingerprint,
@@ -58,7 +59,7 @@ import {
 
 interface LookupPatient {
   id: string;
-  registration_number: string;
+  file_number: string;
   full_name: string;
   phone: string;
   date_of_birth: string;
@@ -312,7 +313,7 @@ export default function CheckinPage() {
 
           return {
             id: patient.patient_id,
-            registration_number: patient.registration_number,
+            file_number: patient.file_number,
             full_name: patient.full_name,
             phone: patient.phone_number,
             date_of_birth: patient.date_of_birth,
@@ -463,7 +464,7 @@ export default function CheckinPage() {
       setBiometricVerified(false);
       setVerificationStep("search");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Check-in failed");
+      toastApiError(error, "Check-in failed");
     } finally {
       setIsCheckingIn(false);
     }
@@ -683,7 +684,7 @@ export default function CheckinPage() {
                               variant="outline"
                               className="text-xs font-mono"
                             >
-                              {patient.registration_number}
+                              {patient.file_number}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {patient.phone}
@@ -791,7 +792,7 @@ export default function CheckinPage() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <Badge className="bg-[#0d7377] text-white font-mono">
-                          {selectedPatient.registration_number}
+                          {selectedPatient.file_number}
                         </Badge>
                         {biometricVerified && (
                           <Badge className="bg-emerald-500 text-white">

@@ -5,8 +5,7 @@ export interface AuthUser {
   id: string;
   full_name: string;
   email: string;
-  role: "admin" | "reception" | "receptionist" | string;
-  hospital_id?: string;
+  role: "admin" | "reception" | "counsellor" | "doctor" | "pharmacist" | string;
 }
 
 export interface LoginResponse {
@@ -21,8 +20,7 @@ export interface SessionResponse {
 
 export interface PatientLookupResponse {
   patient_id: string;
-  registration_number: string;
-  file_number?: string;
+  file_number: string;
   photo_url?: string | null;
   hdams_id?: string | null;
   patient_category?: PatientCategory;
@@ -58,7 +56,7 @@ export interface PatientLookupListResponse {
 
 export interface PatientSummaryResponse {
   patient_id: string;
-  registration_number: string;
+  file_number: string;
   hdams_id?: string | null;
   full_name: string;
   phone_number: string;
@@ -82,7 +80,7 @@ export interface FingerprintTemplateResponse {
 
 type RegisterPatientTier1Payload = {
   patient_category: PatientCategory;
-  file_number?: string;
+  file_number: string;
   full_name: string;
   phone_number: string;
   date_of_birth: string;
@@ -131,7 +129,7 @@ export interface PatientGeneralData {
 
 export interface PatientDetailResponse extends PatientGeneralData {
   patient_id: string;
-  registration_number?: string;
+  file_number?: string;
   hdams_id?: string;
   patient_category?: PatientCategory;
   full_name: string;
@@ -320,15 +318,14 @@ export async function registerPatientTier1(
 }
 
 export async function lookupPatient(
-  queryOrToken: { q?: string; registration_number?: string } | string,
-  maybeQuery?: { q?: string; registration_number?: string },
+  queryOrToken: { q?: string; file_number?: string } | string,
+  maybeQuery?: { q?: string; file_number?: string },
 ): Promise<PatientLookupListResponse> {
   const query =
     typeof queryOrToken === "string" ? (maybeQuery ?? {}) : queryOrToken;
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
-  if (query.registration_number)
-    params.set("registration_number", query.registration_number);
+  if (query.file_number) params.set("file_number", query.file_number);
   return apiRequest<PatientLookupListResponse>(
     `/api/v1/patients/lookup/?${params.toString()}`,
     {},
@@ -463,7 +460,7 @@ export async function updatePatientNextFollowupDate(
 }
 
 export interface ReportPatientSnapshot {
-  registration_number: string;
+  file_number: string;
   full_name: string;
   date_of_birth: string;
   gender: "male" | "female" | "other";
@@ -591,7 +588,7 @@ export async function getQueueStatus(_token?: string) {
 export type CheckinHistoryVerificationMethod = "fingerprint" | "photo";
 
 export interface CheckinHistoryPatientSnapshot {
-  registration_number: string;
+  file_number: string;
   full_name: string;
   date_of_birth: string;
   gender: "male" | "female" | "other";

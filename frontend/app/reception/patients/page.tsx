@@ -160,7 +160,7 @@ export default function PatientDataPage() {
 
   const mapLookupPatient = (p: PatientLookupResponse): Patient => ({
     id: p.patient_id,
-    registration_number: p.registration_number,
+    file_number: p.file_number,
     hdams_id: p.hdams_id || "",
     patient_category: (p.patient_category as PatientCategory) || "deaddiction",
     full_name: p.full_name,
@@ -196,7 +196,7 @@ export default function PatientDataPage() {
 
   const mapPatientDetail = (p: PatientDetailResponse): Patient => ({
     id: p.patient_id,
-    registration_number: p.registration_number || "",
+    file_number: p.file_number || "",
     hdams_id: p.hdams_id || "",
     patient_category: (p.patient_category as PatientCategory) || "deaddiction",
     full_name: p.full_name || "",
@@ -491,8 +491,8 @@ export default function PatientDataPage() {
     const result = [...patients];
 
     result.sort((a, b) => {
-      const comparison = a.registration_number.localeCompare(
-        b.registration_number,
+      const comparison = a.file_number.localeCompare(
+        b.file_number,
       );
       return sortOrder === "asc" ? comparison : -comparison;
     });
@@ -589,7 +589,7 @@ export default function PatientDataPage() {
 
       // Convert patients to CSV rows
       const rows = exportCandidates.map((patient) => [
-        patient.registration_number || "",
+        patient.file_number || "",
         patient.hdams_id || "",
         patient.full_name || "",
         patient.aadhaar_number || "",
@@ -991,7 +991,7 @@ export default function PatientDataPage() {
             <p className="text-muted-foreground">
               File No:{" "}
               <span className="font-mono text-[#0d7377]">
-                {selectedPatient.registration_number}
+                {selectedPatient.file_number}
               </span>
               {selectedPatient.hdams_id && (
                 <>
@@ -1087,7 +1087,7 @@ export default function PatientDataPage() {
               </DialogTitle>
               <DialogDescription>
                 Patient: {selectedPatient.full_name} (
-                {selectedPatient.registration_number})
+                {selectedPatient.file_number})
               </DialogDescription>
             </DialogHeader>
 
@@ -1767,10 +1767,10 @@ export default function PatientDataPage() {
                         <div>
                           <Label>File Number</Label>
                           <Input
-                            value={editingPatient.registration_number}
+                            value={editingPatient.file_number}
                             onChange={(e) =>
                               handleEditChange(
-                                "registration_number",
+                                "file_number",
                                 e.target.value,
                               )
                             }
@@ -2700,7 +2700,7 @@ export default function PatientDataPage() {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                       <span className="font-mono text-[#0d7377]">
-                        {patient.registration_number}
+                        {patient.file_number}
                       </span>
                       <span className="font-mono text-[#14919b]">
                         {patient.hdams_id

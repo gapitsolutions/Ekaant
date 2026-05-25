@@ -50,7 +50,7 @@ def followup_item_payload(ticket: FollowUpTicket):
         "id": str(ticket.pk),
         "patient_id": str(patient.pk),
         "patient_name": patient.full_name,
-        "file_number": patient.registration_number,
+        "file_number": patient.file_number,
         "phone": patient.phone_number,
         "patient_category": patient.patient_category,
         "follow_up_date": ticket.follow_up_date,

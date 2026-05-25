@@ -10,7 +10,7 @@ from rest_framework import serializers
 from core.exceptions import ConflictError
 from visits.models import VisitSession
 
-from .models import Patient
+from .models import FILE_NUMBER_MAX_LENGTH, FILE_NUMBER_VALIDATOR, Patient
 
 
 def _digits_only(value: str) -> str:
@@ -34,7 +34,10 @@ class PatientRegistrationSerializer(serializers.Serializer):
     patient_category = serializers.ChoiceField(
         choices=Patient._meta.get_field("patient_category").choices
     )
-    file_number = serializers.CharField(required=False, allow_blank=True)
+    file_number = serializers.CharField(
+        max_length=FILE_NUMBER_MAX_LENGTH,
+        validators=[FILE_NUMBER_VALIDATOR],
+    )
     full_name = serializers.CharField()
     phone_number = serializers.CharField()
     date_of_birth = serializers.DateField()
@@ -127,9 +130,16 @@ class PatientRegistrationSerializer(serializers.Serializer):
         return digits
 
     def validate_file_number(self, value):
-        value = value.strip()
-        if value and Patient.objects.filter(registration_number=value).exists():
-            raise ConflictError("This file number already exists.")
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("File number is required.")
+        if Patient.objects.filter(file_number__iexact=value).exists():
+            # ConflictError → 409. The view layer attaches `last_file_number`
+            # to the error response so the front-end can suggest the next id.
+            raise ConflictError(
+                "This file number already exists.",
+                extra={"last_file_number": Patient.latest_file_number()},
+            )
         return value
 
     def validate_pincode(self, value):
@@ -146,16 +156,26 @@ class PatientRegistrationSerializer(serializers.Serializer):
         photo_mime_type = validated_data.pop("photo_mime_type", None)
         validated_data.pop("photo_base64", None)
 
-        registration_number = (
-            validated_data.pop("file_number", "").strip()
-            or Patient.generate_registration_number()
-        )
-        patient = Patient.objects.create(
-            registration_number=registration_number,
-            fingerprint_enrolled_at=timezone.now(),
-            emergency_contact_phone=validated_data.get("relative_phone", ""),
-            **validated_data,
-        )
+        # ``file_number`` is validated for uniqueness in ``validate_file_number``
+        # but a race with a concurrent registration is still possible — the DB
+        # unique constraint is the source of truth. Convert IntegrityError back
+        # into the same ConflictError shape so clients see one error contract.
+        from django.db import IntegrityError, transaction
+
+        try:
+            with transaction.atomic():
+                patient = Patient.objects.create(
+                    fingerprint_enrolled_at=timezone.now(),
+                    emergency_contact_phone=validated_data.get("relative_phone", ""),
+                    **validated_data,
+                )
+        except IntegrityError as exc:
+            if "file_number" in str(exc):
+                raise ConflictError(
+                    "This file number already exists.",
+                    extra={"last_file_number": Patient.latest_file_number()},
+                ) from exc
+            raise
 
         if photo_bytes and photo_mime_type:
             extension = "jpg" if photo_mime_type == "image/jpeg" else "png"
@@ -175,7 +195,7 @@ class PatientSummarySerializer(serializers.ModelSerializer):
         model = Patient
         fields = (
             "patient_id",
-            "registration_number",
+            "file_number",
             "hdams_id",
             "full_name",
             "phone_number",
@@ -194,7 +214,6 @@ class PatientSummarySerializer(serializers.ModelSerializer):
 
 class PatientLookupSerializer(serializers.ModelSerializer):
     patient_id = serializers.SerializerMethodField()
-    file_number = serializers.CharField(source="registration_number")
     phone = serializers.CharField(source="phone_number")
     gender = serializers.CharField(source="sex")
     address = serializers.CharField(source="address_line1")
@@ -206,7 +225,6 @@ class PatientLookupSerializer(serializers.ModelSerializer):
         model = Patient
         fields = (
             "patient_id",
-            "registration_number",
             "file_number",
             "hdams_id",
             "patient_category",
@@ -261,7 +279,7 @@ class PatientGeneralDataSerializer(serializers.ModelSerializer):
         model = Patient
         fields = (
             "patient_id",
-            "registration_number",
+            "file_number",
             "hdams_id",
             "patient_category",
             "full_name",
@@ -487,7 +505,7 @@ def patient_search_queryset(query: str):
         return Patient.objects.none()
 
     return Patient.objects.filter(
-        Q(registration_number__icontains=query)
+        Q(file_number__icontains=query)
         | Q(full_name__icontains=query)
         | Q(phone_number__icontains=digits or query)
         | Q(aadhaar_number__icontains=digits or query)

@@ -49,7 +49,7 @@ export function PatientCard({ patient, visit, onClick, showStage = true, waitTim
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <User className="h-3.5 w-3.5 text-[#0d7377]" />
-              {patient.registration_number}
+              {patient.file_number}
             </span>
             {age && (
               <span className="flex items-center gap-1">
@@ -115,7 +115,7 @@ export function PatientQueueItem({
 
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate">{patient.full_name}</p>
-        <p className="text-xs text-muted-foreground">{patient.registration_number}</p>
+        <p className="text-xs text-muted-foreground">{patient.file_number}</p>
       </div>
 
       <div className="text-right">

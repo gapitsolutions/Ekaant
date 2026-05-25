@@ -16,7 +16,7 @@ class FollowUpTicketAdmin(admin.ModelAdmin):
         "successful_at",
     )
     list_filter = ("status", "patient__patient_category", "follow_up_date", "pending_since")
-    search_fields = ("patient__registration_number", "patient__full_name", "patient__phone_number")
+    search_fields = ("patient__file_number", "patient__full_name", "patient__phone_number")
     ordering = ("-pending_since", "-created_at")
 
 
@@ -24,5 +24,5 @@ class FollowUpTicketAdmin(admin.ModelAdmin):
 class FollowUpCallAttemptAdmin(admin.ModelAdmin):
     list_display = ("id", "ticket", "result", "called_by", "called_at", "next_call_date")
     list_filter = ("result", "called_at")
-    search_fields = ("ticket__patient__registration_number", "ticket__patient__full_name", "note")
+    search_fields = ("ticket__patient__file_number", "ticket__patient__full_name", "note")
     ordering = ("-called_at",)

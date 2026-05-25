@@ -1,9 +1,18 @@
-import random
 import uuid
 
+from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+
+
+# Human-entered patient identifier. Free-form but URL-safe: letters,
+# digits, hyphens only. Length capped to keep generated URLs sensible.
+FILE_NUMBER_VALIDATOR = RegexValidator(
+    regex=r"^[A-Za-z0-9-]+$",
+    message="File number may only contain letters, digits and hyphens.",
+)
+FILE_NUMBER_MAX_LENGTH = 32
 
 
 class PatientCategory(models.TextChoices):
@@ -39,7 +48,11 @@ def patient_photo_upload_path(instance, filename):
 
 class Patient(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    registration_number = models.CharField(max_length=32, unique=True)
+    file_number = models.CharField(
+        max_length=FILE_NUMBER_MAX_LENGTH,
+        unique=True,
+        validators=[FILE_NUMBER_VALIDATOR],
+    )
     hdams_id = models.CharField(max_length=64, blank=True, null=True, unique=True)
     patient_category = models.CharField(max_length=32, choices=PatientCategory.choices)
     full_name = models.CharField(max_length=255)
@@ -113,7 +126,7 @@ class Patient(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["registration_number"]
+        ordering = ["file_number"]
         constraints = [
             models.UniqueConstraint(
                 fields=["aadhaar_number"],
@@ -122,14 +135,14 @@ class Patient(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["registration_number"]),
+            models.Index(fields=["file_number"]),
             models.Index(fields=["phone_number"]),
             models.Index(fields=["full_name"]),
             models.Index(fields=["next_followup_date"]),
         ]
 
     def __str__(self):
-        return f"{self.registration_number} - {self.full_name}"
+        return f"{self.file_number} - {self.full_name}"
 
     @property
     def general_data_complete(self) -> bool:
@@ -142,9 +155,12 @@ class Patient(models.Model):
         return all(bool(value) for value in required_fields)
 
     @classmethod
-    def generate_registration_number(cls) -> str:
-        prefix = timezone.localtime().strftime("AGH%y%m%d")
-        while True:
-            candidate = f"{prefix}{random.randint(100, 999)}"
-            if not cls.objects.filter(registration_number=candidate).exists():
-                return candidate
+    def latest_file_number(cls) -> str | None:
+        """Return the most recently created patient's file_number.
+
+        Used by the registration 409 response so the front-end can suggest
+        the next available number after a collision. Returns ``None`` when
+        the table is empty.
+        """
+        latest = cls.objects.order_by("-created_at").only("file_number").first()
+        return latest.file_number if latest else None

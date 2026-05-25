@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "corsheaders",
     "rest_framework",
     "django_filters",
@@ -31,6 +32,7 @@ INSTALLED_APPS = [
     "patients",
     "followups",
     "visits",
+    "pharmacy",  # NEW
 ]
 
 MIDDLEWARE = [
@@ -104,6 +106,7 @@ REST_FRAMEWORK = {
         "django_filters.rest_framework.DjangoFilterBackend",
     ],
     "EXCEPTION_HANDLER": "core.exceptions.api_exception_handler",
+    "EXCEPTION_HANDLER": "utils.exceptions.custom_exception_handler",
 }
 
 SIMPLE_JWT = {
