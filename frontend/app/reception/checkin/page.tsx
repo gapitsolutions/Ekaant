@@ -73,6 +73,46 @@ interface LookupPatient {
   next_followup_date?: string;
 }
 
+type VisitStatus = "early" | "on_time" | "missed" | "late" | "none";
+
+const getVisitStatus = (dateStr?: string): VisitStatus => {
+  if (!dateStr) return "none";
+  const followUp = new Date(dateStr);
+  followUp.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = (today.getTime() - followUp.getTime()) / (1000 * 3600 * 24);
+
+  if (diffDays < 0) return "early";
+  if (diffDays === 0) return "on_time";
+  if (diffDays > 0 && diffDays <= 45) return "missed";
+  return "late";
+};
+
+const getBannerStyle = (status: VisitStatus) => {
+  switch (status) {
+    case "early":
+      return { bg: "bg-blue-50 border-blue-100", text: "text-blue-700", label: "EARLY VISIT", badge: "bg-slate-100 text-slate-700" };
+    case "on_time":
+      return { bg: "bg-[#0d7377]/10 border-[#0d7377]/10", text: "text-[#0d7377]", label: "ON TIME VISIT", badge: null };
+    case "missed":
+      return { bg: "bg-orange-50 border-orange-100", text: "text-orange-700", label: "MISSED VISIT", badge: "bg-blue-50 text-blue-700" };
+    case "late":
+      return { bg: "bg-red-50 border-red-100", text: "text-red-700", label: "LATE VISIT (>1.5 MONTHS)", badge: "bg-red-600 text-white" };
+    default:
+      return { bg: "bg-slate-50 border-slate-100", text: "text-slate-500", label: "LATEST FOLLOW-UP DATE", badge: null };
+  }
+};
+
+const formatPatientNameWithStatus = (name: string, dateStr?: string) => {
+  const status = getVisitStatus(dateStr);
+  if (status === "early") return `${name} (EARLY)`;
+  if (status === "on_time") return `${name} (ON TIME)`;
+  if (status === "missed") return `${name} (MISSED)`;
+  if (status === "late") return `${name} (LATE)`;
+  return name;
+};
+
 export default function CheckinPage() {
   const { accessToken } = useAuth();
   const [rdService, setRdService] = useState<RDServiceInfo | null>(null);
@@ -499,7 +539,7 @@ export default function CheckinPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -677,7 +717,7 @@ export default function CheckinPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-foreground">
-                            {patient.full_name}
+                            {formatPatientNameWithStatus(patient.full_name, patient.next_followup_date)}
                           </p>
                           <div className="flex flex-wrap gap-2 mt-1">
                             <Badge
@@ -757,16 +797,52 @@ export default function CheckinPage() {
               <div className="space-y-6">
                 {/* Patient Registration Details Card */}
                 <div
-                  className={`rounded-xl border-2 overflow-hidden transition-all ${
+                  className={`rounded-2xl border overflow-hidden transition-all bg-[#f8fafc] ${
                     biometricVerified
-                      ? "border-emerald-500 bg-emerald-50/50"
-                      : "border-[#0d7377]/30 bg-gradient-to-br from-[#0d7377]/5 to-[#14919b]/5"
+                      ? "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                      : "border-[#0d7377]/20 shadow-sm"
                   }`}
                 >
+                  {/* Latest Follow-Up Date Banner */}
+                  {(() => {
+                    const status = getVisitStatus(selectedPatient.next_followup_date);
+                    const style = getBannerStyle(status);
+
+                    let displayDate = selectedPatient.next_followup_date || "NO PREVIOUS RECORD";
+                    if (selectedPatient.next_followup_date) {
+                      displayDate = new Date(selectedPatient.next_followup_date).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      });
+                    }
+
+                    return (
+                      <div className={`${style.bg} px-5 py-4 border-b flex items-center justify-between gap-3`}>
+                        <div className="flex items-center gap-3">
+                          <RefreshCw className={`h-5 w-5 ${style.text}`} />
+                          <div>
+                            <p className={`text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 ${style.text} opacity-80`}>
+                              {style.label}
+                            </p>
+                            <p className={`font-extrabold text-lg tracking-tight ${style.text}`}>
+                              {displayDate}
+                            </p>
+                          </div>
+                        </div>
+                        {style.badge && (
+                          <Badge className={`${style.badge} border-0 text-[10px] font-bold tracking-wider shadow-none`}>
+                            {style.label}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Photo & Basic Info Header */}
-                  <div className="p-5 md:p-6 flex flex-col sm:flex-row sm:items-start gap-6 border-b border-dashed">
-                    <div className="relative mx-auto sm:mx-0">
-                      <div className="w-40 h-40 md:w-48 md:h-48 rounded-2xl bg-white shadow-md flex items-center justify-center overflow-hidden border-2 border-white">
+                  <div className="p-6 flex flex-col sm:flex-row sm:items-center gap-6 border-b border-slate-200/60 bg-white/40">
+                    <div className="relative mx-auto sm:mx-0 flex flex-col items-center gap-3">
+                      <div className="w-40 h-40 rounded-3xl bg-white shadow-sm flex items-center justify-center overflow-hidden border border-slate-200 relative">
                         {selectedPatient.photo ? (
                           <img
                             src={selectedPatient.photo}
@@ -774,105 +850,88 @@ export default function CheckinPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Camera className="h-12 w-12 text-muted-foreground/30" />
+                          <Camera className="h-12 w-12 text-slate-300" />
+                        )}
+                        {selectedPatient.fingerprint_template && (
+                          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#0d7377] flex items-center justify-center ring-2 ring-white">
+                            <Fingerprint className="h-3 w-3 text-white" />
+                          </div>
                         )}
                       </div>
-                      {selectedPatient.fingerprint_template && (
-                        <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-[#0d7377] flex items-center justify-center ring-2 ring-white">
-                          <Fingerprint className="h-3.5 w-3.5 text-white" />
-                        </div>
-                      )}
-                      <p className="mt-2 text-xs text-center text-muted-foreground">
+                      <p className="text-[11px] text-slate-400 font-medium">
                         Patient photo
                       </p>
                     </div>
-                    <div className="flex-1 w-full">
-                      <h3 className="text-xl font-bold text-foreground">
-                        {selectedPatient.full_name}
+
+                    <div className="flex-1 text-center sm:text-left">
+                      <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">
+                        {formatPatientNameWithStatus(selectedPatient.full_name, selectedPatient.next_followup_date)}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <Badge className="bg-[#0d7377] text-white font-mono">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2 mb-3">
+                        <Badge className="bg-[#0d7377] hover:bg-[#0d7377] text-white font-mono px-3 py-1 rounded-md text-xs border-0">
                           {selectedPatient.file_number}
                         </Badge>
                         {biometricVerified && (
-                          <Badge className="bg-emerald-500 text-white">
+                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-0 px-2 py-1">
                             <ShieldCheck className="h-3 w-3 mr-1" />
                             Verified
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-3">
+                      <p className="text-sm text-slate-500 leading-relaxed max-w-sm">
                         Confirm patient identity using photo, name, and file
                         number before biometric verification.
                       </p>
                     </div>
                   </div>
 
-                  {/* Registration Details Grid */}
-                  <div className="p-4 grid gap-3">
-                    {/* Aadhaar */}
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-white/50">
-                      <div className="w-8 h-8 rounded-full bg-[#0d7377]/10 flex items-center justify-center">
-                        <CreditCard className="h-4 w-4 text-[#0d7377]" />
+                  {/* Registration Details Stack */}
+                  <div className="p-6 space-y-3 bg-[#f8fafc]/50">
+                    {/* Age / DOB */}
+                    <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="h-5 w-5 text-[#0d7377]" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">
-                          Aadhaar Number
+                        <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                          Date of Birth / Age
                         </p>
-                        <p className="font-mono font-medium">
-                          {formatAadhaarDisplay(selectedPatient.aadhaar_last4)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* DOB & Age */}
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-white/50">
-                      <div className="w-8 h-8 rounded-full bg-[#0d7377]/10 flex items-center justify-center">
-                        <Calendar className="h-4 w-4 text-[#0d7377]" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">
-                          Date of Birth
-                        </p>
-                        <p className="font-medium">
-                          {new Date(
-                            selectedPatient.date_of_birth,
-                          ).toLocaleDateString("en-IN", {
+                        <p className="font-bold text-slate-700 text-[15px] mt-0.5">
+                          {new Date(selectedPatient.date_of_birth).toLocaleDateString("en-IN", {
                             day: "2-digit",
                             month: "short",
                             year: "numeric",
-                          })}
-                          <span className="text-muted-foreground ml-2">
-                            ({calculateAge(selectedPatient.date_of_birth)}{" "}
-                            years)
-                          </span>
+                          })}{" "}
+                          ({calculateAge(selectedPatient.date_of_birth)} Years)
                         </p>
                       </div>
                     </div>
 
-                    {/* Mobile */}
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-white/50">
-                      <div className="w-8 h-8 rounded-full bg-[#0d7377]/10 flex items-center justify-center">
-                        <Phone className="h-4 w-4 text-[#0d7377]" />
+                    {/* Mobile Number */}
+                    <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
+                        <Phone className="h-5 w-5 text-[#0d7377]" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
                           Mobile Number
                         </p>
-                        <p className="font-medium">{selectedPatient.phone}</p>
+                        <p className="font-bold text-slate-700 text-[15px] mt-0.5">
+                          {selectedPatient.phone}
+                        </p>
                       </div>
                     </div>
 
                     {/* Relative Mobile */}
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-white/50">
-                      <div className="w-8 h-8 rounded-full bg-[#0d7377]/10 flex items-center justify-center">
-                        <Users className="h-4 w-4 text-[#0d7377]" />
+                    <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
+                        <Users className="h-5 w-5 text-[#0d7377]" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
                           Relative Mobile
                         </p>
-                        <p className="font-medium">
+                        <p className="font-bold text-slate-700 text-[15px] mt-0.5">
                           {selectedPatient.emergency_contact_phone ||
                             selectedPatient.relative_phone ||
                             "Not provided"}
@@ -880,14 +939,31 @@ export default function CheckinPage() {
                       </div>
                     </div>
 
-                    {/* Address */}
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-white/50">
-                      <div className="w-8 h-8 rounded-full bg-[#0d7377]/10 flex items-center justify-center">
-                        <MapPin className="h-4 w-4 text-[#0d7377]" />
+                    {/* Aadhaar Number */}
+                    <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
+                        <CreditCard className="h-5 w-5 text-[#0d7377]" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Address</p>
-                        <p className="font-medium text-sm">
+                        <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                          Aadhaar Number
+                        </p>
+                        <p className="font-bold text-slate-700 font-mono text-[15px] mt-0.5">
+                          {formatAadhaarDisplay(selectedPatient.aadhaar_last4)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
+                        <MapPin className="h-5 w-5 text-[#0d7377]" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                          Address
+                        </p>
+                        <p className="font-bold text-slate-700 text-[15px] mt-0.5 line-clamp-2">
                           {selectedPatient.address || "Not provided"}
                         </p>
                       </div>

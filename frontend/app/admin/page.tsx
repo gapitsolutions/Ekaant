@@ -17,6 +17,7 @@ import {
   Activity,
   AlertTriangle,
   Clock,
+  LayoutDashboard,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -87,63 +88,74 @@ export default function AdminDashboard() {
       value: patients.length,
       description: "Registered patients",
       icon: Users,
-      gradient: "from-primary to-primary/80",
+      accent: "bg-[#0d7377]",
+      iconBg: "bg-teal-50",
+      iconColor: "text-[#0d7377]",
     },
     {
       title: "Today's Visits",
       value: todayVisits.length,
       description: `${completedToday} completed, ${inProgressToday} in progress`,
       icon: Calendar,
-      gradient: "from-emerald-500 to-emerald-600",
+      accent: "bg-emerald-500",
+      iconBg: "bg-emerald-50",
+      iconColor: "text-emerald-600",
     },
     {
       title: "Today's Revenue",
-      value: `Rs. ${todayRevenue.toLocaleString('en-IN')}`,
-      description: `Total: Rs. ${totalRevenue.toLocaleString('en-IN')}`,
+      value: `₹${todayRevenue.toLocaleString('en-IN')}`,
+      description: `Total: ₹${totalRevenue.toLocaleString('en-IN')}`,
       icon: TrendingUp,
-      gradient: "from-sky-500 to-sky-600",
+      accent: "bg-sky-500",
+      iconBg: "bg-sky-50",
+      iconColor: "text-sky-600",
     },
     {
       title: "Active Staff",
       value: users.length,
       description: "Total team members",
       icon: UserCheck,
-      gradient: "from-indigo-500 to-indigo-600",
+      accent: "bg-indigo-500",
+      iconBg: "bg-indigo-50",
+      iconColor: "text-indigo-600",
     },
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Overview of Aggarwal Psychiatric & De-Addiction Centre operations
+          <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <LayoutDashboard className="h-7 w-7 text-[#0d7377]" />
+            Admin Dashboard
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm">
+            Overview of Aggarwal Psychiatric &amp; De-Addiction Centre operations
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
           <Clock className="h-4 w-4" />
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
-          <Card key={stat.title} className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow">
-            <div className={`h-1.5 bg-gradient-to-r ${stat.gradient}`} />
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
+          <Card key={stat.title} className="overflow-hidden border-slate-100 shadow-sm hover:shadow-md hover:border-slate-300 transition-all rounded-2xl">
+            <div className={`h-1 w-full ${stat.accent}`} />
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.title}</p>
-                  <p className="text-xs text-muted-foreground/70">{stat.description}</p>
+                  <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">{stat.title}</p>
                 </div>
-                <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.gradient} text-white`}>
-                  <stat.icon className="h-4 w-4" />
+                <div className={`w-10 h-10 rounded-full ${stat.iconBg} flex items-center justify-center`}>
+                  <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />
                 </div>
               </div>
+              <p className="text-xs text-slate-400">{stat.description}</p>
             </CardContent>
           </Card>
         ))}
@@ -157,13 +169,13 @@ export default function AdminDashboard() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Alerts Section */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Alerts & Notifications
+        <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/30">
+            <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Alerts &amp; Notifications
             </CardTitle>
-            <CardDescription>Items requiring attention</CardDescription>
+            <CardDescription className="text-slate-400 text-xs">Items requiring attention</CardDescription>
           </CardHeader>
           <CardContent className="p-4 space-y-4">
             {lowStockMedicines.length > 0 && (
@@ -227,86 +239,86 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Staff Overview */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
+        <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/30">
+            <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Users className="h-4 w-4 text-[#0d7377]" />
               Staff Overview
             </CardTitle>
-            <CardDescription>Team distribution by role</CardDescription>
+            <CardDescription className="text-slate-400 text-xs">Team distribution by role</CardDescription>
           </CardHeader>
           <CardContent className="p-4 space-y-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-primary" />
-                  <span className="text-sm text-foreground">Reception</span>
+                  <div className="h-3 w-3 rounded-full bg-[#0d7377]" />
+                  <span className="text-sm font-medium text-slate-700">Reception</span>
                 </div>
-                <span className="font-semibold text-foreground">{staffByRole.reception}</span>
+                <span className="font-bold text-slate-800">{staffByRole.reception}</span>
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                  <span className="text-sm text-foreground">Counsellors</span>
+                  <span className="text-sm font-medium text-slate-700">Counsellors</span>
                 </div>
-                <span className="font-semibold text-foreground">{staffByRole.counsellor}</span>
+                <span className="font-bold text-slate-800">{staffByRole.counsellor}</span>
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="h-3 w-3 rounded-full bg-indigo-500" />
-                  <span className="text-sm text-foreground">Doctors</span>
+                  <span className="text-sm font-medium text-slate-700">Doctors</span>
                 </div>
-                <span className="font-semibold text-foreground">{staffByRole.doctor}</span>
+                <span className="font-bold text-slate-800">{staffByRole.doctor}</span>
               </div>
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="h-3 w-3 rounded-full bg-amber-500" />
-                  <span className="text-sm text-foreground">Pharmacists</span>
+                  <span className="text-sm font-medium text-slate-700">Pharmacists</span>
                 </div>
-                <span className="font-semibold text-foreground">{staffByRole.pharmacist}</span>
+                <span className="font-bold text-slate-800">{staffByRole.pharmacist}</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Recent Patients */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
+        <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/30">
+            <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Users className="h-4 w-4 text-[#0d7377]" />
               Recent Patients
             </CardTitle>
-            <CardDescription>Newly registered patients</CardDescription>
+            <CardDescription className="text-slate-400 text-xs">Newly registered patients</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y">
+            <div className="divide-y divide-slate-100">
               {patients.slice(0, 5).map((patient) => (
                 <div
                   key={patient.id}
-                  className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+                  className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-primary">
+                    <div className="h-10 w-10 rounded-full bg-teal-50 flex items-center justify-center">
+                      <span className="text-sm font-bold text-[#0d7377]">
                         {patient.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </span>
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{patient.full_name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-semibold text-slate-800 text-sm">{patient.full_name}</p>
+                      <p className="text-xs text-slate-400">
                         {patient.addiction_type} | Age: {new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()}
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="font-mono">{patient.file_number}</Badge>
+                  <Badge variant="outline" className="font-mono text-[10px] text-[#0d7377] border-teal-200 bg-teal-50">{patient.file_number}</Badge>
                 </div>
               ))}
               {patients.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                    <Users className="h-8 w-8 text-muted-foreground" />
+                  <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                    <Users className="h-7 w-7 text-slate-200" />
                   </div>
-                  <p className="text-muted-foreground font-medium">No patients registered yet</p>
+                  <p className="text-slate-400 text-sm font-medium">No patients registered yet</p>
                 </div>
               )}
             </div>
@@ -314,43 +326,43 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Today's Flow */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b bg-muted/30">
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
+        <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/30">
+            <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Activity className="h-4 w-4 text-[#0d7377]" />
               Today&apos;s Patient Flow
             </CardTitle>
-            <CardDescription>Current status of visits</CardDescription>
+            <CardDescription className="text-slate-400 text-xs">Current status of visits</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <span className="text-sm text-foreground">At Reception</span>
-                <Badge variant="secondary" className="bg-primary/10 text-primary">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50">
+                <span className="text-sm font-medium text-slate-700">At Reception</span>
+                <Badge variant="secondary" className="bg-teal-50 text-[#0d7377] border border-teal-200 font-bold text-xs">
                   {todayVisits.filter((v) => v.current_stage === "reception").length}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <span className="text-sm text-foreground">With Counsellor</span>
-                <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50">
+                <span className="text-sm font-medium text-slate-700">With Counsellor</span>
+                <Badge variant="secondary" className="bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs">
                   {todayVisits.filter((v) => v.current_stage === "counsellor").length}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <span className="text-sm text-foreground">With Doctor</span>
-                <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50">
+                <span className="text-sm font-medium text-slate-700">With Doctor</span>
+                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-xs">
                   {todayVisits.filter((v) => v.current_stage === "doctor").length}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <span className="text-sm text-foreground">At Pharmacy</span>
-                <Badge variant="secondary" className="bg-rose-100 text-rose-700">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50">
+                <span className="text-sm font-medium text-slate-700">At Pharmacy</span>
+                <Badge variant="secondary" className="bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs">
                   {todayVisits.filter((v) => v.current_stage === "pharmacy").length}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50">
-                <span className="text-sm font-medium text-emerald-700">Completed</span>
-                <Badge className="bg-emerald-500 text-white">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50">
+                <span className="text-sm font-bold text-emerald-700">Completed</span>
+                <Badge className="bg-emerald-500 text-white font-bold text-xs border-0">
                   {completedToday}
                 </Badge>
               </div>

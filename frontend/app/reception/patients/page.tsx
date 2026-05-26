@@ -980,7 +980,7 @@ export default function PatientDataPage() {
   // If a patient is selected, show full profile
   if (selectedPatient) {
     return (
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Back Button & Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={handleBackToList}>
@@ -2467,11 +2467,11 @@ export default function PatientDataPage() {
 
   // Patient List View
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#0d7377] to-[#14919b] bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold text-[#0d7377]">
             Patient Data
           </h1>
           <p className="text-muted-foreground">
@@ -2479,28 +2479,28 @@ export default function PatientDataPage() {
             history
           </p>
         </div>
-        <Badge variant="secondary" className="text-lg px-4 py-2">
+        <div className="bg-[#e6f4f1] text-[#0d7377] font-bold px-4 py-2 rounded-lg border border-[#0d7377]/20">
           {totalPatientsCount} Patients
-        </Badge>
+        </div>
       </div>
 
       {/* Search and Filter */}
-      <Card className="border-[#0d7377]/20">
+      <Card className="border-none shadow-sm bg-white">
         <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by File No., HDAMS ID, Name, Phone, or Aadhaar..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-[#f9fafb] border-slate-200 h-11"
               />
             </div>
             <Button
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className={`gap-2 ${showFilters ? "bg-[#0d7377]/10 border-[#0d7377]" : ""}`}
+              className={`gap-2 h-11 border-slate-200 ${showFilters ? "bg-[#0d7377]/10 border-[#0d7377] text-[#0d7377]" : ""}`}
             >
               <Filter className="h-4 w-4" />
               Filters
@@ -2508,7 +2508,7 @@ export default function PatientDataPage() {
             <Button
               variant="outline"
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className="gap-2"
+              className="gap-2 h-11 border-slate-200"
             >
               <ArrowUpDown className="h-4 w-4" />
               {sortOrder === "asc" ? "A-Z" : "Z-A"}
@@ -2518,7 +2518,7 @@ export default function PatientDataPage() {
                 value={String(listPageSize)}
                 onValueChange={(value) => setListPageSize(Number(value))}
               >
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-11 border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2532,7 +2532,7 @@ export default function PatientDataPage() {
             <Button
               onClick={exportToExcel}
               disabled={isExporting || isLoadingPatients}
-              className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              className="gap-2 h-11 bg-[#21834e] hover:bg-[#1a6b3f] text-white"
             >
               {isExporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2545,46 +2545,25 @@ export default function PatientDataPage() {
 
           {/* Filters Panel */}
           {showFilters && (
-            <div className="border-t pt-4 mt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium text-sm text-muted-foreground">
-                  Filter Options
-                </h4>
+            <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Filter Options</h4>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={resetFilters}
-                  className="gap-1 h-8"
+                  className="h-8 text-xs text-muted-foreground hover:text-[#0d7377] gap-1"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Reset
                 </Button>
               </div>
-              <div className="grid grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
-                  <Label className="text-xs">District</Label>
-                  <Select
-                    value={filterDistrict}
-                    onValueChange={setFilterDistrict}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Districts</SelectItem>
-                      {uniqueDistricts.map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">State</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">State</Label>
                   <Select value={filterState} onValueChange={setFilterState}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
+                    <SelectTrigger className="h-10 bg-[#f9fafb] border-slate-200">
+                      <SelectValue placeholder="All States" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All States</SelectItem>
@@ -2597,13 +2576,32 @@ export default function PatientDataPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Addiction Type</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">District</Label>
+                  <Select
+                    value={filterDistrict}
+                    onValueChange={setFilterDistrict}
+                  >
+                    <SelectTrigger className="h-10 bg-[#f9fafb] border-slate-200">
+                      <SelectValue placeholder="All Districts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Districts</SelectItem>
+                      {uniqueDistricts.map((district) => (
+                        <SelectItem key={district} value={district}>
+                          {district}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Addiction Type</Label>
                   <Select
                     value={filterAddictionType}
                     onValueChange={setFilterAddictionType}
                   >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
+                    <SelectTrigger className="h-10 bg-[#f9fafb] border-slate-200">
+                      <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
@@ -2616,21 +2614,21 @@ export default function PatientDataPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Reg. Date From</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Reg. Date From</Label>
                   <Input
                     type="date"
                     value={filterDateFrom}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
-                    className="h-9"
+                    className="h-10 bg-[#f9fafb] border-slate-200"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Reg. Date To</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Reg. Date To</Label>
                   <Input
                     type="date"
                     value={filterDateTo}
                     onChange={(e) => setFilterDateTo(e.target.value)}
-                    className="h-9"
+                    className="h-10 bg-[#f9fafb] border-slate-200"
                   />
                 </div>
               </div>
@@ -2659,64 +2657,86 @@ export default function PatientDataPage() {
           filteredPatients.map((patient) => (
             <Card
               key={patient.id}
-              className="cursor-pointer hover:border-[#0d7377]/50 hover:shadow-md transition-all group"
+              className="cursor-pointer hover:border-[#0d7377]/30 hover:shadow-lg transition-all group bg-white border-slate-100"
               onClick={() => handleSelectPatient(patient)}
             >
-              <CardContent className="py-4">
-                <div className="flex items-center gap-4">
-                  {/* Photo */}
-                  {patient.photo_url ? (
-                    <Image
-                      src={patient.photo_url}
-                      alt={patient.full_name}
-                      width={50}
-                      height={50}
-                      className="rounded-full object-cover border-2 border-[#0d7377]/20"
-                    />
-                  ) : (
-                    <div className="w-[50px] h-[50px] rounded-full bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 flex items-center justify-center border-2 border-[#0d7377]/20">
-                      <User className="h-6 w-6 text-[#0d7377]" />
-                    </div>
-                  )}
+              <CardContent className="p-0">
+                <div className="flex items-stretch min-h-[140px]">
+                  {/* Photo Section */}
+                  <div className="w-[180px] bg-[#f0f9f8] flex items-center justify-center border-r border-slate-50">
+                    {patient.photo_url ? (
+                      <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-white shadow-sm">
+                        <Image
+                          src={patient.photo_url}
+                          alt={patient.full_name}
+                          width={96}
+                          height={96}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 rounded-lg bg-white flex items-center justify-center border-2 border-white shadow-sm">
+                        <User className="h-10 w-10 text-[#0d7377]/30" />
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold truncate">
-                        {patient.full_name}
-                      </span>
-                      <Badge
-                        variant={
-                          patient.status === "active" ? "default" : "secondary"
-                        }
-                        className={
-                          patient.status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : ""
-                        }
-                      >
-                        {patient.status}
-                      </Badge>
+                  {/* Info Section */}
+                  <div className="flex-1 p-6 flex flex-col justify-between relative">
+                    {/* Top Row: Name and ID Badges */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-xl font-bold text-slate-800">
+                          {patient.full_name}
+                        </h3>
+                        <Badge
+                          className={
+                            patient.status === "active"
+                              ? "bg-[#e6f4f1] text-[#0d7377] border-[#0d7377]/20 hover:bg-[#e6f4f1]"
+                              : "bg-slate-100 text-slate-600 border-slate-200"
+                          }
+                        >
+                          {patient.status}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">File No:</span>
+                          <span className="text-xs font-mono font-bold text-[#0d7377]">{patient.file_number}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">HDAMS:</span>
+                          <span className="text-xs font-mono font-bold text-[#14919b]">{patient.hdams_id || "N/A"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                      <span className="font-mono text-[#0d7377]">
-                        {patient.file_number}
-                      </span>
-                      <span className="font-mono text-[#14919b]">
-                        {patient.hdams_id
-                          ? `HDAMS: ${patient.hdams_id}`
-                          : "HDAMS: N/A"}
-                      </span>
-                      <span>
-                        {getAge(patient.date_of_birth)} yrs /{" "}
-                        {patient.gender?.charAt(0).toUpperCase()}
-                      </span>
-                      <span>{patient.phone}</span>
+
+                    {/* Bottom Grid: Patient Details */}
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-12 mt-4">
+                      <div className="flex items-center gap-3 text-slate-600">
+                        <div className="w-8 flex justify-center"><Phone className="h-4 w-4 text-[#0d7377]" /></div>
+                        <span className="text-sm font-bold text-slate-700">{patient.phone || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-600">
+                        <div className="w-8 flex justify-center"><Calendar className="h-4 w-4 text-slate-400" /></div>
+                        <span className="text-sm font-medium">{getAge(patient.date_of_birth)} yrs / {patient.gender?.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="flex items-start gap-3 text-slate-600">
+                        <div className="w-8 flex justify-center mt-0.5"><MapPin className="h-4 w-4 text-slate-400" /></div>
+                        <span className="text-sm font-medium line-clamp-1">{patient.address || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-600">
+                        <div className="w-8 flex justify-center"><Droplet className="h-4 w-4 text-slate-400" /></div>
+                        <span className="text-sm font-medium capitalize">{patient.addiction_type || "N/A"}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Arrow */}
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#0d7377] transition-colors" />
+                  {/* Action Section */}
+                  <div className="w-16 border-l border-slate-50 flex items-center justify-center group-hover:bg-[#0d7377]/5 transition-colors">
+                    <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-[#0d7377]" />
+                  </div>
                 </div>
               </CardContent>
             </Card>

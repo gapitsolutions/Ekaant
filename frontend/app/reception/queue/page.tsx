@@ -36,7 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, Loader2, Search, Trash2 } from "lucide-react";
+import { Eye, Loader2, Search, Trash2, Camera, ShieldCheck, RotateCcw, Calendar } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   deleteReceptionCheckinHistoryVisit,
   getReceptionCheckinHistory,
@@ -238,61 +239,70 @@ export default function ReceptionQueuePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Check-in History</h1>
-        <p className="text-muted-foreground">
-          Search, review, and manage completed and in-progress visit check-ins.
-        </p>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[#0d7377]">Check-in History</h1>
+          <p className="text-muted-foreground">
+            Search, review, and manage completed and in-progress visit check-ins.
+          </p>
+        </div>
+        <div className="bg-[#e6f4f1] text-[#0d7377] font-bold px-4 py-2 rounded-lg border border-[#0d7377]/20 shadow-sm flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          {pagination.total} {pagination.total === 1 ? 'Check-in' : 'Check-ins'} Total
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Records</CardTitle>
+        <Card className="border-none shadow-sm bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500">Total Records</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{pagination.total}</p>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-3xl font-bold text-slate-800">{pagination.total}</p>
+            <p className="text-muted-foreground text-xs mt-1">
               Matching history entries
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Fingerprint Verified</CardTitle>
+        <Card className="border-none shadow-sm bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-blue-600" />
+              Fingerprint Verified
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">
+            <p className="text-3xl font-bold text-slate-800">
               {verificationCounts.fingerprint}
             </p>
-            <p className="text-muted-foreground text-sm">Current page count</p>
+            <p className="text-muted-foreground text-xs mt-1">Current page count</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Photo Verified</CardTitle>
+        <Card className="border-none shadow-sm bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Camera className="h-4 w-4 text-purple-600" />
+              Photo Verified
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{verificationCounts.photo}</p>
-            <p className="text-muted-foreground text-sm">Current page count</p>
+            <p className="text-3xl font-bold text-slate-800">{verificationCounts.photo}</p>
+            <p className="text-muted-foreground text-xs mt-1">Current page count</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Visit Records</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_180px_180px_140px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Card className="border-none shadow-sm bg-white">
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search by file no., visit ID, patient name, phone"
-                className="pl-9"
+                className="pl-10 bg-[#f9fafb] border-slate-200 h-11"
               />
             </div>
             <Select
@@ -304,7 +314,7 @@ export default function ReceptionQueuePage() {
                 );
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-[180px] h-11 bg-[#f9fafb] border-slate-200">
                 <SelectValue placeholder="Verification Method" />
               </SelectTrigger>
               <SelectContent>
@@ -322,7 +332,7 @@ export default function ReceptionQueuePage() {
                 );
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-[180px] h-11 bg-[#f9fafb] border-slate-200">
                 <SelectValue placeholder="Visit Status" />
               </SelectTrigger>
               <SelectContent>
@@ -339,7 +349,7 @@ export default function ReceptionQueuePage() {
                 setPageSize(Number(value));
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-[140px] h-11 bg-[#f9fafb] border-slate-200">
                 <SelectValue placeholder="Page Size" />
               </SelectTrigger>
               <SelectContent>
@@ -350,28 +360,36 @@ export default function ReceptionQueuePage() {
             </Select>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto]">
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(event) => {
-                setPage(1);
-                setStartDate(event.target.value);
-              }}
-              aria-label="Start date"
-            />
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(event) => {
-                setPage(1);
-                setEndDate(event.target.value);
-              }}
-              aria-label="End date"
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-[#f9fafb] border border-slate-200 rounded-md px-3 h-11">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">From:</span>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(event) => {
+                  setPage(1);
+                  setStartDate(event.target.value);
+                }}
+                className="border-none bg-transparent shadow-none focus-visible:ring-0 p-0 w-[130px] h-full text-sm font-medium"
+                aria-label="Start date"
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-[#f9fafb] border border-slate-200 rounded-md px-3 h-11">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">To:</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(event) => {
+                  setPage(1);
+                  setEndDate(event.target.value);
+                }}
+                className="border-none bg-transparent shadow-none focus-visible:ring-0 p-0 w-[130px] h-full text-sm font-medium"
+                aria-label="End date"
+              />
+            </div>
             <Button
-              type="button"
-              variant="outline"
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setPage(1);
                 setStatusFilter("all");
@@ -381,8 +399,10 @@ export default function ReceptionQueuePage() {
                 setSearchQuery("");
                 setDebouncedSearchQuery("");
               }}
+              className="h-11 w-11 text-slate-400 hover:text-[#0d7377] hover:bg-[#0d7377]/5"
+              title="Reset Filters"
             >
-              Clear Filters
+              <RotateCcw className="h-5 w-5" />
             </Button>
           </div>
 
@@ -395,72 +415,98 @@ export default function ReceptionQueuePage() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : historyItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No matching history records found.
-            </p>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Search className="h-10 w-10 text-slate-300 mb-3" />
+              <p className="text-sm font-medium text-slate-500">
+                No matching history records found.
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Try adjusting your search or filter criteria.
+              </p>
+            </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/50">
                   <TableRow>
-                    <TableHead>Visit ID</TableHead>
-                    <TableHead>File No.</TableHead>
-                    <TableHead>Patient Name</TableHead>
-                    <TableHead>Check-in Time</TableHead>
-                    <TableHead>Verification</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="font-bold text-slate-700 uppercase text-[10px] tracking-wider">Visit ID</TableHead>
+                    <TableHead className="w-[120px] font-bold text-slate-700 uppercase text-[10px] tracking-wider">File No.</TableHead>
+                    <TableHead className="font-bold text-slate-700 uppercase text-[10px] tracking-wider">Patient Name</TableHead>
+                    <TableHead className="font-bold text-slate-700 uppercase text-[10px] tracking-wider">Check-in Time</TableHead>
+                    <TableHead className="font-bold text-slate-700 uppercase text-[10px] tracking-wider">Verification</TableHead>
+                    <TableHead className="font-bold text-slate-700 uppercase text-[10px] tracking-wider">Status</TableHead>
+                    <TableHead className="text-right font-bold text-slate-700 uppercase text-[10px] tracking-wider">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {historyItems.map((visit) => (
-                    <TableRow key={visit.id}>
-                      <TableCell className="font-mono text-xs">
+                    <TableRow key={visit.id} className="hover:bg-slate-50 transition-colors">
+                      <TableCell className="font-mono text-xs text-slate-500">
                         {visit.visit_uid}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono">
+                        <Badge variant="outline" className="bg-[#f0f9f8] text-[#0d7377] border-[#0d7377]/20 font-bold font-mono">
                           {visit.patient.file_number}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium">
-                        <div>{visit.patient.full_name}</div>
-                        <div className="text-xs text-muted-foreground">
+                      <TableCell>
+                        <div className="font-bold text-slate-800">{visit.patient.full_name}</div>
+                        <div className="text-xs text-slate-400">
                           {visit.patient.phone}
                         </div>
                       </TableCell>
-                      <TableCell>{formatTime(visit.checkin_time)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {visit.verification_method}
-                        </Badge>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-700">{formatTime(visit.checkin_time)}</span>
+                          <span className="text-[10px] text-slate-400">{formatDate(visit.checkin_time)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {visit.verification_method === "photo" ? (
+                            <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 px-2 py-1 rounded-md border border-purple-100 text-xs font-bold">
+                              <Camera className="h-3 w-3" />
+                              Photo
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-100 text-xs font-bold">
+                              <ShieldCheck className="h-3 w-3" />
+                              Fingerprint
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={
-                            visit.status === "completed" ? "default" : "outline"
-                          }
-                          className={
-                            visit.status === "completed" ? "bg-emerald-600" : ""
-                          }
+                          className={cn(
+                            "capitalize",
+                            visit.status === "completed"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"
+                              : visit.status === "in_progress"
+                                ? "bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100"
+                                : visit.status === "cancelled"
+                                  ? "bg-red-50 text-red-700 border-red-100 hover:bg-red-100"
+                                  : "bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100"
+                          )}
                         >
-                          {visit.status}
+                          {visit.status.replace("_", " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end items-center gap-1">
                           <Sheet>
                             <SheetTrigger asChild>
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
                                 onClick={() => setSelectedVisit(visit)}
+                                className="h-8 w-8 text-slate-400 hover:text-[#0d7377] hover:bg-[#0d7377]/5 rounded-full"
                                 aria-label="View visit details"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </SheetTrigger>
-                            <SheetContent className="overflow-y-auto">
+                            <SheetContent className="overflow-y-auto sm:max-w-md">
                               <SheetHeader>
                                 <SheetTitle>Visit Details</SheetTitle>
                                 <SheetDescription>
@@ -699,9 +745,9 @@ export default function ReceptionQueuePage() {
 
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => setVisitPendingDelete(visit)}
-                            className="text-red-600 hover:text-red-700"
+                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
                             aria-label="Delete visit"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -715,8 +761,8 @@ export default function ReceptionQueuePage() {
             </div>
           )}
 
-          <div className="flex flex-col gap-3 pt-2 md:flex-row md:items-center md:justify-between">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col gap-3 pt-4 md:flex-row md:items-center md:justify-between border-t border-slate-100">
+            <p className="text-xs text-slate-400">
               Showing {pageStart} to {pageEnd} of {pagination.total} records
             </p>
             <div className="flex items-center gap-2">
@@ -725,10 +771,11 @@ export default function ReceptionQueuePage() {
                 size="sm"
                 disabled={page <= 1 || isLoading}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
+                className="h-9 border-slate-200 text-slate-600"
               >
                 Previous
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs font-medium text-slate-500 px-2">
                 Page {page} of {totalPages}
               </span>
               <Button
@@ -738,6 +785,7 @@ export default function ReceptionQueuePage() {
                 onClick={() =>
                   setPage((current) => Math.min(totalPages, current + 1))
                 }
+                className="h-9 border-slate-200 text-slate-600"
               >
                 Next
               </Button>

@@ -14,7 +14,6 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
+  BarChart3,
   Calendar,
   CalendarDays,
   CheckCircle,
@@ -66,10 +66,6 @@ function stageClass(stage: string) {
   }
 }
 
-function statusClass(status: string) {
-  if (status === "completed") return "bg-emerald-600";
-  return "";
-}
 
 function exportVisitsToCSV(items: ReportVisitItem[], filename: string) {
   const headers = [
@@ -269,606 +265,523 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0d7377] to-[#14919b] bg-clip-text text-transparent">
-          Reports
-        </h1>
-        <p className="text-muted-foreground">
-          Backend report records for daily, monthly, and custom date ranges.
-        </p>
+    <div className="space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-[#0d7377] tracking-tight flex items-center gap-3">
+            <BarChart3 className="h-8 w-8" />
+            Hospital Analytics &amp; Reports
+          </h1>
+          <p className="text-slate-500 mt-1 font-medium">
+            Generate day-wise, monthly, and custom reports for hospital operations.
+          </p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px] bg-[#0d7377]/10">
+        <TabsList className="bg-slate-100 p-1.5 rounded-2xl h-14 shadow-sm border border-slate-200 w-full lg:w-[480px]">
           <TabsTrigger
             value="daily"
-            className="flex items-center gap-2 data-[state=active]:bg-[#0d7377] data-[state=active]:text-white"
+            className="flex items-center gap-2 rounded-xl px-6 h-full data-[state=active]:bg-[#0d7377] data-[state=active]:text-white font-bold transition-all"
           >
             <Calendar className="h-4 w-4" />
             Daily
           </TabsTrigger>
           <TabsTrigger
             value="monthly"
-            className="flex items-center gap-2 data-[state=active]:bg-[#0d7377] data-[state=active]:text-white"
+            className="flex items-center gap-2 rounded-xl px-6 h-full data-[state=active]:bg-[#0d7377] data-[state=active]:text-white font-bold transition-all"
           >
             <CalendarDays className="h-4 w-4" />
             Monthly
           </TabsTrigger>
           <TabsTrigger
             value="custom"
-            className="flex items-center gap-2 data-[state=active]:bg-[#0d7377] data-[state=active]:text-white"
+            className="flex items-center gap-2 rounded-xl px-6 h-full data-[state=active]:bg-[#0d7377] data-[state=active]:text-white font-bold transition-all"
           >
             <Filter className="h-4 w-4" />
-            Custom
+            Custom Range
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="daily" className="space-y-6">
-          <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-            <CardHeader className="pb-3 border-b bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">Daily Report</CardTitle>
-                  <CardDescription>
-                    Records fetched from backend for the selected date.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-auto focus-visible:ring-[#0d7377]"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      exportVisitsToCSV(
-                        dailyData?.items || [],
-                        `daily-report-${selectedDate}`,
-                      )
-                    }
-                    disabled={!dailyData || dailyData.items.length === 0}
-                    className="border-[#0d7377]/30 hover:bg-[#0d7377]/10"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap items-end gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Date</Label>
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
+                <Calendar className="h-4 w-4 text-[#0d7377]" />
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold text-[#0d7377] p-0 h-auto"
+                />
               </div>
-            </CardHeader>
-          </Card>
+            </div>
+            <div className="ml-auto">
+              <Button
+                onClick={() =>
+                  exportVisitsToCSV(
+                    dailyData?.items || [],
+                    `daily-report-${selectedDate}`,
+                  )
+                }
+                disabled={!dailyData || dailyData.items.length === 0}
+                className="bg-[#0d7377] hover:bg-[#0d7377]/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV Report
+              </Button>
+            </div>
+          </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <ClipboardList className="h-5 w-5 text-[#0d7377]" />
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {dailyData?.total_checkins || 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Total Visits
-                    </p>
-                  </div>
-                </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-[#0d7377] w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
+                <p className="text-4xl font-black text-slate-800">
+                  {dailyData?.total_checkins || 0}
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {dailyData?.completed_checkins || 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Completed</p>
-                  </div>
-                </div>
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-emerald-500 w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-4xl font-black text-slate-800">
+                  {dailyData?.completed_checkins || 0}
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-amber-600" />
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {dailyData?.active_checkins || 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">In Progress</p>
-                  </div>
-                </div>
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-amber-500 w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">In Progress</p>
+                <p className="text-4xl font-black text-slate-800">
+                  {dailyData?.active_checkins || 0}
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Visit Records</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="border-b border-slate-50">
+              <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-[#0d7377]" />
+                Daily Visit Records
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {dailyLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  Loading daily records...
+                <p className="py-20 text-center text-slate-400 italic">
+                  Fetching daily records...
                 </p>
               ) : dailyError ? (
-                <p className="text-sm text-destructive">{dailyError}</p>
+                <p className="py-8 px-6 text-sm text-destructive">{dailyError}</p>
               ) : !dailyData || dailyData.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="py-20 text-center text-slate-300 italic">
                   No records found for the selected date.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>File No.</TableHead>
-                        <TableHead>Patient Name</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Check-in Time</TableHead>
-                        <TableHead>Stage</TableHead>
-                        <TableHead>Status</TableHead>
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead className="px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">File No.</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Patient Name</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Phone</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Check-in</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Stage</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dailyData.items.map((item) => (
+                      <TableRow key={item.id} className="hover:bg-slate-50/50">
+                        <TableCell className="px-6">
+                          <span className="font-mono font-bold text-[#0d7377]">
+                            {item.patient.file_number}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-bold text-slate-800">
+                          {item.patient.full_name}
+                        </TableCell>
+                        <TableCell className="text-slate-500">{item.patient.phone || "-"}</TableCell>
+                        <TableCell className="capitalize text-slate-500">
+                          {item.patient.patient_category}
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-600">{formatTime(item.checkin_time)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={stageClass(item.current_stage)}
+                          >
+                            {item.current_stage}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={item.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}
+                          >
+                            {item.status}
+                          </Badge>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dailyData.items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono">
-                              {item.patient.file_number}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {item.patient.full_name}
-                          </TableCell>
-                          <TableCell>{item.patient.phone || "-"}</TableCell>
-                          <TableCell className="capitalize">
-                            {item.patient.patient_category}
-                          </TableCell>
-                          <TableCell>{formatTime(item.checkin_time)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className={stageClass(item.current_stage)}
-                            >
-                              {item.current_stage}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.status === "completed"
-                                  ? "default"
-                                  : "outline"
-                              }
-                              className={statusClass(item.status)}
-                            >
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="monthly" className="space-y-6">
-          <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-            <CardHeader className="pb-3 border-b bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">Monthly Report</CardTitle>
-                  <CardDescription>
-                    Month-wise records fetched from backend.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-auto focus-visible:ring-[#0d7377]"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exportMonthlyRecords}
-                    disabled={!monthlyData || monthlyExportLoading}
-                    className="border-[#0d7377]/30 hover:bg-[#0d7377]/10"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    {monthlyExportLoading ? "Exporting..." : "Export"}
-                  </Button>
-                </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap items-end gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Month</Label>
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
+                <CalendarDays className="h-4 w-4 text-[#0d7377]" />
+                <Input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold text-[#0d7377] p-0 h-auto"
+                />
               </div>
-            </CardHeader>
-          </Card>
+            </div>
+            <div className="ml-auto">
+              <Button
+                onClick={exportMonthlyRecords}
+                disabled={!monthlyData || monthlyExportLoading}
+                className="bg-[#0d7377] hover:bg-[#0d7377]/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {monthlyExportLoading ? "Exporting..." : "Export CSV Report"}
+              </Button>
+            </div>
+          </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <ClipboardList className="h-5 w-5 text-[#0d7377]" />
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {monthlyData?.total_checkins || 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Total Visits
-                    </p>
-                  </div>
-                </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-[#0d7377] w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
+                <p className="text-4xl font-black text-slate-800">
+                  {monthlyData?.total_checkins || 0}
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {monthlyData?.completed_checkins || 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Completed</p>
-                  </div>
-                </div>
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-emerald-500 w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Completed</p>
+                <p className="text-4xl font-black text-slate-800">
+                  {monthlyData?.completed_checkins || 0}
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {monthlyDaysWithVisits}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Days with Visits
-                    </p>
-                  </div>
-                </div>
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-blue-500 w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Days with Visits</p>
+                <p className="text-4xl font-black text-slate-800">
+                  {monthlyDaysWithVisits}
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="h-5 w-5 text-amber-600" />
-                  <div>
-                    <p className="text-2xl font-bold">{monthlyAverage}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Avg. Visits/Day
-                    </p>
-                  </div>
-                </div>
+            <Card className="border-none shadow-sm bg-white overflow-hidden">
+              <div className="h-1.5 bg-amber-500 w-full" />
+              <CardContent className="p-6">
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Avg. Visits/Day</p>
+                <p className="text-4xl font-black text-slate-800">{monthlyAverage}</p>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Breakdown</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="border-b border-slate-50">
+              <CardTitle className="text-xl font-black text-slate-800">Daily Breakdown</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {monthlyLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  Loading monthly records...
+                <p className="py-20 text-center text-slate-400 italic">
+                  Processing monthly breakdown...
                 </p>
               ) : monthlyError ? (
-                <p className="text-sm text-destructive">{monthlyError}</p>
+                <p className="py-8 px-6 text-sm text-destructive">{monthlyError}</p>
               ) : monthlyRows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="py-20 text-center text-slate-300 italic">
                   No records found for the selected month.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Total Visits</TableHead>
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead className="px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Date</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Total Visits</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {monthlyRows.map((row) => (
+                      <TableRow key={row.date} className="hover:bg-slate-50/50">
+                        <TableCell className="px-6 font-bold text-slate-800">
+                          {new Date(row.date).toLocaleDateString("en-IN", {
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </TableCell>
+                        <TableCell className="font-black text-lg text-center">{row.total}</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {monthlyRows.map((row) => (
-                        <TableRow key={row.date}>
-                          <TableCell className="font-medium">
-                            {new Date(row.date).toLocaleDateString("en-IN", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                            })}
-                          </TableCell>
-                          <TableCell>{row.total}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Visit Records</CardTitle>
+          <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="border-b border-slate-50">
+              <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-[#0d7377]" />
+                Monthly Visit Records
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {monthlyRecordsLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  Loading monthly patient records...
+                <p className="py-20 text-center text-slate-400 italic">
+                  Fetching monthly patient records...
                 </p>
               ) : monthlyRecordsError ? (
-                <p className="text-sm text-destructive">
+                <p className="py-8 px-6 text-sm text-destructive">
                   {monthlyRecordsError}
                 </p>
               ) : monthlyRecords.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="py-20 text-center text-slate-300 italic">
                   No patient records found for the selected month.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>File No.</TableHead>
-                        <TableHead>Patient Name</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Visit Date</TableHead>
-                        <TableHead>Check-in Time</TableHead>
-                        <TableHead>Stage</TableHead>
-                        <TableHead>Status</TableHead>
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow>
+                      <TableHead className="px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">File No.</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Patient Name</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Phone</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Visit Date</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Check-in</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Stage</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {monthlyRecords.map((item) => (
+                      <TableRow key={item.id} className="hover:bg-slate-50/50">
+                        <TableCell className="px-6">
+                          <span className="font-mono font-bold text-[#0d7377]">
+                            {item.patient.file_number}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-bold text-slate-800">
+                          {item.patient.full_name}
+                        </TableCell>
+                        <TableCell className="text-slate-500">{item.patient.phone || "-"}</TableCell>
+                        <TableCell className="text-slate-500 font-medium">
+                          {new Date(item.visit_date).toLocaleDateString("en-IN")}
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-600">{formatTime(item.checkin_time)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={stageClass(item.current_stage)}
+                          >
+                            {item.current_stage}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={item.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}
+                          >
+                            {item.status}
+                          </Badge>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {monthlyRecords.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono">
-                              {item.patient.file_number}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {item.patient.full_name}
-                          </TableCell>
-                          <TableCell>{item.patient.phone || "-"}</TableCell>
-                          <TableCell>
-                            {new Date(item.visit_date).toLocaleDateString(
-                              "en-IN",
-                            )}
-                          </TableCell>
-                          <TableCell>{formatTime(item.checkin_time)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className={stageClass(item.current_stage)}
-                            >
-                              {item.current_stage}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.status === "completed"
-                                  ? "default"
-                                  : "outline"
-                              }
-                              className={statusClass(item.status)}
-                            >
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="custom" className="space-y-6">
-          <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-            <CardHeader className="pb-3 border-b bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg">Custom Date Range</CardTitle>
-                  <CardDescription>
-                    Fetch and list report rows from backend for the selected
-                    range.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="startDate"
-                      className="text-sm whitespace-nowrap"
-                    >
-                      From:
-                    </Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-auto focus-visible:ring-[#0d7377]"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="endDate"
-                      className="text-sm whitespace-nowrap"
-                    >
-                      To:
-                    </Label>
-                    <Input
-                      id="endDate"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-auto focus-visible:ring-[#0d7377]"
-                    />
-                  </div>
-                  <Button
-                    onClick={fetchCustomRange}
-                    className="bg-[#0d7377] hover:bg-[#0d7377]/90"
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Fetch Records
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      exportVisitsToCSV(
-                        customData?.items || [],
-                        `custom-report-${startDate}-to-${endDate}`,
-                      )
-                    }
-                    disabled={!customData || customData.items.length === 0}
-                    className="border-[#0d7377]/30 hover:bg-[#0d7377]/10"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap items-end gap-6">
+            <div className="flex items-center gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">From</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="rounded-xl border-slate-200 focus-visible:ring-[#0d7377]"
+                />
               </div>
-            </CardHeader>
-          </Card>
+              <div className="space-y-2">
+                <Label htmlFor="endDate" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">To</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="rounded-xl border-slate-200 focus-visible:ring-[#0d7377]"
+                />
+              </div>
+            </div>
+            <Button
+              onClick={fetchCustomRange}
+              className="bg-[#0d7377] hover:bg-[#0d7377]/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Fetch Records
+            </Button>
+            <div className="ml-auto">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  exportVisitsToCSV(
+                    customData?.items || [],
+                    `custom-report-${startDate}-to-${endDate}`,
+                  )
+                }
+                disabled={!customData || customData.items.length === 0}
+                className="border-[#0d7377]/30 text-[#0d7377] hover:bg-[#0d7377]/10 font-bold rounded-xl h-12 px-6"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
+          </div>
 
           {customError ? (
             <p className="text-sm text-destructive">{customError}</p>
           ) : null}
 
           {customLoading ? (
-            <Card>
-              <CardContent className="py-8 text-sm text-muted-foreground">
-                Loading custom range records...
+            <Card className="border-0 shadow-sm rounded-2xl bg-white">
+              <CardContent className="py-20 text-center text-slate-400 italic">
+                Fetching custom range records...
               </CardContent>
             </Card>
           ) : customData ? (
             <>
-              <div className="grid gap-4 md:grid-cols-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-2xl font-bold">
+              <div className="grid gap-6 md:grid-cols-4">
+                <Card className="border-none shadow-sm bg-white overflow-hidden">
+                  <div className="h-1.5 bg-[#0d7377] w-full" />
+                  <CardContent className="p-6">
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
+                    <p className="text-4xl font-black text-slate-800">
                       {customData.total_checkins}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Total Visits
-                    </p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-2xl font-bold text-emerald-600">
+                <Card className="border-none shadow-sm bg-white overflow-hidden">
+                  <div className="h-1.5 bg-emerald-500 w-full" />
+                  <CardContent className="p-6">
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Completed</p>
+                    <p className="text-4xl font-black text-slate-800">
                       {customData.completed_checkins}
                     </p>
-                    <p className="text-sm text-muted-foreground">Completed</p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-2xl font-bold text-amber-600">
+                <Card className="border-none shadow-sm bg-white overflow-hidden">
+                  <div className="h-1.5 bg-amber-500 w-full" />
+                  <CardContent className="p-6">
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">In Progress</p>
+                    <p className="text-4xl font-black text-slate-800">
                       {customData.active_checkins}
                     </p>
-                    <p className="text-sm text-muted-foreground">In Progress</p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-2xl font-bold">
+                <Card className="border-none shadow-sm bg-white overflow-hidden">
+                  <div className="h-1.5 bg-blue-500 w-full" />
+                  <CardContent className="p-6">
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Unique Patients</p>
+                    <p className="text-4xl font-black text-slate-800">
                       {customData.unique_patients}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Unique Patients
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Custom Range Records</CardTitle>
+              <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+                <CardHeader className="border-b border-slate-50">
+                  <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-[#0d7377]" />
+                    Custom Range Records
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   {customData.items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="py-20 text-center text-slate-300 italic">
                       No records found for this date range.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto rounded-lg border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>File No.</TableHead>
-                            <TableHead>Patient Name</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>Visit Date</TableHead>
-                            <TableHead>Check-in Time</TableHead>
-                            <TableHead>Stage</TableHead>
-                            <TableHead>Status</TableHead>
+                    <Table>
+                      <TableHeader className="bg-slate-50/50">
+                        <TableRow>
+                          <TableHead className="px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">File No.</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Patient Name</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Phone</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Visit Date</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Check-in</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Stage</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {customData.items.map((item) => (
+                          <TableRow key={item.id} className="hover:bg-slate-50/50">
+                            <TableCell className="px-6">
+                              <span className="font-mono font-bold text-[#0d7377]">
+                                {item.patient.file_number}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-bold text-slate-800">
+                              {item.patient.full_name}
+                            </TableCell>
+                            <TableCell className="text-slate-500">{item.patient.phone || "-"}</TableCell>
+                            <TableCell className="text-slate-500 font-medium">
+                              {new Date(item.visit_date).toLocaleDateString("en-IN")}
+                            </TableCell>
+                            <TableCell className="font-medium text-slate-600">
+                              {formatTime(item.checkin_time)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className={stageClass(item.current_stage)}
+                              >
+                                {item.current_stage}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={item.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}
+                              >
+                                {item.status}
+                              </Badge>
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {customData.items.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>
-                                <Badge variant="outline" className="font-mono">
-                                  {item.patient.file_number}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {item.patient.full_name}
-                              </TableCell>
-                              <TableCell>{item.patient.phone || "-"}</TableCell>
-                              <TableCell>
-                                {new Date(item.visit_date).toLocaleDateString(
-                                  "en-IN",
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {formatTime(item.checkin_time)}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="secondary"
-                                  className={stageClass(item.current_stage)}
-                                >
-                                  {item.current_stage}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    item.status === "completed"
-                                      ? "default"
-                                      : "outline"
-                                  }
-                                  className={statusClass(item.status)}
-                                >
-                                  {item.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                        ))}
+                      </TableBody>
+                    </Table>
                   )}
                 </CardContent>
               </Card>
             </>
           ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            <Card className="border-0 shadow-sm rounded-2xl bg-white">
+              <CardContent className="py-20 text-center text-slate-300 italic">
                 Select a date range and click Fetch Records.
               </CardContent>
             </Card>

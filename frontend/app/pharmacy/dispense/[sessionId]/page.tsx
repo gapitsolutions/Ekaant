@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -30,12 +29,19 @@ import {
   ArrowLeft,
   Trash2,
   Plus,
-  Save,
   XCircle,
   AlertTriangle,
   Phone,
   User,
-  CalendarDays,
+  Pill,
+  CreditCard,
+  FileText,
+  Package,
+  ShoppingCart,
+  Layers,
+  Calendar,
+  ShieldCheck,
+  Activity,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { getPatientById, type PatientDetailResponse } from "@/lib/hms-api";
@@ -441,37 +447,41 @@ export default function DispenseWorkstationPage() {
 
   if (isLoadingData) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner className="h-8 w-8" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 border-4 border-[#0d7377] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-500 font-bold tracking-tight">Loading Dispensing Workstation...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-slate-50/60 pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
             onClick={() => navigate("/pharmacy/prescription-queue")}
             aria-label="Back to queue"
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-100 shadow-sm text-slate-500 hover:text-slate-700 transition-all hover:scale-105 active:scale-95"
           >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+            <ArrowLeft className="h-5 w-5" />
+          </button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Dispense Medicines &amp; Bill
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <Pill className="h-7 w-7 text-[#0d7377]" /> Dispense Medicines &amp; Bill
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-xs text-slate-500 font-medium">
               Invoice number will be assigned on save.
             </p>
           </div>
         </div>
         <Button
           variant="outline"
-          className="border-rose-500 text-rose-600 hover:bg-rose-50"
+          className="border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold rounded-xl px-4 h-10 shadow-sm"
           onClick={() => setCancelDialogOpen(true)}
         >
           <XCircle className="h-4 w-4 mr-2" />
@@ -480,102 +490,98 @@ export default function DispenseWorkstationPage() {
       </div>
 
       {errorMessage ? (
-        <p className="text-sm text-destructive">{errorMessage}</p>
+        <p className="text-sm text-red-600 font-medium">{errorMessage}</p>
       ) : null}
 
-      {/* Patient Banner */}
+      {/* Patient Summary Header */}
       {queueItem ? (
-        <Card className="border-0 shadow-md bg-gradient-to-r from-primary/5 to-primary/10">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className="h-14 w-14 rounded-full bg-primary/15 flex items-center justify-center">
-                  <span className="text-lg font-bold text-primary">
-                    {initials}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">
-                    {queueItem.patient_name}
-                  </p>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      {calculateAge(patient?.date_of_birth)}{" "}
-                      {patient?.sex === "male"
-                        ? "/ M"
-                        : patient?.sex === "female"
-                          ? "/ F"
-                          : ""}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {patient?.phone_number || queueItem.patient?.phone || "—"}
-                    </span>
-                    <Badge variant="outline" className="font-mono">
-                      {queueItem.patient?.file_number || "—"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-              {Number(queueItem.outstanding_debt) > 0 ? (
-                <Badge
-                  variant="outline"
-                  className="border-rose-500 text-rose-700 bg-rose-50 text-sm px-3 py-1"
-                >
-                  Outstanding ₹
-                  {Number(queueItem.outstanding_debt).toLocaleString("en-IN")}
-                </Badge>
-              ) : null}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[#0d7377] font-black text-lg flex-shrink-0">
+              {initials}
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <div className="flex items-center gap-2.5 mb-1">
+                <h2 className="font-extrabold text-slate-800 text-lg leading-none">
+                  {queueItem.patient_name}
+                </h2>
+                <Badge variant="outline" className="text-[10px] font-bold text-slate-500 bg-slate-50 border-slate-200 uppercase tracking-wider px-2 py-0 h-5 font-mono">
+                  {queueItem.patient?.file_number || "—"}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-slate-400" />
+                  {calculateAge(patient?.date_of_birth)}{" "}
+                  {patient?.sex === "male"
+                    ? "/ M"
+                    : patient?.sex === "female"
+                      ? "/ F"
+                      : ""}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-slate-400" />
+                  {patient?.phone_number || queueItem.patient?.phone || "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+          {Number(queueItem.outstanding_debt) > 0 ? (
+            <Badge
+              variant="outline"
+              className="border-rose-200 text-rose-700 bg-rose-50 text-sm px-3 py-1 font-bold rounded-xl"
+            >
+              Outstanding ₹
+              {Number(queueItem.outstanding_debt).toLocaleString("en-IN")}
+            </Badge>
+          ) : null}
+        </div>
       ) : (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <p className="text-sm text-amber-800">
-              Session not found in the pharmacy queue. The visit may already be
-              completed.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 shadow-sm p-4 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <p className="text-sm text-amber-800 font-medium">
+            Session not found in the pharmacy queue. The visit may already be
+            completed.
+          </p>
+        </div>
       )}
 
-      {/* 4-Panel Grid */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* TOP-LEFT: Medicine Entry */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b">
-            <CardTitle className="text-base">Medicine Entry</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {/* Category Tabs */}
-            <Tabs
-              value={formCategory}
-              onValueChange={(v) => handleCategoryChange(v as MedicineCategory)}
-            >
-              <TabsList className="grid grid-cols-3 w-full">
-                <TabsTrigger value="BUP">BUP</TabsTrigger>
-                <TabsTrigger value="Rx">Rx</TabsTrigger>
-                <TabsTrigger value="NRx">NRx</TabsTrigger>
-              </TabsList>
-            </Tabs>
+      {/* Formulation Entry Panel */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+            <Layers className="h-4 w-4 text-[#0d7377]" /> Formulation &amp; Dose Configuration
+          </h3>
+        </div>
 
-            {/* BUP Strength */}
-            {formCategory === "BUP" ? (
-              <div>
-                <Label className="text-xs text-muted-foreground">
-                  BUP Strength
-                </Label>
+        <div className="p-5 space-y-5">
+          {/* ROW 1: Category / Subcategory / Medicine */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-3 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Medicine Category</Label>
+              <Tabs
+                value={formCategory}
+                onValueChange={(v) => handleCategoryChange(v as MedicineCategory)}
+              >
+                <TabsList className="grid grid-cols-3 w-full h-10 rounded-xl">
+                  <TabsTrigger value="BUP" className="rounded-lg text-xs font-bold">BUP</TabsTrigger>
+                  <TabsTrigger value="Rx" className="rounded-lg text-xs font-bold">Rx</TabsTrigger>
+                  <TabsTrigger value="NRx" className="rounded-lg text-xs font-bold">NRx</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="md:col-span-3 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subcategory</Label>
+              {formCategory === "BUP" ? (
                 <Select
                   value={formSubcategory}
                   onValueChange={(v) => handleSubcategoryChange(v as BupStrength)}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl border-slate-200 text-xs">
                     {BUP_STRENGTHS.map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
@@ -583,22 +589,34 @@ export default function DispenseWorkstationPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            ) : null}
+              ) : (
+                <Select disabled value="none">
+                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-400 font-bold text-xs opacity-60">
+                    <SelectValue placeholder="N/A" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">N/A</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
 
-            {/* Medicine */}
-            <div>
-              <Label className="text-xs text-muted-foreground">Medicine</Label>
+            <div className="md:col-span-6 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Predefined Formulation</Label>
               <Select
                 value={formMedicineId}
                 onValueChange={handleMedicineChange}
               >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select a medicine" />
+                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
+                  <SelectValue placeholder={
+                    filteredMedicines.length === 0
+                      ? "No matched formulations"
+                      : "Select Formulation (Salt)"
+                  } />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-slate-200 text-xs">
                   {filteredMedicines.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    <div className="px-2 py-1.5 text-sm text-slate-400">
                       No medicines available
                     </div>
                   ) : (
@@ -611,21 +629,23 @@ export default function DispenseWorkstationPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            {/* Batch */}
-            <div>
-              <Label className="text-xs text-muted-foreground">Batch</Label>
+          {/* ROW 2: Batch / Dose / Days / Qty / Price */}
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-4 items-end">
+            <div className="md:col-span-3 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Batch No.</Label>
               <Select
                 value={formBatchNumber}
                 onValueChange={setFormBatchNumber}
                 disabled={!selectedMedicine}
               >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select batch" />
+                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs">
+                  <SelectValue placeholder={selectedMedicine ? "Select Batch" : "—"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-slate-200 text-xs">
                   {availableBatches.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    <div className="px-2 py-1.5 text-sm text-slate-400">
                       No available batches
                     </div>
                   ) : (
@@ -641,185 +661,210 @@ export default function DispenseWorkstationPage() {
               </Select>
             </div>
 
-            {/* Dose / Days / Qty */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground">Dose</Label>
-                <Input
-                  value={formDose}
-                  onChange={(e) => setFormDose(e.target.value)}
-                  placeholder="1-0-1"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Days</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={formDays}
-                  onChange={(e) =>
-                    setFormDays(Math.max(1, parseInt(e.target.value) || 0))
-                  }
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Qty</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={formQty}
-                  onChange={(e) =>
-                    setFormQty(Math.max(0, parseInt(e.target.value) || 0))
-                  }
-                  className="mt-1"
-                />
+            <div className="md:col-span-2 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expiry Date</Label>
+              <div className="h-10 flex items-center px-2">
+                {currentBatch ? (
+                  <Badge variant="outline" className="text-xs font-bold text-slate-600 bg-slate-50 border-slate-200 px-2 py-1">
+                    {new Date(currentBatch.expiry_date).toLocaleDateString("en-IN")}
+                  </Badge>
+                ) : (
+                  <span className="text-xs font-bold text-slate-400">—</span>
+                )}
               </div>
             </div>
 
-            {/* Unit Price */}
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Unit Price (₹)
-              </Label>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dose Pattern</Label>
               <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={formPrice}
-                onChange={(e) =>
-                  setFormPrice(Math.max(0, parseFloat(e.target.value) || 0))
-                }
-                className="mt-1"
+                value={formDose}
+                onChange={(e) => setFormDose(e.target.value)}
+                placeholder="e.g. 1-0-1"
+                className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs text-center"
               />
             </div>
 
-            <Button onClick={handleAddToList} className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add to List
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* TOP-RIGHT: Dispensing List */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Dispensing List</CardTitle>
-              <Badge variant="secondary">{lineItems.length} items</Badge>
+            <div className="md:col-span-1 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Days</Label>
+              <Input
+                type="number"
+                min={1}
+                value={formDays}
+                onChange={(e) =>
+                  setFormDays(Math.max(1, parseInt(e.target.value) || 0))
+                }
+                className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs text-center"
+              />
             </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            {lineItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No medicines added yet
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Use the entry form on the left to add items
-                </p>
+
+            <div className="md:col-span-2 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Tabs</Label>
+              <Input
+                type="number"
+                min={0}
+                value={formQty}
+                onChange={(e) =>
+                  setFormQty(Math.max(0, parseInt(e.target.value) || 0))
+                }
+                className="h-10 rounded-xl bg-teal-50/30 border-teal-200 font-bold text-[#0d7377] text-xs text-center focus:ring-1 focus:ring-[#0d7377]"
+              />
+            </div>
+
+            <div className="md:col-span-2 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price/Tab</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formPrice}
+                  onChange={(e) =>
+                    setFormPrice(Math.max(0, parseFloat(e.target.value) || 0))
+                  }
+                  className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs pl-6 pr-2 text-center"
+                />
               </div>
-            ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                {lineItems.map((li) => (
-                  <div
-                    key={li.id}
-                    className="border rounded-lg p-3 hover:bg-muted/40 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium truncate">
-                            {li.medicineName}
-                          </p>
-                          <Badge variant="outline" className="text-xs">
-                            {li.category}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {li.salt}
-                        </p>
-                        <div className="mt-1 grid grid-cols-4 gap-2 text-xs">
-                          <span>
-                            <span className="text-muted-foreground">
-                              Batch:
-                            </span>{" "}
-                            {li.batchNumber}
-                          </span>
-                          <span>
-                            <span className="text-muted-foreground">Dose:</span>{" "}
-                            {li.dose}
-                          </span>
-                          <span>
-                            <span className="text-muted-foreground">Days:</span>{" "}
-                            {li.days}
-                          </span>
-                          <span>
-                            <span className="text-muted-foreground">Qty:</span>{" "}
-                            {li.qty}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <p className="font-semibold text-primary">
-                          ₹{li.total.toLocaleString("en-IN")}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-rose-600 hover:bg-rose-50"
-                          onClick={() => handleRemoveLine(li.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+            </div>
+          </div>
+
+          {/* Add to List Button */}
+          <div className="flex items-center justify-end pt-2">
+            <Button
+              onClick={handleAddToList}
+              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-bold px-6 h-10 rounded-xl shadow-sm flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Add to List
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Active Dispensing List */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-[#0d7377]" /> Active Dispensing List
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Below items are verified and will be deducted from active inventory.</p>
+          </div>
+          {lineItems.length > 0 && (
+            <Badge className="bg-[#0d7377] text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full border-0">
+              {lineItems.length} Formulation(s)
+            </Badge>
+          )}
+        </div>
+
+        {lineItems.length === 0 ? (
+          <div className="py-16 text-center">
+            <Package className="h-12 w-12 text-slate-200 mx-auto mb-3" />
+            <p className="text-sm text-slate-400 font-semibold">Prescription dispensing list is currently empty.</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">Select a predefined medicine, configure dose above, and add to populate list.</p>
+          </div>
+        ) : (
+          <div>
+            {/* Table Header */}
+            <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100">
+              <div className="col-span-5">Medicine &amp; Salt Detail</div>
+              <div className="col-span-2 text-center">Batch / Exp</div>
+              <div className="col-span-2 text-center">Dose (Days)</div>
+              <div className="col-span-2 text-right">Amount</div>
+              <div className="col-span-1" />
+            </div>
+
+            {/* Line Items */}
+            <div className="divide-y divide-slate-100">
+              {lineItems.map((li) => (
+                <div key={li.id} className="grid grid-cols-12 gap-2 px-5 py-4 items-center hover:bg-slate-50/50 transition-colors">
+                  <div className="col-span-5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-extrabold text-slate-800 text-sm leading-none">{li.medicineName}</span>
+                      <Badge variant="outline" className="text-[9px] font-bold py-0.5 px-2 rounded h-4 flex items-center border-slate-200">
+                        {li.category}
+                      </Badge>
                     </div>
+                    <p className="text-[10px] text-slate-400 mt-1 italic font-medium">{li.salt}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="col-span-2 text-center">
+                    <p className="text-xs font-mono font-bold text-slate-700">{li.batchNumber}</p>
+                    <p className="text-[9px] font-bold text-slate-400">Exp: {new Date(li.expiryDate).toLocaleDateString("en-IN")}</p>
+                  </div>
+                  <div className="col-span-2 text-center">
+                    <p className="text-xs font-extrabold text-slate-800">{li.qty} Tabs</p>
+                    <p className="text-[10px] text-slate-400">{li.dose} daily for {li.days}d</p>
+                  </div>
+                  <div className="col-span-2 text-right">
+                    <p className="font-extrabold text-slate-800">₹{li.total.toLocaleString("en-IN")}</p>
+                    <p className="text-[9px] font-bold text-slate-400">₹{li.unitPrice}/tab</p>
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <button
+                      onClick={() => handleRemoveLine(li.id)}
+                      className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Subtotal */}
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/30 flex justify-between items-center">
+              <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Subtotal ({lineItems.length} Formulation{lineItems.length !== 1 ? "s" : ""})</span>
+              <span className="text-base font-extrabold text-slate-800">₹{subtotal.toLocaleString("en-IN")}.00</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Section: Next Visit & Billing side-by-side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
 
         {/* BOTTOM-LEFT: Schedule Next Visit + Notes */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Schedule Next Visit
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Quick Presets
-              </Label>
-              <div className="flex flex-wrap gap-2 mt-2">
+        <div className="space-y-6">
+          {/* Next Visit */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-50">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-[#0d7377]" />
+                <h3 className="font-bold text-slate-800 text-sm">Schedule Next Visit</h3>
+              </div>
+              <Badge className="bg-teal-50 border border-teal-100 text-[#0d7377] font-semibold text-[9px] px-2 py-0.5 rounded">
+                Clinical scheduler
+              </Badge>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quick Days Preset</Label>
+              <div className="flex flex-wrap gap-2">
                 {[7, 10, 15, 30, 45].map((d) => (
-                  <Button
+                  <button
                     key={d}
-                    variant={nextVisitDays === d ? "default" : "outline"}
-                    size="sm"
                     onClick={() => handleDaysPreset(d)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition-all ${
+                      nextVisitDays === d
+                        ? "bg-[#0d7377] text-white border-[#0d7377] shadow-sm"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800"
+                    }`}
                   >
-                    {d} days
-                  </Button>
+                    {d} Days
+                  </button>
                 ))}
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={handleClearNextVisit}
-                  className="text-muted-foreground"
+                  className="px-3 py-1.5 rounded-lg text-xs font-extrabold border bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
                 >
                   Clear
-                </Button>
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground">Days</Label>
+            <div className="grid grid-cols-2 gap-4 pt-1">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Follow-up in Days</Label>
                 <Input
                   type="number"
                   min={1}
@@ -832,58 +877,83 @@ export default function DispenseWorkstationPage() {
                       handleClearNextVisit();
                     }
                   }}
-                  placeholder="—"
-                  className="mt-1"
+                  placeholder="e.g. 7, 10, 30"
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50 text-center font-bold text-slate-700 focus:ring-1 focus:ring-[#0d7377]"
                 />
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Date</Label>
-                <Input
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Follow-up Date</Label>
+                <input
                   type="date"
                   value={nextVisitDate}
                   onChange={(e) => handleNextVisitDateChange(e.target.value)}
-                  className="mt-1"
+                  className="w-full h-11 px-3 border border-slate-200 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0d7377]/10 focus:border-[#0d7377]"
                 />
                 <FieldError message={apiErrors.get("next_followup_date")} />
               </div>
             </div>
 
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Ledger Remarks / Notes
-              </Label>
+            {nextVisitDate && (
+              <div className="bg-teal-50/70 border border-teal-100 rounded-xl p-3.5 flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2.5 text-[#0d7377]">
+                  <ShieldCheck className="h-5 w-5 flex-shrink-0" />
+                  <span className="text-xs font-black tracking-tight leading-snug">
+                    Next Follow-up: <span className="underline decoration-wavy decoration-[#0d7377]/30 ml-0.5">{new Date(nextVisitDate).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</span>
+                  </span>
+                </div>
+                <Badge className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold text-[9px] px-2 py-0.5 border-0 rounded-lg">
+                  {nextVisitDays ? `${nextVisitDays} Days` : "Custom"}
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          {/* Remarks / Notes */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+            <div className="flex items-center gap-2 pb-2.5 border-b border-slate-50">
+              <FileText className="h-4 w-4 text-[#0d7377]" />
+              <h3 className="font-bold text-slate-800 text-sm">Ledger Remarks &amp; Notes</h3>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Remarks / Instructions</Label>
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes about this dispense"
-                className="mt-1"
+                placeholder="Record any clinical dispense comments, partial payments, or special instructions..."
+                className="rounded-xl border-slate-200 bg-slate-50/50 text-sm min-h-[90px] resize-none font-semibold text-slate-700"
                 rows={3}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* BOTTOM-RIGHT: Settlement */}
-        <Card className="border-0 shadow-md">
-          <CardHeader className="border-b">
-            <CardTitle className="text-base">Settlement &amp; Pricing</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Payment Method
-              </Label>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 relative overflow-hidden">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-50">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-[#0d7377]" />
+              <h3 className="font-bold text-slate-800 text-sm">Settlement &amp; Pricing</h3>
+            </div>
+            <Badge className="bg-teal-50 border border-teal-100 text-[#0d7377] font-semibold text-[9px] px-2 py-0.5 rounded">
+              Deductions verified
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Payment Mode */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement Method</Label>
               <Select
                 value={paymentMethod}
                 onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-slate-50/50 font-medium">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Online">Online</SelectItem>
-                  <SelectItem value="Split">Split</SelectItem>
+                  <SelectItem value="Online">Online / Digital Payment</SelectItem>
+                  <SelectItem value="Split">Split Payment (Cash &amp; Online)</SelectItem>
                 </SelectContent>
               </Select>
               <FieldError
@@ -894,10 +964,9 @@ export default function DispenseWorkstationPage() {
               />
             </div>
 
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Discount (%)
-              </Label>
+            {/* Discount */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount Percentage (%)</Label>
               <Input
                 type="number"
                 min={0}
@@ -909,159 +978,142 @@ export default function DispenseWorkstationPage() {
                     Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
                   )
                 }
-                className="mt-1"
+                className="h-11 rounded-xl border-slate-200 bg-slate-50/50 text-center font-bold text-slate-700"
               />
               <FieldError message={apiErrors.get("payment.discount")} />
             </div>
+          </div>
 
-            {paymentMethod === "Split" ? (
-              <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-                <div className="flex gap-2">
-                  <Button
+          {/* Split Details */}
+          {paymentMethod === "Split" ? (
+            <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Activity className="h-3.5 w-3.5 text-[#0d7377]" /> Split Payment Portions
+                </span>
+                <Badge className="bg-[#0d7377]/10 text-[#0d7377] font-black text-[10px] py-0.5 px-2 rounded-lg border-0 h-5 flex items-center">
+                  Total: ₹{grandTotal}
+                </Badge>
+              </div>
+
+              <div className="flex gap-1.5">
+                {[
+                  { label: "50/50 Split", cash: Math.round(grandTotal / 2) },
+                  { label: "100% Cash", cash: grandTotal },
+                  { label: "100% Online", cash: 0 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      handleSplitCashChange(Math.round(grandTotal / 2))
+                    onClick={() => handleSplitCashChange(preset.cash)}
+                    className="bg-white hover:bg-slate-100 text-slate-600 font-extrabold text-[10px] px-2.5 py-1 rounded border border-slate-200 transition-colors shadow-sm"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold text-slate-400">Cash Portion (₹)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={cashAmount}
+                    onChange={(e) =>
+                      handleSplitCashChange(parseFloat(e.target.value) || 0)
                     }
-                  >
-                    50 / 50 Split
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSplitCashChange(grandTotal)}
-                  >
-                    100% Cash
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSplitCashChange(0)}
-                  >
-                    100% Online
-                  </Button>
+                    className="h-10 rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">
-                      Cash Amount (₹)
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={cashAmount}
-                      onChange={(e) =>
-                        handleSplitCashChange(parseFloat(e.target.value) || 0)
-                      }
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">
-                      Online Amount (₹)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={onlineAmount}
-                      readOnly
-                      className="mt-1 bg-muted"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold text-slate-400">Online Portion (₹)</Label>
+                  <Input
+                    type="number"
+                    value={onlineAmount}
+                    readOnly
+                    className="h-10 rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
+                  />
                 </div>
-              </div>
-            ) : null}
-
-            <div className="border-t pt-3 space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">
-                  ₹{subtotal.toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Discount ({discount}%)
-                </span>
-                <span className="font-medium text-rose-600">
-                  − ₹{discountAmount.toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div className="flex justify-between text-base pt-2 border-t">
-                <span className="font-semibold">Net Payable</span>
-                <span className="font-bold text-primary">
-                  ₹{grandTotal.toLocaleString("en-IN")}
-                </span>
               </div>
             </div>
+          ) : null}
 
-            {/* Surface line-item and any other backend errors not paired
-                with a dedicated FieldError, so the pharmacist always sees
-                why a save failed even when the underlying field is buried
-                inside the line-item editor. */}
-            {(() => {
-              const surfaceableKeys = Object.keys(apiErrors.fields).filter(
-                (k) =>
-                  ![
-                    "payment.payment_method",
-                    "payment.discount",
-                    "payment.non_field_errors",
-                    "next_followup_date",
-                  ].includes(k),
-              );
-              if (surfaceableKeys.length === 0) return null;
-              return (
-                <div className="border border-rose-200 bg-rose-50 rounded-md p-3 text-xs space-y-1">
-                  {surfaceableKeys.map((key) => (
-                    <div key={key} className="text-rose-700">
-                      <span className="font-mono">{key}</span>:{" "}
-                      {apiErrors.fields[key].join("; ")}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+          {/* Pricing Breakdown */}
+          <div className="border-t border-slate-100 pt-4 space-y-2.5">
+            <div className="flex justify-between text-sm font-semibold text-slate-500">
+              <span>Formulation Subtotal</span>
+              <span>₹{subtotal.toLocaleString("en-IN")}.00</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-sm font-bold text-emerald-600 bg-emerald-50/50 px-2.5 py-1 rounded-lg">
+                <span>Discount Allowed ({discount}%)</span>
+                <span>− ₹{discountAmount.toLocaleString("en-IN")}.00</span>
+              </div>
+            )}
+            <div className="flex justify-between font-black text-lg text-slate-800 border-t border-slate-200 pt-3 mt-1 tracking-tight">
+              <span>Net Payable</span>
+              <span className="text-[#0d7377]">₹{grandTotal.toLocaleString("en-IN")}.00</span>
+            </div>
+          </div>
 
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={handleSaveInvoice}
-              disabled={isSaving || lineItems.length === 0}
-            >
-              {isSaving ? (
-                <>
-                  <Spinner className="h-4 w-4 mr-2" /> Saving…
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Dispense &amp; Save Invoice
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Surface line-item and any other backend errors */}
+          {(() => {
+            const surfaceableKeys = Object.keys(apiErrors.fields).filter(
+              (k) =>
+                ![
+                  "payment.payment_method",
+                  "payment.discount",
+                  "payment.non_field_errors",
+                  "next_followup_date",
+                ].includes(k),
+            );
+            if (surfaceableKeys.length === 0) return null;
+            return (
+              <div className="border border-rose-200 bg-rose-50 rounded-xl p-3 text-xs space-y-1">
+                {surfaceableKeys.map((key) => (
+                  <div key={key} className="text-rose-700">
+                    <span className="font-mono">{key}</span>:{" "}
+                    {apiErrors.fields[key].join("; ")}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Dispense & Save Button */}
+          <button
+            onClick={handleSaveInvoice}
+            disabled={isSaving || lineItems.length === 0}
+            className="w-full h-12 bg-gradient-to-r from-[#0d7377] to-teal-700 hover:from-[#0a5c5f] hover:to-teal-800 disabled:opacity-60 text-white font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-900/10 hover:scale-[1.01] active:scale-95 mt-1"
+          >
+            {isSaving ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <ShieldCheck className="h-5 w-5" />
+            )}
+            {isSaving ? "Finalizing Settlement..." : "Dispense & Save Invoice"}
+          </button>
+        </div>
       </div>
 
       {/* Cancel Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Cancel Prescription</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-black text-slate-800">Cancel Prescription</DialogTitle>
+            <DialogDescription className="text-slate-500">
               This will complete the visit with a cancelled outcome. Provide a
               reason for cancellation.
             </DialogDescription>
           </DialogHeader>
-          <div>
-            <Label className="text-xs text-muted-foreground">Reason</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reason</Label>
             <Textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="e.g. Patient declined treatment"
-              className="mt-1"
+              className="rounded-xl border-slate-200 bg-slate-50/50 text-sm font-semibold text-slate-700"
               rows={3}
             />
           </div>
@@ -1070,17 +1122,18 @@ export default function DispenseWorkstationPage() {
               variant="outline"
               onClick={() => setCancelDialogOpen(false)}
               disabled={isCancelling}
+              className="rounded-xl border-slate-200 font-bold"
             >
               Close
             </Button>
             <Button
-              className="bg-rose-600 hover:bg-rose-700 text-white"
+              className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold"
               onClick={handleCancelDispense}
               disabled={isCancelling || !cancelReason.trim()}
             >
               {isCancelling ? (
                 <>
-                  <Spinner className="h-4 w-4 mr-2" /> Cancelling…
+                  <Spinner className="h-4 w-4 mr-2" /> Cancelling...
                 </>
               ) : (
                 "Confirm Cancel"
@@ -1089,6 +1142,8 @@ export default function DispenseWorkstationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      </div>
     </div>
   );
 }

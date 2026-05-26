@@ -476,7 +476,7 @@ export default function RegisterPatientPage() {
 
   if (registrationComplete) {
     return (
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
@@ -565,7 +565,7 @@ export default function RegisterPatientPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
@@ -878,116 +878,123 @@ export default function RegisterPatientPage() {
                     </div>
                   </div>
 
-                  {/* Address */}
-                  <div>
-                    <Label
-                      htmlFor="address"
-                      className="flex items-center gap-2"
-                    >
-                      <MapPin className="h-4 w-4 text-teal-600" />
-                      Address <span className="text-destructive">*</span>
-                    </Label>
-                    <Textarea
-                      id="address"
-                      name="address"
-                      value={instantFormData.address}
-                      onChange={handleInstantChange}
-                      placeholder="Enter complete address"
-                      className="mt-1.5 min-h-[80px]"
-                      required
-                    />
-                    <FieldError message={apiErrors.get("address_line1")} />
-                  </div>
+                  {/* Location Details */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Location Details
+                    </h3>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label
+                          htmlFor="state"
+                          className="flex items-center gap-2"
+                        >
+                          <MapPin className="h-4 w-4 text-teal-600" />
+                          State
+                        </Label>
+                        <Input
+                          id="state"
+                          name="state"
+                          value={instantFormData.state}
+                          onChange={(e) =>
+                            handleAddressStateChange(e.target.value)
+                          }
+                          list="state-suggestions"
+                          placeholder="Type to search state"
+                          className="mt-1.5"
+                        />
+                        <datalist id="state-suggestions">
+                          {stateOptions.map((state) => (
+                            <option key={state.code} value={state.name} />
+                          ))}
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <Label
+                          htmlFor="district"
+                          className="flex items-center gap-2"
+                        >
+                          <MapPin className="h-4 w-4 text-teal-600" />
+                          District
+                        </Label>
+                        <Input
+                          id="district"
+                          name="district"
+                          value={instantFormData.district}
+                          onChange={handleInstantChange}
+                          placeholder="Enter district"
+                          className="mt-1.5"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="city" className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-teal-600" />
+                          City/Village
+                        </Label>
+                        <Input
+                          id="city"
+                          name="city"
+                          value={instantFormData.city}
+                          onChange={handleInstantChange}
+                          list="city-suggestions"
+                          placeholder={
+                            instantFormData.state
+                              ? "Type to search city"
+                              : "Select state first"
+                          }
+                          disabled={!instantFormData.state}
+                          className="mt-1.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        <datalist id="city-suggestions">
+                          {cityOptions.map((city) => (
+                            <option key={city} value={city} />
+                          ))}
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <Label
+                          htmlFor="pincode"
+                          className="flex items-center gap-2"
+                        >
+                          <MapPin className="h-4 w-4 text-teal-600" />
+                          Pincode
+                        </Label>
+                        <Input
+                          id="pincode"
+                          name="pincode"
+                          value={instantFormData.pincode}
+                          onChange={handleInstantChange}
+                          placeholder="Enter pincode"
+                          inputMode="numeric"
+                          maxLength={6}
+                          className="mt-1.5"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Address */}
                     <div>
                       <Label
-                        htmlFor="state"
+                        htmlFor="address"
                         className="flex items-center gap-2"
                       >
                         <MapPin className="h-4 w-4 text-teal-600" />
-                        State
+                        Address <span className="text-destructive">*</span>
                       </Label>
-                      <Input
-                        id="state"
-                        name="state"
-                        value={instantFormData.state}
-                        onChange={(e) =>
-                          handleAddressStateChange(e.target.value)
-                        }
-                        list="state-suggestions"
-                        placeholder="Type to search state"
-                        className="mt-1.5"
-                      />
-                      <datalist id="state-suggestions">
-                        {stateOptions.map((state) => (
-                          <option key={state.code} value={state.name} />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="city" className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-teal-600" />
-                        City
-                      </Label>
-                      <Input
-                        id="city"
-                        name="city"
-                        value={instantFormData.city}
+                      <Textarea
+                        id="address"
+                        name="address"
+                        value={instantFormData.address}
                         onChange={handleInstantChange}
-                        list="city-suggestions"
-                        placeholder={
-                          instantFormData.state
-                            ? "Type to search city"
-                            : "Select state first"
-                        }
-                        disabled={!instantFormData.state}
-                        className="mt-1.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        placeholder="Enter complete address"
+                        className="mt-1.5 min-h-[80px]"
+                        required
                       />
-                      <datalist id="city-suggestions">
-                        {cityOptions.map((city) => (
-                          <option key={city} value={city} />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <Label
-                        htmlFor="district"
-                        className="flex items-center gap-2"
-                      >
-                        <MapPin className="h-4 w-4 text-teal-600" />
-                        District
-                      </Label>
-                      <Input
-                        id="district"
-                        name="district"
-                        value={instantFormData.district}
-                        onChange={handleInstantChange}
-                        placeholder="Enter district"
-                        className="mt-1.5"
-                      />
-                    </div>
-
-                    <div>
-                      <Label
-                        htmlFor="pincode"
-                        className="flex items-center gap-2"
-                      >
-                        <MapPin className="h-4 w-4 text-teal-600" />
-                        Pincode
-                      </Label>
-                      <Input
-                        id="pincode"
-                        name="pincode"
-                        value={instantFormData.pincode}
-                        onChange={handleInstantChange}
-                        placeholder="6-digit pincode"
-                        inputMode="numeric"
-                        maxLength={6}
-                        className="mt-1.5"
-                      />
+                      <FieldError message={apiErrors.get("address_line1")} />
                     </div>
                   </div>
                 </CardContent>

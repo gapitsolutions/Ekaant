@@ -50,6 +50,14 @@ import {
   Loader2,
   Package,
   FileWarning,
+  Boxes,
+  Sparkles,
+  Calendar,
+  Layers,
+  ShieldCheck,
+  Archive,
+  FileSpreadsheet,
+  TrendingDown,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { FieldError } from "@/components/ui/field-error";
@@ -183,90 +191,132 @@ export default function InventoryWorkstationPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Inventory Workstation
-          </h1>
-          <p className="text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
+              <Boxes className="h-7 w-7 text-[#0d7377]" /> Inventory Workstation
+            </h1>
+            <Badge className="bg-teal-50 border border-teal-100 text-[#0d7377] font-bold text-[10px] uppercase px-2 py-0.5 rounded-lg flex items-center gap-1">
+              <Sparkles className="h-3 w-3" /> Audit Compliant
+            </Badge>
+          </div>
+          <p className="text-xs text-slate-500 font-medium">
             {medicines.length} active formulation
             {medicines.length === 1 ? "" : "s"} registered
           </p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Register Medicine
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="bg-white text-slate-600 font-extrabold px-3.5 py-2 rounded-xl border border-slate-100 shadow-sm flex items-center gap-2 text-xs">
+            <Calendar className="h-4 w-4 text-[#0d7377]" />
+            <span>{medicines.length} Predefined Formulations</span>
+          </div>
+          <Button
+            onClick={() => setAddDialogOpen(true)}
+            className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
+          >
+            <Plus className="h-4 w-4" />
+            Register Medicine
+          </Button>
+        </div>
       </div>
 
       {/* Stat Filter Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {(
           [
             {
               key: "all",
               title: "All Formulations",
               count: counts.all,
-              ring: "ring-primary",
-              icon: Pill,
-              iconColor: "text-primary",
+              labelColor: "text-slate-500",
+              activeBg: "bg-teal-50/30",
+              activeBorder: "border-[#0d7377]",
+              activeRing: "ring-[#0d7377]/20",
+              badgeClass: "bg-[#0d7377] text-white",
+              icon: Layers,
+              subtitle: "Predefined stock",
             },
             {
               key: "BUP",
               title: "BUP (Controlled)",
               count: counts.BUP,
-              ring: "ring-rose-500",
+              labelColor: "text-rose-600",
+              activeBg: "bg-rose-50/30",
+              activeBorder: "border-rose-500",
+              activeRing: "ring-rose-500/20",
+              badgeClass: "bg-rose-500 text-white",
               icon: AlertTriangle,
-              iconColor: "text-rose-600",
+              subtitle: "Controlled substances",
             },
             {
               key: "Rx",
               title: "Rx Formulations",
               count: counts.Rx,
-              ring: "ring-blue-500",
-              icon: Package,
-              iconColor: "text-blue-600",
+              labelColor: "text-blue-600",
+              activeBg: "bg-blue-50/30",
+              activeBorder: "border-blue-500",
+              activeRing: "ring-blue-500/20",
+              badgeClass: "bg-blue-500 text-white",
+              icon: ShieldCheck,
+              subtitle: "Prescribed items",
             },
             {
               key: "NRx",
               title: "NRx Formulations",
               count: counts.NRx,
-              ring: "ring-amber-500",
-              icon: Package,
-              iconColor: "text-amber-600",
+              labelColor: "text-amber-600",
+              activeBg: "bg-amber-50/30",
+              activeBorder: "border-amber-500",
+              activeRing: "ring-amber-500/20",
+              badgeClass: "bg-amber-500 text-white",
+              icon: Archive,
+              subtitle: "Over-the-counter",
             },
           ] as const
         ).map((stat) => {
           const active = categoryFilter === stat.key;
           return (
-            <button
+            <div
               key={stat.key}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 setCategoryFilter(stat.key as CategoryFilter);
                 if (stat.key !== "BUP") setBupFilter("all");
               }}
-              className="text-left"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setCategoryFilter(stat.key as CategoryFilter);
+                  if (stat.key !== "BUP") setBupFilter("all");
+                }
+              }}
+              className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 group hover:shadow-sm ${
+                active
+                  ? `${stat.activeBg} ${stat.activeBorder} ring-1 ${stat.activeRing}`
+                  : "bg-white border-slate-200 hover:border-slate-300"
+              }`}
             >
-              <Card
-                className={`border-0 shadow-md hover:shadow-lg transition-all ${
-                  active ? `ring-2 ${stat.ring}` : ""
-                }`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-3xl font-bold">{stat.count}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {stat.title}
-                      </p>
-                    </div>
-                    <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />
-                  </div>
-                </CardContent>
-              </Card>
-            </button>
+              <div className="flex justify-between items-start mb-2">
+                <div className={`text-xs font-bold ${stat.labelColor} uppercase tracking-wider`}>
+                  {stat.title}
+                </div>
+                {active && (
+                  <Badge className={`${stat.badgeClass} border-0 font-bold text-[9px] px-1.5 py-0 rounded shadow-sm`}>
+                    Active
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-800 tracking-tight">
+                  {stat.count}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                <stat.icon className="h-3 w-3 text-slate-400" /> {stat.subtitle}
+              </p>
+            </div>
           );
         })}
       </div>
@@ -274,263 +324,344 @@ export default function InventoryWorkstationPage() {
       {/* Alerts */}
       {(lowStockMedicines.length > 0 || nearExpiryBatches.length > 0) &&
       tab === "list" ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-3">
           {lowStockMedicines.length > 0 ? (
-            <Card className="border-rose-200 bg-rose-50">
-              <CardContent className="p-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center justify-between gap-3.5 shadow-sm">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="h-5 w-5 text-rose-600" />
-                  <div>
-                    <p className="font-semibold text-rose-900">
-                      Low Stock Alerts
-                    </p>
-                    <p className="text-sm text-rose-700">
-                      {lowStockMedicines.length} medicine
-                      {lowStockMedicines.length === 1 ? "" : "s"} at or below
-                      reorder level
-                    </p>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-rose-800 uppercase tracking-widest">
+                    Low Stock Alert
+                  </p>
+                  <p className="text-[11px] text-rose-600 font-bold leading-relaxed mt-0.5">
+                    {lowStockMedicines.length} medicine
+                    {lowStockMedicines.length === 1 ? "" : "s"} at or below
+                    reorder level
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : null}
           {nearExpiryBatches.length > 0 ? (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardContent className="p-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <CalendarClock className="h-5 w-5 text-amber-600" />
-                  <div>
-                    <p className="font-semibold text-amber-900">Near Expiry</p>
-                    <p className="text-sm text-amber-700">
-                      {nearExpiryBatches.length} batch
-                      {nearExpiryBatches.length === 1 ? "" : "es"} expiring
-                      within 180 days
-                    </p>
-                  </div>
+            <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-center justify-between gap-3.5 shadow-sm">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center flex-shrink-0">
+                  <CalendarClock className="h-5 w-5 text-orange-600" />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-orange-800 uppercase tracking-widest">
+                    Near Expiry Alert
+                  </p>
+                  <p className="text-[11px] text-orange-600 font-bold leading-relaxed mt-0.5">
+                    {nearExpiryBatches.length} batch
+                    {nearExpiryBatches.length === 1 ? "" : "es"} expiring
+                    within 180 days
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : null}
         </div>
       ) : null}
 
+      {/* Mode selector bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setTab("list")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+              tab === "list"
+                ? "bg-[#0d7377] text-white shadow-md shadow-teal-900/10"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+            }`}
+          >
+            <Pill className="h-4 w-4" /> Registered List
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("invoice")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+              tab === "invoice"
+                ? "bg-[#0d7377] text-white shadow-md shadow-teal-900/10"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+            }`}
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Enter New Invoice
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("audit")}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+              tab === "audit"
+                ? "bg-rose-600 text-white shadow-md shadow-rose-900/10"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+            }`}
+          >
+            <Trash2 className="h-4 w-4" /> Audit Stock Removal
+          </button>
+        </div>
+      </div>
+
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-        <TabsList>
+        <TabsList className="hidden">
           <TabsTrigger value="list">Registered List</TabsTrigger>
           <TabsTrigger value="invoice">Enter New Invoice</TabsTrigger>
           <TabsTrigger value="audit">Audit Stock Removal</TabsTrigger>
         </TabsList>
 
         {/* Registered List Tab */}
-        <TabsContent value="list" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Medicine Registry</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <TabsContent value="list" className="mt-0 outline-none space-y-6">
+          <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="py-4 px-6 border-b border-slate-100 bg-white">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex-1 w-full md:w-auto relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by name or salt"
-                    className="pl-9"
+                    placeholder="Search registered composition, salt or name..."
+                    className="pl-9 h-10 bg-white border-slate-200 rounded-lg focus:ring-[#0d7377]/10 focus:border-[#0d7377] font-medium text-slate-700 text-sm w-full md:max-w-md"
                   />
                 </div>
-                <Select
-                  value={categoryFilter}
-                  onValueChange={(v) => {
-                    setCategoryFilter(v as CategoryFilter);
-                    if (v !== "BUP") setBupFilter("all");
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="BUP">BUP</SelectItem>
-                    <SelectItem value="Rx">Rx</SelectItem>
-                    <SelectItem value="NRx">NRx</SelectItem>
-                  </SelectContent>
-                </Select>
-                {categoryFilter === "BUP" ? (
+                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
                   <Select
-                    value={bupFilter}
-                    onValueChange={(v) => setBupFilter(v as BupStrength | "all")}
+                    value={categoryFilter}
+                    onValueChange={(v) => {
+                      setCategoryFilter(v as CategoryFilter);
+                      if (v !== "BUP") setBupFilter("all");
+                    }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Strength" />
+                    <SelectTrigger className="w-36 h-10 rounded-lg border-slate-200 bg-white font-medium text-sm text-slate-700">
+                      <SelectValue placeholder="Category" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Strengths</SelectItem>
-                      {BUP_STRENGTHS.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="rounded-lg border-slate-200 text-sm">
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="BUP">BUP (Controlled)</SelectItem>
+                      <SelectItem value="Rx">Rx (Prescribed)</SelectItem>
+                      <SelectItem value="NRx">NRx (General)</SelectItem>
                     </SelectContent>
                   </Select>
-                ) : (
-                  <div />
-                )}
+                  {categoryFilter === "BUP" ? (
+                    <Select
+                      value={bupFilter}
+                      onValueChange={(v) => setBupFilter(v as BupStrength | "all")}
+                    >
+                      <SelectTrigger className="w-40 h-10 rounded-lg border-slate-200 bg-white font-medium text-sm text-[#0d7377]">
+                        <SelectValue placeholder="Strength" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-lg border-slate-200 text-sm">
+                        <SelectItem value="all">All Strengths</SelectItem>
+                        {BUP_STRENGTHS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                </div>
               </div>
+            </CardHeader>
 
+            <CardContent className="p-0 overflow-x-auto">
               {errorMessage ? (
-                <p className="text-sm text-destructive">{errorMessage}</p>
+                <p className="text-sm text-destructive px-6 py-4">{errorMessage}</p>
               ) : null}
 
               {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-200 hover:bg-transparent bg-slate-50/80">
+                      <TableHead className="px-6 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine &amp; Salt</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Active Batches &amp; Expiry</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Price</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Stock</TableHead>
+                      <TableHead className="px-6 h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">Manage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-slate-100">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={`skel-${i}`}>
+                        <TableCell className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-100 animate-pulse flex-shrink-0" />
+                            <div className="space-y-2 flex-1">
+                              <div className="h-3.5 bg-slate-100 rounded w-48 animate-pulse" />
+                              <div className="h-2.5 bg-slate-50 rounded w-32 animate-pulse" />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell><div className="h-5 bg-slate-100 rounded w-16 animate-pulse" /></TableCell>
+                        <TableCell><div className="h-8 bg-slate-50 rounded w-48 animate-pulse" /></TableCell>
+                        <TableCell className="text-center"><div className="h-4 bg-slate-100 rounded w-12 mx-auto animate-pulse" /></TableCell>
+                        <TableCell className="text-center"><div className="h-6 bg-slate-50 rounded w-16 mx-auto animate-pulse" /></TableCell>
+                        <TableCell className="px-6"><div className="h-8 bg-slate-50 rounded w-8 ml-auto animate-pulse" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : filteredMedicines.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <p className="text-muted-foreground font-medium">
-                    No medicines found
+                  <Package className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-slate-500">
+                    No registered formulations found.
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     Try adjusting your filters or register a new medicine
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Medicine &amp; Salt</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Active Batches</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Stock</TableHead>
-                        <TableHead className="text-right">Manage</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredMedicines.map((m) => {
-                        const stock = stockFor(m);
-                        const isLow = stock <= m.reorder_level;
-                        return (
-                          <TableRow key={m.id}>
-                            <TableCell>
-                              <div className="font-medium">{m.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {m.salt}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    m.category === "BUP"
-                                      ? "border-rose-500 text-rose-700 bg-rose-50"
-                                      : m.category === "Rx"
-                                        ? "border-blue-500 text-blue-700 bg-blue-50"
-                                        : "border-amber-500 text-amber-700 bg-amber-50"
-                                  }
-                                >
-                                  {m.category}
-                                </Badge>
-                                {m.bup_category ? (
-                                  <span className="text-xs text-muted-foreground">
-                                    {m.bup_category}
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-200 hover:bg-transparent bg-slate-50/80">
+                      <TableHead className="px-6 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine &amp; Salt</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Active Batches &amp; Expiry</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Price</TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Stock</TableHead>
+                      <TableHead className="px-6 h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">Manage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-slate-100">
+                    {filteredMedicines.map((m) => {
+                      const stock = stockFor(m);
+                      const isLow = stock <= m.reorder_level;
+                      return (
+                        <TableRow key={m.id} className="group hover:bg-slate-50/50 transition-colors border-slate-100">
+                          <TableCell className="px-6 py-3">
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-800 text-sm tracking-tight">{m.name}</p>
+                              <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-wide">{m.salt}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1 items-start">
+                              <Badge
+                                variant="outline"
+                                className={`font-bold text-[9px] uppercase px-1.5 py-0 rounded ${
+                                  m.category === "BUP"
+                                    ? "text-rose-600 border-rose-200 bg-rose-50"
+                                    : m.category === "Rx"
+                                      ? "text-blue-600 border-blue-200 bg-blue-50"
+                                      : "text-amber-600 border-amber-200 bg-amber-50"
+                                }`}
+                              >
+                                {m.category}
+                              </Badge>
+                              {m.bup_category ? (
+                                <span className="text-[10px] text-slate-500">
+                                  {m.bup_category}
+                                </span>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {m.batches && m.batches.length > 0 ? (
+                              <div className="flex flex-col gap-1 max-w-[280px]">
+                                {m.batches.slice(0, 3).map((b) => {
+                                  const expDate = new Date(b.expiry_date);
+                                  const diffTime = expDate.getTime() - Date.now();
+                                  const diffDays = Math.ceil(diffTime / 86400000);
+                                  const isNearExpiry = diffDays > 0 && diffDays <= 180;
+                                  const isExpired = diffDays <= 0;
+                                  return (
+                                    <div
+                                      key={b.batch_number}
+                                      className="flex items-center justify-between text-[11px] font-medium"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-slate-700 font-mono">{b.batch_number}</span>
+                                        <span className="text-slate-300">&middot;</span>
+                                        <span className={`flex items-center gap-1 ${
+                                          isExpired ? "text-rose-600 font-bold" :
+                                          isNearExpiry ? "text-amber-600 font-bold" : "text-slate-500"
+                                        }`}>
+                                          Exp: {expDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })}
+                                          {isNearExpiry && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                                          {isExpired && <AlertTriangle className="h-3 w-3 text-rose-500" />}
+                                        </span>
+                                      </div>
+                                      <span className="text-slate-600 font-semibold">{b.quantity}u</span>
+                                    </div>
+                                  );
+                                })}
+                                {m.batches.length > 3 ? (
+                                  <span className="text-[10px] text-slate-400">
+                                    +{m.batches.length - 3} more
                                   </span>
                                 ) : null}
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              {m.batches && m.batches.length > 0 ? (
-                                <div className="space-y-0.5">
-                                  {m.batches.slice(0, 2).map((b) => (
-                                    <div
-                                      key={b.batch_number}
-                                      className="text-xs"
-                                    >
-                                      <span className="font-mono">
-                                        {b.batch_number}
-                                      </span>{" "}
-                                      <span className="text-muted-foreground">
-                                        ·{" "}
-                                        {new Date(
-                                          b.expiry_date,
-                                        ).toLocaleDateString("en-IN", {
-                                          month: "short",
-                                          year: "numeric",
-                                        })}{" "}
-                                        · {b.quantity}u
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {m.batches.length > 2 ? (
-                                    <span className="text-xs text-muted-foreground">
-                                      +{m.batches.length - 2} more
-                                    </span>
-                                  ) : null}
-                                </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">
+                                No batches
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-bold text-slate-800 text-sm">
+                              ₹{parseFloat(m.selling_price).toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                              MRP: ₹{parseFloat(m.mrp).toFixed(2)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <span className={`text-sm font-black ${isLow ? "text-rose-600" : "text-slate-800"}`}>
+                                {stock} u
+                              </span>
+                              {isLow ? (
+                                <span className="text-[9px] text-rose-500 font-bold uppercase mt-0.5 flex items-center gap-1">
+                                  <TrendingDown className="h-3 w-3" /> Reorder
+                                </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  No batches
+                                <span className="text-[9px] text-slate-400 mt-0.5">
+                                  Min: {m.reorder_level}
                                 </span>
                               )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                ₹{parseFloat(m.selling_price).toFixed(2)}
-                              </div>
-                              <div className="text-xs text-muted-foreground line-through">
-                                MRP ₹{parseFloat(m.mrp).toFixed(2)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  isLow
-                                    ? "border-rose-500 text-rose-700 bg-rose-50"
-                                    : "border-emerald-500 text-emerald-700 bg-emerald-50"
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-6 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                onClick={() =>
+                                  navigate(`/pharmacy/inventory/${m.id}`)
                                 }
+                                aria-label="View history"
+                                title="View Dispense History"
                               >
-                                {stock} u
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    navigate(`/pharmacy/inventory/${m.id}`)
-                                  }
-                                  aria-label="View history"
-                                >
-                                  <History className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-rose-600 hover:bg-rose-50"
-                                  onClick={() => setDeleteTarget(m)}
-                                  aria-label="Delete medicine"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                                <History className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                onClick={() => setDeleteTarget(m)}
+                                aria-label="Delete medicine"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Invoice Tab */}
-        <TabsContent value="invoice" className="mt-4">
+        <TabsContent value="invoice" className="mt-0 outline-none">
           <PurchaseInvoiceForm
             medicines={medicines}
             suppliers={suppliers}
@@ -543,7 +674,7 @@ export default function InventoryWorkstationPage() {
         </TabsContent>
 
         {/* Audit Tab */}
-        <TabsContent value="audit" className="mt-4">
+        <TabsContent value="audit" className="mt-0 outline-none">
           <AuditRemovalView
             medicines={medicines}
             onSuccess={() => loadMedicines()}
@@ -645,158 +776,162 @@ function AddMedicineDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Register New Medicine</DialogTitle>
-          <DialogDescription>
-            Add a new formulation to the active inventory registry
+      <DialogContent className="sm:max-w-[550px] rounded-2xl p-6 bg-white border border-slate-100">
+        <DialogHeader className="pb-3 border-b border-slate-50">
+          <DialogTitle className="text-base font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <Pill className="h-5 w-5 text-[#0d7377]" /> Register New Medicine
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-400 mt-1">
+            Configure standard chemical salts, dosage constraints and reorder alert levels.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Category</Label>
+        <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">Formulation Category</Label>
+            <Select
+              value={category}
+              onValueChange={(v) => setCategory(v as MedicineCategory)}
+            >
+              <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-slate-200 text-xs">
+                <SelectItem value="BUP">BUP Category (Controlled)</SelectItem>
+                <SelectItem value="Rx">Rx Category (Prescription)</SelectItem>
+                <SelectItem value="NRx">NRx Category (General)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {category === "BUP" ? (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-[#0d7377]">
+                BUP Strength Subcategory
+              </Label>
               <Select
-                value={category}
-                onValueChange={(v) => setCategory(v as MedicineCategory)}
+                value={bupCategory}
+                onValueChange={(v) => setBupCategory(v as BupStrength)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-11 rounded-xl bg-teal-50/50 border-teal-200 text-[#0d7377] font-black text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BUP">BUP (Controlled)</SelectItem>
-                  <SelectItem value="Rx">Rx</SelectItem>
-                  <SelectItem value="NRx">NRx</SelectItem>
+                <SelectContent className="rounded-xl border-teal-100 text-xs">
+                  {BUP_STRENGTHS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            {category === "BUP" ? (
-              <div>
-                <Label className="text-xs text-muted-foreground">
-                  BUP Strength
-                </Label>
-                <Select
-                  value={bupCategory}
-                  onValueChange={(v) => setBupCategory(v as BupStrength)}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUP_STRENGTHS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div />
-            )}
-          </div>
+          ) : (
+            <div className="space-y-1.5 opacity-60">
+              <Label className="text-xs font-bold text-slate-400">BUP Strength Subcategory</Label>
+              <div className="h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center px-4 text-slate-400 text-xs font-bold">N/A</div>
+            </div>
+          )}
 
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5 col-span-2">
+            <Label className="text-xs font-bold text-slate-500">
               Medicine Name
             </Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Olanzapine 5mg"
-              className="mt-1"
+              className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-xs"
             />
           </div>
 
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5 col-span-2">
+            <Label className="text-xs font-bold text-slate-500">
               Salt Composition
             </Label>
             <Input
               value={salt}
               onChange={(e) => setSalt(e.target.value)}
               placeholder="e.g. Olanzapine"
-              className="mt-1"
+              className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-xs"
             />
           </div>
 
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5 col-span-2">
+            <Label className="text-xs font-bold text-slate-500">
               Manufacturer
             </Label>
             <Input
               value={manufacturer}
               onChange={(e) => setManufacturer(e.target.value)}
               placeholder="e.g. Sun Pharma"
-              className="mt-1"
+              className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-xs"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">MRP (₹)</Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={mrp}
-                onChange={(e) => setMrp(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Selling Price (₹)
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={sellingPrice}
-                onChange={(e) => setSellingPrice(e.target.value)}
-                className="mt-1"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">MRP price (₹)</Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={mrp}
+              onChange={(e) => setMrp(e.target.value)}
+              className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-center text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-[#0d7377]">
+              Dispense Selling Price (₹)
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={sellingPrice}
+              onChange={(e) => setSellingPrice(e.target.value)}
+              className="h-11 rounded-xl bg-teal-50/30 border-teal-200 font-black text-[#0d7377] text-center text-xs"
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Reorder Level
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={reorderLevel}
-                onChange={(e) => setReorderLevel(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Tablets / Strip
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                value={tabletsPerStrip}
-                onChange={(e) => setTabletsPerStrip(e.target.value)}
-                className="mt-1"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
+              Reorder Level
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              value={reorderLevel}
+              onChange={(e) => setReorderLevel(e.target.value)}
+              className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-center text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
+              Tablets / Strip
+            </Label>
+            <Input
+              type="number"
+              min={1}
+              value={tabletsPerStrip}
+              onChange={(e) => setTabletsPerStrip(e.target.value)}
+              className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-center text-xs"
+            />
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="pt-2 border-t border-slate-50">
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
+            className="rounded-xl h-11 font-bold text-slate-400 hover:bg-slate-50 text-xs"
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="bg-[#0d7377] hover:bg-[#0a5c5f] font-extrabold rounded-xl h-11 px-6 shadow-md shadow-teal-900/10 text-xs"
+          >
             {isSubmitting ? (
               <>
                 <Spinner className="h-4 w-4 mr-2" /> Saving…
@@ -849,25 +984,31 @@ function DeleteMedicineDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Remove Medicine</DialogTitle>
-          <DialogDescription>
-            This will soft-delete <span className="font-semibold">{target?.name}</span>.
+      <DialogContent className="sm:max-w-[480px] rounded-2xl p-6 bg-white border border-slate-100">
+        <DialogHeader className="pb-3 border-b border-slate-50">
+          <DialogTitle className="text-base font-black text-rose-600 tracking-tight flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-rose-600" /> Audit Stock Deletion
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-400 mt-1">
+            Submit audit reason for removing <strong className="text-slate-700">{target?.name}</strong>.
             Historical batches and dispense records remain intact.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs text-muted-foreground">
-              Deletion Reason
+        <div className="space-y-4 py-4">
+          <div className="bg-rose-50/70 border border-rose-100 p-3 rounded-xl text-xs font-semibold text-rose-700 leading-normal">
+            Controlled deletion is strictly audited. Ensure compliance documents are available.
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
+              Reason for removal
             </Label>
             <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl border-slate-200 text-xs">
                 <SelectItem value="destroyed">Destroyed</SelectItem>
                 <SelectItem value="returned">Returned to Supplier</SelectItem>
                 <SelectItem value="defect">Manufacturing Defect</SelectItem>
@@ -875,26 +1016,31 @@ function DeleteMedicineDialog({
             </Select>
           </div>
 
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
               Compliance Notes
             </Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional explanation for audit log"
-              className="mt-1"
+              className="rounded-xl bg-slate-50 border-slate-200 text-xs min-h-[80px] resize-none font-semibold text-slate-700"
               rows={3}
             />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+        <DialogFooter className="pt-2 border-t border-slate-50">
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-xl h-11 font-bold text-slate-400 hover:bg-slate-50 text-xs"
+          >
             Cancel
           </Button>
           <Button
-            className="bg-rose-600 hover:bg-rose-700 text-white"
+            className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl h-11 px-6 shadow-md shadow-rose-900/10 text-xs"
             onClick={handleConfirm}
             disabled={isSubmitting}
           >
@@ -1063,34 +1209,37 @@ function PurchaseInvoiceForm({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Enter New Purchase Invoice</CardTitle>
+    <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+      <CardHeader className="p-6 border-b border-slate-100 bg-slate-50/20">
+        <CardTitle className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
+          <FileSpreadsheet className="h-5 w-5 text-[#0d7377]" /> Enter Purchase Invoice (Bulk Stock Entry)
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <div>
-            <Label className="text-xs text-muted-foreground">
+      <CardContent className="p-6 space-y-6">
+        {/* Invoice Metadata Header */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
               Invoice / Challan No.
             </Label>
             <Input
               value={invoiceNo}
               onChange={(e) => setInvoiceNo(e.target.value)}
               placeholder="SUP-2026-0042"
-              className="mt-1"
+              className="h-11 rounded-xl bg-white border-slate-200 font-bold text-slate-700 text-xs uppercase"
             />
             <FieldError message={apiErrors.get("invoice_number")} />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
               Supplier Company
             </Label>
-            <div className="flex gap-2 mt-1">
+            <div className="flex gap-2">
               <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 h-11 rounded-xl bg-white border-slate-200 font-bold text-xs text-slate-700">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-slate-200 text-xs">
                   {suppliers.length === 0 ? (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
                       No active suppliers yet.
@@ -1113,6 +1262,7 @@ function PurchaseInvoiceForm({
                 size="icon"
                 onClick={() => setSupplierDialogOpen(true)}
                 title="Add new supplier"
+                className="h-11 w-11 rounded-xl border-slate-200 bg-white hover:bg-slate-50 flex-shrink-0"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -1128,73 +1278,81 @@ function PurchaseInvoiceForm({
             />
             <FieldError message={apiErrors.get("supplier_id")} />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
               Invoice Date
             </Label>
             <Input
               type="date"
               value={invoiceDate}
               onChange={(e) => setInvoiceDate(e.target.value)}
-              className="mt-1"
+              className="h-11 rounded-xl bg-white border-slate-200 font-bold text-slate-700 text-xs text-center"
             />
             <FieldError message={apiErrors.get("invoice_date")} />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
               Delivery Date
             </Label>
             <Input
               type="date"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="mt-1"
+              className="h-11 rounded-xl bg-white border-slate-200 font-bold text-slate-700 text-xs text-center"
             />
             <FieldError message={apiErrors.get("delivery_date")} />
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Invoice Items</p>
+        {/* Invoice Items Header */}
+        <div className="flex justify-between items-center px-1">
+          <div>
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Invoice Batch Details</h3>
+            <p className="text-[10px] text-slate-400 font-bold mt-0.5">Fill batch details, prices and GST for the selected items.</p>
+          </div>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setSelectDialogOpen(true)}
+            className="h-9 px-3 rounded-xl border-[#0d7377]/30 bg-teal-50/50 hover:bg-teal-50 text-xs font-black text-[#0d7377] flex items-center gap-1.5"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Select Medicines
           </Button>
         </div>
 
         {items.length === 0 ? (
-          <div className="border rounded-lg p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              No items added yet. Click &quot;Select Medicines&quot; to choose
-              from your registry.
+          <div className="py-12 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50">
+            <Boxes className="h-10 w-10 text-slate-300 mb-3" />
+            <p className="text-sm font-bold text-slate-400">
+              No items added yet.
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              Click &quot;Select Medicines&quot; to pick items from the registry.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-2xl border border-slate-100">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Medicine</TableHead>
-                  <TableHead>Batch No.</TableHead>
-                  <TableHead>Expiry</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Purchase ₹</TableHead>
-                  <TableHead>GST %</TableHead>
-                  <TableHead></TableHead>
+                <TableRow className="border-slate-200 hover:bg-transparent bg-slate-50/80">
+                  <TableHead className="px-4 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine</TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Batch No.</TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Expiry</TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Qty</TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Purchase ₹</TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">GST %</TableHead>
+                  <TableHead className="h-10"></TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="divide-y divide-slate-100">
                 {items.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell>
-                      <div className="font-medium text-sm">
+                  <TableRow key={i.id} className="group hover:bg-slate-50/40 transition-colors">
+                    <TableCell className="px-4">
+                      <div className="font-extrabold text-slate-800 text-sm">
                         {i.medicineName}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-[10px] text-slate-400 font-medium">
                         {i.category}
                         {i.subcategory ? ` · ${i.subcategory}` : ""}
                       </div>
@@ -1207,7 +1365,7 @@ function PurchaseInvoiceForm({
                             batchNumber: e.target.value.toUpperCase(),
                           })
                         }
-                        className="h-8"
+                        className="h-8 rounded-lg bg-slate-50 border-slate-200 font-black text-slate-700 text-xs text-center uppercase"
                         placeholder="BAT-XXXX"
                       />
                     </TableCell>
@@ -1218,7 +1376,7 @@ function PurchaseInvoiceForm({
                         onChange={(e) =>
                           updateItem(i.id, { expiryDate: e.target.value })
                         }
-                        className="h-8"
+                        className="h-8 rounded-lg bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs text-center"
                       />
                     </TableCell>
                     <TableCell>
@@ -1231,7 +1389,7 @@ function PurchaseInvoiceForm({
                             quantity: parseInt(e.target.value) || 0,
                           })
                         }
-                        className="h-8 w-20"
+                        className="h-8 w-20 rounded-lg bg-slate-50 border-slate-200 font-black text-slate-700 text-xs text-center"
                       />
                     </TableCell>
                     <TableCell>
@@ -1245,7 +1403,7 @@ function PurchaseInvoiceForm({
                             purchasePrice: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className="h-8 w-24"
+                        className="h-8 w-24 rounded-lg bg-slate-50 border-slate-200 font-black text-[#0d7377] text-xs text-center"
                       />
                     </TableCell>
                     <TableCell>
@@ -1260,18 +1418,18 @@ function PurchaseInvoiceForm({
                             gstPercentage: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className="h-8 w-20"
+                        className="h-8 w-20 rounded-lg bg-slate-50 border-slate-200 font-black text-purple-600 text-xs text-center"
                       />
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-rose-600 hover:bg-rose-50"
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
                         onClick={() => handleRemove(i.id)}
+                        title="Remove item"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      </button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1280,34 +1438,35 @@ function PurchaseInvoiceForm({
           </div>
         )}
 
-        {/* Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t pt-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Unique Formulations</p>
-            <p className="text-lg font-semibold">{summary.formulations}</p>
+        {/* Financial Summary & Save */}
+        <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
+            <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Unique Formulations</span>
+              <strong className="text-xs text-slate-800 block mt-1">{summary.formulations} Items</strong>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Loaded Volume</span>
+              <strong className="text-xs text-teal-600 block mt-1">{summary.totalQty} units</strong>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
+              <span className="text-[8px] font-bold text-purple-400 uppercase tracking-wider block">GST Total</span>
+              <strong className="text-xs text-purple-600 block mt-1">
+                ₹{summary.gstTotal.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </strong>
+            </div>
+            <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 shadow-sm">
+              <span className="text-[8px] font-black text-[#0d7377] uppercase tracking-wider block">Grand Total</span>
+              <strong className="text-sm font-black text-[#0d7377] block mt-0.5">
+                ₹{summary.grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </strong>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Loaded Volume</p>
-            <p className="text-lg font-semibold">{summary.totalQty} units</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">GST Total</p>
-            <p className="text-lg font-semibold">
-              ₹{summary.gstTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Grand Total</p>
-            <p className="text-lg font-bold text-primary">
-              ₹{summary.grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex justify-end">
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || items.length === 0}
+            className="w-full md:w-auto bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-12 px-8 shadow-md shadow-teal-900/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform text-xs flex-shrink-0"
           >
             {isSubmitting ? (
               <>
@@ -1322,61 +1481,69 @@ function PurchaseInvoiceForm({
 
       {/* Medicine Selection Dialog */}
       <Dialog open={selectDialogOpen} onOpenChange={setSelectDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Select Medicines</DialogTitle>
-            <DialogDescription>
-              Pick medicines to include in this invoice
+        <DialogContent className="sm:max-w-[600px] bg-white rounded-2xl border-slate-100 p-0 overflow-hidden shadow-2xl">
+          <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
+            <DialogTitle className="text-lg font-black text-slate-800">Select Medicines for Invoice</DialogTitle>
+            <DialogDescription className="text-xs font-semibold text-slate-500">
+              Check all the items that are present on this invoice.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[400px] overflow-y-auto space-y-1">
+          <div className="p-2 max-h-[350px] overflow-y-auto bg-slate-50/30">
             {medicines.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
+              <div className="py-8 text-center text-slate-400 text-xs font-bold">
                 No medicines registered yet
-              </p>
+              </div>
             ) : (
-              medicines.map((m) => {
-                const checked = selectedIds.includes(m.id);
-                return (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(c) => {
-                        if (c) {
-                          setSelectedIds((prev) => [...prev, m.id]);
-                        } else {
-                          setSelectedIds((prev) =>
-                            prev.filter((id) => id !== m.id),
-                          );
-                        }
-                      }}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{m.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {m.salt} · {m.category}
-                        {m.bup_category ? ` · ${m.bup_category}` : ""}
-                      </p>
-                    </div>
-                  </label>
-                );
-              })
+              <div className="space-y-1 px-4 py-2">
+                {medicines.map((m) => {
+                  const checked = selectedIds.includes(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className="flex items-start gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer border border-transparent hover:border-slate-200 transition-all"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(c) => {
+                          if (c) {
+                            setSelectedIds((prev) => [...prev, m.id]);
+                          } else {
+                            setSelectedIds((prev) =>
+                              prev.filter((id) => id !== m.id),
+                            );
+                          }
+                        }}
+                        className="mt-0.5 rounded-md border-slate-300 data-[state=checked]:bg-[#0d7377] data-[state=checked]:border-[#0d7377]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-black text-slate-800 truncate">{m.name}</div>
+                        <div className="text-xs text-slate-500 truncate">
+                          {m.salt} · {m.category}
+                          {m.bup_category ? ` · ${m.bup_category}` : ""}
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold text-slate-500">{m.category}</Badge>
+                    </label>
+                  );
+                })}
+              </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t border-slate-100 bg-white">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => {
                 setSelectedIds([]);
                 setSelectDialogOpen(false);
               }}
+              className="rounded-xl text-xs font-bold"
             >
               Cancel
             </Button>
-            <Button onClick={handleConfirmSelection}>
+            <Button
+              onClick={handleConfirmSelection}
+              className="rounded-xl bg-[#0d7377] hover:bg-[#0a5c5f] text-xs font-bold text-white"
+            >
               Add {selectedIds.length} medicine(s)
             </Button>
           </DialogFooter>
@@ -1437,167 +1604,14 @@ function AuditRemovalView({
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle>Audit Stock Removal</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-xs text-muted-foreground">
-              Choose Medicine
-            </Label>
-            <Select
-              value={selectedMedId}
-              onValueChange={(v) => {
-                setSelectedMedId(v);
-                setBatchNo("");
-              }}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a medicine" />
-              </SelectTrigger>
-              <SelectContent>
-                {medicines.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name} ({m.salt})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldError message={apiErrors.get("medicine_id")} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+    <div className="space-y-6">
+      {/* Expiry Auditing overview panels */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Card className="border-0 shadow-sm rounded-2xl bg-amber-50/50 border-l-4 border-l-amber-500 overflow-hidden">
+          <CardContent className="p-5 flex items-start gap-3">
+            <FileWarning className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
             <div>
-              <Label className="text-xs text-muted-foreground">
-                Target Batch
-              </Label>
-              <Select
-                value={batchNo}
-                onValueChange={setBatchNo}
-                disabled={!selectedMed}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select batch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {batches.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      No batches
-                    </div>
-                  ) : (
-                    batches.map((b) => (
-                      <SelectItem key={b.batch_number} value={b.batch_number}>
-                        {b.batch_number} · Stock {b.quantity}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <FieldError message={apiErrors.get("batch_number")} />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Batch Expiry
-              </Label>
-              <Input
-                value={
-                  currentBatch?.expiry_date
-                    ? new Date(currentBatch.expiry_date).toLocaleDateString(
-                        "en-IN",
-                      )
-                    : ""
-                }
-                disabled
-                className="mt-1 bg-muted"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Quantity (optional — empty = full batch)
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                max={currentBatch?.quantity || undefined}
-                value={quantity}
-                onChange={(e) =>
-                  setQuantity(
-                    e.target.value === ""
-                      ? ""
-                      : Math.max(0, parseInt(e.target.value) || 0),
-                  )
-                }
-                placeholder={
-                  currentBatch
-                    ? `Up to ${currentBatch.quantity}`
-                    : "Select batch first"
-                }
-                className="mt-1"
-              />
-              <FieldError message={apiErrors.get("quantity")} />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">
-                Deletion Reason
-              </Label>
-              <Select
-                value={reason}
-                onValueChange={(v) => setReason(v as RemovalReason)}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="destroyed">Destroyed</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
-                  <SelectItem value="damaged">Damaged</SelectItem>
-                  <SelectItem value="defect">Manufacturing Defect</SelectItem>
-                </SelectContent>
-              </Select>
-              <FieldError message={apiErrors.get("reason")} />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-xs text-muted-foreground">
-              Compliance Notes
-            </Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Document reasoning for audit log"
-              className="mt-1"
-              rows={3}
-            />
-          </div>
-
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !selectedMedId || !batchNo}
-            className="w-full"
-          >
-            {isSubmitting ? (
-              <>
-                <Spinner className="h-4 w-4 mr-2" /> Removing…
-              </>
-            ) : (
-              "Confirm Stock Removal"
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-3">
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4 flex items-start gap-3">
-            <FileWarning className="h-5 w-5 text-amber-600 mt-0.5" />
-            <div>
-              <p className="font-semibold text-sm text-amber-900">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-900">
                 Near-Expiry Awareness
               </p>
               <p className="text-xs text-amber-700 mt-1">
@@ -1608,11 +1622,11 @@ function AuditRemovalView({
           </CardContent>
         </Card>
 
-        <Card className="border-rose-200 bg-rose-50">
-          <CardContent className="p-4 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-rose-600 mt-0.5" />
+        <Card className="border-0 shadow-sm rounded-2xl bg-rose-50/50 border-l-4 border-l-rose-500 overflow-hidden">
+          <CardContent className="p-5 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-rose-600 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-semibold text-sm text-rose-900">
+              <p className="text-xs font-black uppercase tracking-widest text-rose-900">
                 Expired Stock Safeguard
               </p>
               <p className="text-xs text-rose-700 mt-1">
@@ -1620,6 +1634,171 @@ function AuditRemovalView({
                 are flagged for NDPS audit).
               </p>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Audited Removal form */}
+      <div className="max-w-2xl mx-auto">
+        <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="p-6 border-b border-slate-100 bg-slate-50/20">
+            <CardTitle className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
+              <AlertTriangle className="h-5 w-5 text-rose-600" /> Controlled Stock Audited Removal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <div className="bg-rose-50/70 border border-rose-100 p-3 rounded-xl text-xs font-semibold text-rose-700 leading-normal">
+              Controlled deletion is strictly audited. All entries write directly to clinic compliance records.
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-500">
+                Choose Medicine
+              </Label>
+              <Select
+                value={selectedMedId}
+                onValueChange={(v) => {
+                  setSelectedMedId(v);
+                  setBatchNo("");
+                }}
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
+                  <SelectValue placeholder="-- Choose Medicine to Remove --" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-200 text-xs">
+                  {medicines.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name} ({m.salt})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={apiErrors.get("medicine_id")} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-500">
+                  Target Batch
+                </Label>
+                <Select
+                  value={batchNo}
+                  onValueChange={setBatchNo}
+                  disabled={!selectedMed}
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
+                    <SelectValue placeholder="Select batch" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 text-xs">
+                    {batches.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No batches
+                      </div>
+                    ) : (
+                      batches.map((b) => (
+                        <SelectItem key={b.batch_number} value={b.batch_number}>
+                          {b.batch_number} · Stock {b.quantity}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FieldError message={apiErrors.get("batch_number")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-400">
+                  Batch Expiry
+                </Label>
+                <Input
+                  value={
+                    currentBatch?.expiry_date
+                      ? new Date(currentBatch.expiry_date).toLocaleDateString(
+                          "en-IN",
+                        )
+                      : ""
+                  }
+                  disabled
+                  className="h-11 rounded-xl bg-slate-100 border-slate-200 font-bold text-slate-400 text-center text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-500">
+                  Quantity (optional — empty = full batch)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={currentBatch?.quantity || undefined}
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(
+                      e.target.value === ""
+                        ? ""
+                        : Math.max(0, parseInt(e.target.value) || 0),
+                    )
+                  }
+                  placeholder={
+                    currentBatch
+                      ? `Up to ${currentBatch.quantity}`
+                      : "Select batch first"
+                  }
+                  className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-xs"
+                />
+                <FieldError message={apiErrors.get("quantity")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-500">
+                  Deletion Reason
+                </Label>
+                <Select
+                  value={reason}
+                  onValueChange={(v) => setReason(v as RemovalReason)}
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 text-xs">
+                    <SelectItem value="destroyed">Destroyed</SelectItem>
+                    <SelectItem value="returned">Returned</SelectItem>
+                    <SelectItem value="damaged">Damaged</SelectItem>
+                    <SelectItem value="defect">Manufacturing Defect</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FieldError message={apiErrors.get("reason")} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-500">
+                Compliance Notes
+              </Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Document reasoning for audit log"
+                className="rounded-xl bg-slate-50/50 border-slate-200 text-xs min-h-[80px] resize-none font-semibold text-slate-700"
+                rows={3}
+              />
+            </div>
+
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !selectedMedId || !batchNo}
+              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl h-12 shadow-md shadow-rose-900/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform text-xs"
+            >
+              {isSubmitting ? (
+                <>
+                  <Spinner className="h-4 w-4 mr-2" /> Removing…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" /> Confirm Stock Removal
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       </div>

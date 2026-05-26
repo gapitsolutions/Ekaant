@@ -156,29 +156,32 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Building2 className="h-6 w-6 text-primary" />
+          <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
+            <Building2 className="h-8 w-8 text-[#0d7377]" />
             Suppliers
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-slate-500 mt-1 font-medium italic">
             Pharmaceutical wholesalers and distributors. Soft-deactivate
             removes from selection without affecting historical invoices.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button
+          onClick={() => setCreateOpen(true)}
+          className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add supplier
         </Button>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Directory</CardTitle>
+      <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+        <CardHeader className="bg-slate-50/30 border-b border-slate-100 py-6 px-6">
+          <CardTitle className="text-xl font-bold text-slate-800 tracking-tight">Directory</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-6">
           <div className="flex flex-wrap gap-2">
             <form onSubmit={handleSearchSubmit} className="flex gap-2 flex-1 min-w-[260px]">
               <div className="relative flex-1">
@@ -187,10 +190,10 @@ export default function SuppliersPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search company / contact / GST / mobile"
-                  className="pl-8"
+                  className="pl-8 bg-slate-50 border-slate-200 rounded-xl"
                 />
               </div>
-              <Button type="submit" variant="outline">
+              <Button type="submit" variant="outline" className="rounded-xl border-slate-200">
                 Search
               </Button>
             </form>
@@ -198,7 +201,7 @@ export default function SuppliersPage() {
               value={categoryFilter}
               onValueChange={(v) => setCategoryFilter(v as CategoryFilter)}
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[160px] rounded-xl border-slate-200 bg-slate-50">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -214,7 +217,7 @@ export default function SuppliersPage() {
               value={statusFilter}
               onValueChange={(v) => setStatusFilter(v as StatusFilter)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[140px] rounded-xl border-slate-200 bg-slate-50">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -226,106 +229,116 @@ export default function SuppliersPage() {
           </div>
 
           {errorMessage && (
-            <div className="flex items-center gap-2 text-sm text-rose-600 border border-rose-200 bg-rose-50 rounded-md px-3 py-2">
+            <div className="flex items-center gap-2 text-sm text-rose-600 border border-rose-200 bg-rose-50 rounded-xl px-4 py-3">
               <AlertTriangle className="h-4 w-4" /> {errorMessage}
             </div>
           )}
 
           {isLoading ? (
-            <div className="flex justify-center py-10">
-              <Spinner className="h-6 w-6" />
+            <div className="flex items-center justify-center py-24">
+              <Spinner className="h-6 w-6 text-[#0d7377]" />
             </div>
           ) : items.length === 0 ? (
-            <div className="text-center py-10 text-sm text-muted-foreground">
-              No suppliers match the current filters.
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                <Building2 className="h-7 w-7 text-slate-300" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">
+                No suppliers found
+              </h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-[280px] mx-auto">
+                No suppliers match the current filters.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Categories</TableHead>
-                    <TableHead>GST</TableHead>
-                    <TableHead>Drug License</TableHead>
-                    <TableHead className="text-right">Invoices</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="bg-slate-50/50 border-b border-slate-100">
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Company</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Contact</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Categories</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">GST</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Drug License</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Invoices</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Status</TableHead>
+                    <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {items.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-medium">
+                    <TableRow key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="font-semibold text-slate-800 py-4 px-4">
                         <div>{s.company_name}</div>
                         {s.contact_person && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-slate-400 font-normal">
                             {s.contact_person}
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-4 px-4">
                         <div className="text-sm">
                           {s.mobile_number ? (
-                            <span className="font-mono">{s.mobile_number}</span>
+                            <span className="font-mono text-slate-700">{s.mobile_number}</span>
                           ) : (
-                            <span className="text-amber-600 text-xs">
+                            <span className="text-amber-600 text-xs font-medium">
                               needs mobile
                             </span>
                           )}
                         </div>
                         {s.email && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-slate-400">
                             {s.email}
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-4 px-4">
                         <div className="flex gap-1 flex-wrap">
                           {s.categories.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-slate-400">
                               —
                             </span>
                           ) : (
                             s.categories.map((cat) => (
-                              <Badge key={cat} variant="outline">
+                              <Badge key={cat} variant="outline" className="border-slate-200 text-slate-600 text-[10px] font-bold uppercase">
                                 {cat}
                               </Badge>
                             ))
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell className="font-mono text-xs text-slate-600 py-4 px-4">
                         {s.gst_number || "—"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell className="font-mono text-xs text-slate-600 py-4 px-4">
                         {s.drug_license_number || "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right text-slate-700 font-semibold py-4 px-4">
                         {s.invoice_count ?? 0}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-4 px-4">
                         {s.is_active ? (
-                          <Badge className="bg-emerald-600">Active</Badge>
+                          <Badge className="bg-emerald-500/10 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase">Active</Badge>
                         ) : (
-                          <Badge variant="outline">Inactive</Badge>
+                          <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50 text-[10px] font-bold uppercase">Inactive</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right py-4 px-4">
                         <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="rounded-lg hover:bg-slate-100"
                             onClick={() => setEditTarget(s)}
                             title="Edit"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-4 w-4 text-slate-500" />
                           </Button>
                           {s.is_active ? (
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="rounded-lg hover:bg-rose-50"
                               onClick={() => setDeactivateTarget(s)}
                               title="Deactivate"
                             >
@@ -335,6 +348,7 @@ export default function SuppliersPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="rounded-lg hover:bg-emerald-50"
                               onClick={() => handleReactivate(s)}
                               title="Reactivate"
                             >
@@ -347,7 +361,7 @@ export default function SuppliersPage() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="mt-3 text-xs text-muted-foreground">
+              <div className="mt-4 px-2 text-xs text-slate-400 font-medium">
                 {pagination.total} supplier{pagination.total === 1 ? "" : "s"} total
               </div>
             </div>
@@ -381,10 +395,10 @@ export default function SuppliersPage() {
           if (!o) setDeactivateTarget(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Deactivate supplier?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-bold text-slate-800">Deactivate supplier?</DialogTitle>
+            <DialogDescription className="text-slate-500">
               {deactivateTarget?.company_name} will be hidden from the supplier
               picker in the purchase invoice form. Historical invoices remain
               linked. You can reactivate the supplier any time.
@@ -393,11 +407,12 @@ export default function SuppliersPage() {
           <DialogFooter>
             <Button
               variant="outline"
+              className="rounded-xl border-slate-200"
               onClick={() => setDeactivateTarget(null)}
             >
               Cancel
             </Button>
-            <Button onClick={handleDeactivate}>
+            <Button onClick={handleDeactivate} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl">
               <ShieldOff className="h-4 w-4 mr-2" />
               Deactivate
             </Button>
@@ -534,87 +549,87 @@ function SupplierFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-bold text-slate-800">{isEdit ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
+          <DialogDescription className="text-slate-500">
             Required: company name and mobile number. Optional fields can be
             filled later.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <Label>Company name *</Label>
+            <Label className="font-bold text-slate-700">Company name *</Label>
             <Input
               value={form.company_name}
               onChange={(e) => set("company_name", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
             />
             <FieldError message={apiErrors.get("company_name")} />
           </div>
           <div>
-            <Label>Mobile number *</Label>
+            <Label className="font-bold text-slate-700">Mobile number *</Label>
             <Input
               value={form.mobile_number}
               onChange={(e) => set("mobile_number", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
             />
             <FieldError message={apiErrors.get("mobile_number")} />
           </div>
           <div>
-            <Label>Contact person</Label>
+            <Label className="font-bold text-slate-700">Contact person</Label>
             <Input
               value={form.contact_person ?? ""}
               onChange={(e) => set("contact_person", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
             />
             <FieldError message={apiErrors.get("contact_person")} />
           </div>
           <div>
-            <Label>Email</Label>
+            <Label className="font-bold text-slate-700">Email</Label>
             <Input
               type="email"
               value={form.email ?? ""}
               onChange={(e) => set("email", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
             />
             <FieldError message={apiErrors.get("email")} />
           </div>
           <div>
-            <Label>GST number</Label>
+            <Label className="font-bold text-slate-700">GST number</Label>
             <Input
               value={form.gst_number ?? ""}
               onChange={(e) => set("gst_number", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
             />
             <FieldError message={apiErrors.get("gst_number")} />
           </div>
           <div>
-            <Label>Drug license number</Label>
+            <Label className="font-bold text-slate-700">Drug license number</Label>
             <Input
               value={form.drug_license_number ?? ""}
               onChange={(e) => set("drug_license_number", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
             />
             <FieldError message={apiErrors.get("drug_license_number")} />
           </div>
           <div className="md:col-span-2">
-            <Label>Full address</Label>
+            <Label className="font-bold text-slate-700">Full address</Label>
             <Textarea
               value={form.full_address ?? ""}
               onChange={(e) => set("full_address", e.target.value)}
-              className="mt-1"
+              className="mt-1.5 bg-slate-50 border-slate-200"
               rows={2}
             />
             <FieldError message={apiErrors.get("full_address")} />
           </div>
           <div className="md:col-span-2">
-            <Label>Categories supplied</Label>
-            <div className="flex gap-3 mt-2">
+            <Label className="font-bold text-slate-700">Categories supplied</Label>
+            <div className="flex gap-4 mt-2">
               {CATEGORY_OPTIONS.map((cat) => (
                 <label
                   key={cat}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
+                  className="flex items-center gap-2 text-sm cursor-pointer font-medium text-slate-600"
                 >
                   <Checkbox
                     checked={(form.categories ?? []).includes(cat)}
@@ -630,12 +645,13 @@ function SupplierFormDialog({
         <DialogFooter>
           <Button
             variant="outline"
+            className="rounded-xl border-slate-200"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white rounded-xl">
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isEdit ? "Save changes" : "Add supplier"}
           </Button>

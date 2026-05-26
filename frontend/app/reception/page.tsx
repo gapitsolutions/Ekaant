@@ -4,9 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -50,6 +47,7 @@ import {
   FileText,
   Eye,
   X,
+  Link,
 } from "lucide-react";
 
 interface StatData {
@@ -203,49 +201,49 @@ export default function ReceptionDashboard() {
 
   const quickActions = [
     {
-      title: "Patient Check-in",
-      description: "Scan fingerprint to check in a patient",
-      href: "/reception/checkin",
-      icon: Fingerprint,
-      gradient: "from-primary/20 to-primary/5",
-      iconBg: "bg-primary/15",
-      iconColor: "text-primary",
-    },
-    {
-      title: "Register New Patient",
+      title: "Register Patient",
       description: "Add a new patient to the system",
       href: "/reception/register",
       icon: UserPlus,
-      gradient: "from-emerald-500/20 to-emerald-500/5",
-      iconBg: "bg-emerald-500/15",
-      iconColor: "text-emerald-600",
+      bgColor: "bg-[#e8f5e9]",
+      iconBg: "bg-[#c8e6c9]",
+      iconColor: "text-[#2e7d32]",
+    },
+    {
+      title: "Check In Patient",
+      description: "Verify identity and check in a patient",
+      href: "/reception/checkin",
+      icon: Fingerprint,
+      bgColor: "bg-[#e0f2f1]",
+      iconBg: "bg-[#b2dfdb]",
+      iconColor: "text-[#00695c]",
     },
     {
       title: "Patient Data",
       description: "View and edit all patient records",
       href: "/reception/patients",
       icon: Database,
-      gradient: "from-sky-500/20 to-sky-500/5",
-      iconBg: "bg-sky-500/15",
-      iconColor: "text-sky-600",
+      bgColor: "bg-[#e3f2fd]",
+      iconBg: "bg-[#bbdefb]",
+      iconColor: "text-[#1565c0]",
     },
     {
       title: "Reports",
-      description: "View daily, monthly and custom reports",
+      description: "View daily and monthly records",
       href: "/reception/reports",
       icon: BarChart3,
-      gradient: "from-indigo-500/20 to-indigo-500/5",
-      iconBg: "bg-indigo-500/15",
-      iconColor: "text-indigo-600",
+      bgColor: "bg-[#ede7f6]",
+      iconBg: "bg-[#d1c4e9]",
+      iconColor: "text-[#4527a0]",
     },
     {
       title: "Follow-Up Calls",
-      description: "Track pending, completed and successful follow-ups",
+      description: "Manage patient follow-up communication",
       href: "/reception/follow-up",
       icon: Phone,
-      gradient: "from-pink-500/20 to-pink-500/5",
-      iconBg: "bg-pink-500/15",
-      iconColor: "text-pink-600",
+      bgColor: "bg-[#fce4ec]",
+      iconBg: "bg-[#f8bbd0]",
+      iconColor: "text-[#c2185b]",
     },
   ];
 
@@ -255,15 +253,27 @@ export default function ReceptionDashboard() {
           title: "Today's Visits",
           value: stats.todayVisits,
           icon: Clock,
-          gradient: "from-sky-500 to-sky-600",
-          trend: "+5%",
+          borderColor: "border-t-[#1976d2]",
+          iconClass: "bg-[#1976d2] text-white",
+          trend: "+5% from last week",
           statType: "today_visits",
+        },
+        {
+          title: "Patient in Pharmacy",
+          value: queueItems.filter((q) => q.current_stage === "pharmacy").length,
+          icon: Link,
+          borderColor: "border-t-[#f57c00]",
+          iconClass: "bg-[#f57c00] text-white",
+          trend: null,
+          statType: "at_pharmacy",
         },
         {
           title: "Completed Today",
           value: stats.completedToday,
           icon: CheckCircle,
-          gradient: "from-emerald-500 to-emerald-600",
+          borderColor: "border-t-[#388e3c]",
+          iconClass: "bg-[#388e3c] text-white",
+          trend: null,
           statType: "completed_today",
         },
       ]
@@ -284,7 +294,7 @@ export default function ReceptionDashboard() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -295,7 +305,7 @@ export default function ReceptionDashboard() {
             Welcome back! Manage patient check-ins and registrations
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
           <Clock className="h-4 w-4" />
           {new Date().toLocaleDateString("en-IN", {
             weekday: "long",
@@ -306,43 +316,35 @@ export default function ReceptionDashboard() {
         </div>
       </div>
 
-      {/* Stats Overview - Now Clickable Buttons */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+      {/* Stats Overview */}
+      <div className="grid gap-6 md:grid-cols-3">
         {statCards.map((stat) => (
           <button
             key={stat.title}
             onClick={() => handleStatClick(stat.statType)}
             className="text-left"
           >
-            <Card className="overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer group">
-              <div className={`h-1.5 bg-gradient-to-r ${stat.gradient}`} />
-              <CardContent className="p-4 min-h-[132px] flex flex-col justify-between">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-3xl font-bold group-hover:text-primary transition-colors">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {stat.title}
-                    </p>
-                  </div>
-                  <div
-                    className={`p-2 rounded-lg bg-gradient-to-br ${stat.gradient} text-white group-hover:scale-110 transition-transform`}
-                  >
-                    <stat.icon className="h-4 w-4" />
+            <Card className={`border-0 border-t-[6px] ${stat.borderColor} shadow-sm hover:shadow-md transition-shadow cursor-pointer`}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-4xl font-bold text-foreground">
+                    {stat.value}
+                  </p>
+                  <div className={`p-2 rounded-full ${stat.iconClass}`}>
+                    <stat.icon className="h-5 w-5" />
                   </div>
                 </div>
-                {stat.trend && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-emerald-600">
+                <p className="text-sm text-muted-foreground font-medium">
+                  {stat.title}
+                </p>
+                {stat.trend ? (
+                  <div className="flex items-center gap-1 mt-2 text-xs text-emerald-600 font-medium">
                     <TrendingUp className="h-3 w-3" />
-                    {stat.trend} from last week
+                    {stat.trend}
                   </div>
+                ) : (
+                  <div className="h-[20px] mt-2" />
                 )}
-                {!stat.trend && <div className="h-[18px] mt-2" />}
-                <div className="flex items-center gap-1 mt-2 text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Eye className="h-3 w-3" />
-                  Click to view details
-                </div>
               </CardContent>
             </Card>
           </button>
@@ -351,39 +353,29 @@ export default function ReceptionDashboard() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <h2 className="text-lg font-bold text-foreground mb-4">Quick Actions</h2>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           {quickActions.map((action) => (
             <Card
               key={action.href}
-              className={`group hover:shadow-lg transition-all duration-300 border-0 shadow-md bg-gradient-to-br ${action.gradient} overflow-hidden`}
+              className={`border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${action.bgColor}`}
+              onClick={() => navigate(action.href)}
             >
-              <CardHeader className="pb-3">
+              <CardContent className="p-5 flex flex-col h-full">
                 <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${action.iconBg} group-hover:scale-110 transition-transform duration-300`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${action.iconBg}`}
                 >
-                  <action.icon className={`h-6 w-6 ${action.iconColor}`} />
+                  <action.icon className={`h-5 w-5 ${action.iconColor}`} />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <CardTitle className="text-base mb-1 group-hover:text-primary transition-colors">
+                <h3 className="font-bold text-foreground mb-1">
                   {action.title}
-                </CardTitle>
-                <CardDescription className="text-sm mb-4 line-clamp-2">
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4 flex-1">
                   {action.description}
-                </CardDescription>
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="p-0 h-auto group-hover:translate-x-1 transition-transform"
-                >
-                  <span
-                    onClick={() => navigate(action.href)}
-                    className="flex items-center gap-1 text-primary font-medium cursor-pointer"
-                  >
-                    View <ArrowRight className="h-4 w-4" />
-                  </span>
-                </Button>
+                </p>
+                <div className={`text-xs font-semibold flex items-center gap-1 ${action.iconColor}`}>
+                  View <ArrowRight className="h-3 w-3" />
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -391,99 +383,81 @@ export default function ReceptionDashboard() {
       </div>
 
       {/* Recent Activity */}
-      <Card className="border-0 shadow-md">
-        <CardHeader className="border-b bg-muted/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Recent Check-ins</CardTitle>
-              <CardDescription>Patients checked in today</CardDescription>
-            </div>
-            <Button asChild variant="outline" size="sm">
-              <span
-                onClick={() => navigate("/reception/queue")}
-                className="cursor-pointer"
-              >
-                View All
-              </span>
-            </Button>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Recent Check Ins</h2>
+            <p className="text-sm text-muted-foreground">Patients checked in today</p>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {stats && stats.todayVisits > 0 ? (
-            <div className="divide-y">
-              {queueItems.slice(0, 5).map((q) => {
-                if (!q.patient_name) return null;
-                return (
-                  <div
-                    key={q.session_id}
-                    className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-primary">
+          <Button variant="outline" size="sm" className="bg-white font-medium shadow-sm" onClick={() => navigate("/reception/queue")}>
+            View All
+          </Button>
+        </div>
+
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardContent className="p-0">
+            {stats && stats.todayVisits > 0 ? (
+              <div className="divide-y divide-border">
+                {queueItems.slice(0, 5).map((q) => {
+                  if (!q.patient_name) return null;
+                  return (
+                    <div
+                      key={q.session_id}
+                      className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors bg-white"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-full bg-[#e0f2f1] flex items-center justify-center text-[#00695c] font-bold text-sm">
                           {q.patient_name
                             .split(" ")
                             .map((n) => n[0])
                             .join("")
                             .slice(0, 2)}
-                        </span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground text-sm">{q.patient_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Checked in at{" "}
+                            {q.checked_in_at
+                              ? new Date(q.checked_in_at).toLocaleTimeString(
+                                  "en-IN",
+                                  { hour: "2-digit", minute: "2-digit" },
+                                )
+                              : "N/A"}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{q.patient_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Checked in at{" "}
-                          {q.checked_in_at
-                            ? new Date(q.checked_in_at).toLocaleTimeString(
-                                "en-IN",
-                                { hour: "2-digit", minute: "2-digit" },
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
+                      <span
+                        className={`text-xs px-3 py-1 rounded-full font-semibold capitalize
+                        ${
+                          q.current_stage === "completed"
+                            ? "bg-[#e8f5e9] text-[#2e7d32]"
+                            : q.current_stage === "pharmacy"
+                              ? "bg-[#fce4ec] text-[#c2185b]"
+                              : "bg-secondary text-secondary-foreground"
+                        }`}
+                      >
+                        {q.current_stage}
+                      </span>
                     </div>
-                    <span
-                      className={`text-sm px-3 py-1 rounded-full font-medium capitalize
-                      ${
-                        q.current_stage === "completed"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : q.current_stage === "counsellor"
-                            ? "bg-amber-100 text-amber-700"
-                            : q.current_stage === "doctor"
-                              ? "bg-indigo-100 text-indigo-700"
-                              : q.current_stage === "pharmacy"
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-secondary text-secondary-foreground"
-                      }`}
-                    >
-                      {q.current_stage}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Users className="h-8 w-8 text-muted-foreground" />
+                  );
+                })}
               </div>
-              <p className="text-muted-foreground font-medium">
-                No check-ins yet today
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Patients will appear here once they check in
-              </p>
-              <Button asChild className="mt-4">
-                <span
-                  onClick={() => navigate("/reception/checkin")}
-                  className="cursor-pointer"
-                >
-                  Start Check-in
-                </span>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center bg-white">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Users className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground font-medium">
+                  No check-ins yet today
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Patients will appear here once they check in
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Stat Detail Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

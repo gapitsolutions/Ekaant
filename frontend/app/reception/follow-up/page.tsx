@@ -30,7 +30,7 @@ import {
   type FollowUpCallResult,
   type FollowUpItemResponse,
 } from "@/lib/hms-api";
-import { Calendar, CheckCircle2, Clock, Phone, Search } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle, CheckCircle2, Clock, MessageSquare, Phone, Search, User, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type TabValue = "pending" | "completed" | "success" | "all";
@@ -76,6 +76,23 @@ function formatDate(value?: string | null): string {
     year: "numeric",
   });
 }
+
+function getDaysOverdue(dateStr?: string | null): number {
+  if (!dateStr) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const followUpDate = new Date(dateStr);
+  followUpDate.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - followUpDate.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+const RESULT_ICONS: Record<string, React.ReactNode> = {
+  confirmed: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+  busy_later: <Clock className="h-4 w-4 text-amber-500" />,
+  wrong_number: <AlertCircle className="h-4 w-4 text-red-400" />,
+  not_reachable: <XCircle className="h-4 w-4 text-slate-400" />,
+  other: <MessageSquare className="h-4 w-4 text-blue-400" />,
+};
 
 export default function FollowUpPage() {
   const { accessToken } = useAuth();
@@ -179,168 +196,229 @@ export default function FollowUpPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Follow-Up Calls</h1>
-          <p className="text-muted-foreground">
-            Track pending patients and record call outcomes.
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Follow-Up Calling System</h1>
+          <p className="text-slate-500 mt-1">
+            Manage patient follow-ups scheduled by the pharmacy.
           </p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-[#e0f2f1] to-teal-50 border-teal-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <Clock className="h-16 w-16 text-[#00695c]" />
+          </div>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Pending</CardTitle>
+            <CardTitle className="text-sm font-bold text-[#00695c] flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              Pending Calls
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {counts.pending}
+          <CardContent>
+            <div className="text-3xl font-black text-[#004d40]">{counts.pending}</div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Completed</CardTitle>
+            <CardTitle className="text-sm font-semibold text-blue-700 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Completed Calls
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {counts.completed}
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-800">{counts.completed}</div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Successful</CardTitle>
+            <CardTitle className="text-sm font-semibold text-emerald-700 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Call Success (Confirmed)
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {counts.successful}
+          <CardContent>
+            <div className="text-3xl font-bold text-emerald-800">{counts.successful}</div>
           </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold">{counts.all}</CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <Card className="border-0 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden">
+        <CardHeader className="bg-white border-b border-slate-100 pb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <Tabs
               value={tab}
               onValueChange={(value) => setTab(value as TabValue)}
+              className="w-full md:w-auto"
             >
-              <TabsList>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-                <TabsTrigger value="success">Successful</TabsTrigger>
-                <TabsTrigger value="all">All</TabsTrigger>
+              <TabsList className="bg-slate-100 p-1">
+                <TabsTrigger value="pending" className="data-[state=active]:bg-[#00695c] data-[state=active]:text-white font-semibold shadow-sm px-4">
+                  Pending Calls
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="data-[state=active]:bg-white data-[state=active]:text-blue-600 shadow-sm px-4">
+                  Completed
+                </TabsTrigger>
+                <TabsTrigger value="success" className="data-[state=active]:bg-white data-[state=active]:text-emerald-600 shadow-sm px-4">
+                  Success
+                </TabsTrigger>
+                <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:text-slate-600 shadow-sm px-4">
+                  All Records
+                </TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="flex w-full gap-2 md:w-auto">
               <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search file no / name / phone"
-                  className="pl-9"
+                  placeholder="Search name, file no, phone..."
+                  className="pl-9 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-emerald-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSearch();
                   }}
                 />
               </div>
-              <Button variant="outline" onClick={handleSearch}>
+              <Button variant="outline" onClick={handleSearch} className="border-slate-200">
                 Search
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="p-0">
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">
-              Loading follow-ups...
-            </p>
+            <div className="py-20 flex flex-col items-center justify-center text-center">
+              <p className="text-sm text-slate-500">Loading follow-ups...</p>
+            </div>
           ) : items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No follow-ups found.
-            </p>
-          ) : (
-            items.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-lg border p-4 transition-colors hover:bg-muted/30"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{item.patient_name}</p>
-                      <Badge variant="outline">{item.file_number}</Badge>
-                      <Badge className="capitalize">{item.status}</Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <Phone className="h-3.5 w-3.5" />
-                        {item.phone}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        Follow-up: {formatDate(item.follow_up_date)}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        Last call: {formatDate(item.last_call_date)}
-                      </span>
-                    </div>
-                    {item.last_call_note ? (
-                      <p className="text-xs text-muted-foreground">
-                        Note: {item.last_call_note}
-                      </p>
-                    ) : null}
-                    {item.next_call_date ? (
-                      <p className="text-xs text-amber-700">
-                        Next call date: {formatDate(item.next_call_date)}
-                      </p>
-                    ) : null}
-                  </div>
-                  {item.status !== "successful" ? (
-                    <Button onClick={() => openCallDialog(item)}>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      {item.status === "completed"
-                        ? "Update Call"
-                        : "Complete Call"}
-                    </Button>
-                  ) : null}
-                </div>
+            <div className="py-20 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-5 border border-slate-100">
+                <CheckCircle className="h-10 w-10 text-slate-300" />
               </div>
-            ))
+              <h3 className="text-xl font-bold text-slate-700">No {tab} follow-ups found</h3>
+              <p className="text-slate-500 mt-2 max-w-sm">
+                There are no patients matching your criteria. Great job keeping the queue clear!
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {items.map((item) => {
+                const daysOverdue = getDaysOverdue(item.follow_up_date);
+                const isCritical = daysOverdue > 2;
+
+                return (
+                  <div key={item.id} className={`p-5 flex flex-col md:flex-row items-center justify-between transition-colors gap-4 ${isCritical ? 'bg-red-50/30 hover:bg-red-50/60' : 'hover:bg-slate-50'}`}>
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isCritical ? 'bg-red-100' : 'bg-slate-100'}`}>
+                        <User className={`h-6 w-6 ${isCritical ? 'text-red-500' : 'text-slate-400'}`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className={`font-bold text-lg ${isCritical ? 'text-red-900' : 'text-slate-800'}`}>{item.patient_name}</h3>
+                          <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wider ${isCritical ? 'border-red-200 text-red-600 bg-white' : 'bg-slate-50'}`}>
+                            {item.file_number}
+                          </Badge>
+                          <Badge className="capitalize text-[10px] font-bold uppercase tracking-wider">
+                            {item.status}
+                          </Badge>
+                          {isCritical && (
+                            <Badge className="bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider ml-1">
+                              {daysOverdue} Days Overdue
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Phone className={`h-3.5 w-3.5 ${isCritical ? 'text-red-400' : 'text-slate-400'}`} />
+                            {item.phone}
+                          </span>
+                          <span className={`flex items-center gap-1 ${isCritical ? 'text-red-600 font-semibold' : 'text-sky-600'}`}>
+                            <Calendar className="h-3.5 w-3.5" />
+                            Follow-up: {formatDate(item.follow_up_date)}
+                          </span>
+                          {item.last_call_date && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-slate-400" />
+                              Last call: {formatDate(item.last_call_date)}
+                            </span>
+                          )}
+                          {item.last_call_note && (
+                            <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-emerald-100">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {item.last_call_note}
+                            </span>
+                          )}
+                          {item.next_call_date && (
+                            <span className="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-amber-100">
+                              <Clock className="h-3 w-3" />
+                              Next: {formatDate(item.next_call_date)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {item.status !== "successful" && (
+                      <div className="w-full md:w-auto">
+                        <Button
+                          onClick={() => openCallDialog(item)}
+                          className={`w-full md:w-auto shadow-none border ${
+                            item.status === "completed"
+                              ? "bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200"
+                              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200 font-bold px-8"
+                          }`}
+                        >
+                          {item.status === "completed" ? (
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Phone className="h-4 w-4 mr-2" />
+                          )}
+                          {item.status === "completed" ? "Redial / Update" : "Call Patient"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Complete Follow-Up Call</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Phone className="h-5 w-5 text-emerald-600" />
+              Call Result: {selectedTicket?.patient_name}
+            </DialogTitle>
             <DialogDescription>
-              {selectedTicket?.patient_name} ({selectedTicket?.file_number})
+              {selectedTicket?.file_number} — Record the outcome of your conversation.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>Call Result</Label>
+              <Label className="font-bold text-slate-700">Response Status</Label>
               <Select
                 value={callResult}
                 onValueChange={(value) =>
                   setCallResult(value as FollowUpCallResult)
                 }
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select result" />
+                <SelectTrigger className="bg-slate-50 border-slate-200">
+                  <SelectValue placeholder="Select outcome..." />
                 </SelectTrigger>
                 <SelectContent>
                   {RESULT_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      <div className="flex items-center gap-2">
+                        {RESULT_ICONS[option.value]}
+                        {option.label}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -348,33 +426,54 @@ export default function FollowUpPage() {
             </div>
             {selectedResultConfig?.requiresNextCallDate ? (
               <div className="space-y-2">
-                <Label>Next Call Date</Label>
-                <Input
-                  type="date"
-                  value={nextCallDate}
-                  onChange={(e) => setNextCallDate(e.target.value)}
-                />
+                <Label className="font-bold text-slate-700">Schedule Next Call</Label>
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-md px-3 h-11">
+                  <Calendar className="h-4 w-4 text-emerald-600" />
+                  <Input
+                    type="date"
+                    value={nextCallDate}
+                    onChange={(e) => setNextCallDate(e.target.value)}
+                    className="border-none bg-transparent shadow-none focus-visible:ring-0 p-0 h-full text-sm font-medium"
+                  />
+                </div>
               </div>
             ) : null}
             <div className="space-y-2">
-              <Label>Call Note</Label>
+              <Label className="font-bold text-slate-700">Call Note</Label>
               <Textarea
                 value={callNote}
                 onChange={(e) => setCallNote(e.target.value)}
-                placeholder="Write call summary"
+                placeholder="Add any specific details about the call..."
+                className="bg-slate-50 border-slate-200 min-h-[80px]"
               />
             </div>
           </div>
+          {selectedTicket?.last_call_note && (
+            <div className="mx-1 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 mb-4">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <RotateCcw className="h-3 w-3" />
+                Previous Call Note
+              </p>
+              <p className="text-xs text-slate-600 bg-white/50 p-2 rounded border border-emerald-100/50 italic">
+                &ldquo;{selectedTicket.last_call_note}&rdquo;
+              </p>
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
               disabled={isSubmitting}
+              className="rounded-xl"
             >
               Cancel
             </Button>
-            <Button onClick={handleCompleteCall} disabled={isSubmitting}>
-              Save
+            <Button
+              onClick={handleCompleteCall}
+              disabled={isSubmitting}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-8"
+            >
+              Save Response
             </Button>
           </DialogFooter>
         </DialogContent>

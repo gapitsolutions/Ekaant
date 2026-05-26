@@ -65,42 +65,43 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("revenue");
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
+        <h1 className="text-3xl font-black text-[#0d7377] tracking-tight flex items-center gap-2">
+          <BarChart3 className="h-7 w-7" />
           Pharmacy Reports
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-slate-500 mt-1 text-sm">
           Analytics across revenue, consumption, and inventory health
         </p>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as ReportTab)}>
-        <TabsList>
-          <TabsTrigger value="revenue">
+        <TabsList className="bg-slate-100 p-1.5 rounded-2xl h-14 shadow-sm border border-slate-200">
+          <TabsTrigger value="revenue" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
             <IndianRupee className="h-4 w-4 mr-1" /> Revenue
           </TabsTrigger>
-          <TabsTrigger value="consumption">
+          <TabsTrigger value="consumption" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
             <BarChart3 className="h-4 w-4 mr-1" /> Consumption
           </TabsTrigger>
-          <TabsTrigger value="low-stock">
+          <TabsTrigger value="low-stock" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
             <AlertTriangle className="h-4 w-4 mr-1" /> Low Stock
           </TabsTrigger>
-          <TabsTrigger value="expiry">
+          <TabsTrigger value="expiry" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
             <CalendarClock className="h-4 w-4 mr-1" /> Expiry
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="revenue" className="mt-4">
+        <TabsContent value="revenue" className="mt-6">
           <RevenueReportTab />
         </TabsContent>
-        <TabsContent value="consumption" className="mt-4">
+        <TabsContent value="consumption" className="mt-6">
           <ConsumptionReportTab />
         </TabsContent>
-        <TabsContent value="low-stock" className="mt-4">
+        <TabsContent value="low-stock" className="mt-6">
           <LowStockReportTab />
         </TabsContent>
-        <TabsContent value="expiry" className="mt-4">
+        <TabsContent value="expiry" className="mt-6">
           <ExpiryReportTab />
         </TabsContent>
       </Tabs>
@@ -137,54 +138,73 @@ function RangeFilter({
   onChange: (next: RangeFilterState) => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr]">
-      <Select
-        value={state.range}
-        onValueChange={(v) => onChange({ ...state, range: v as ReportRange })}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="daily">Daily</SelectItem>
-          <SelectItem value="monthly">Monthly</SelectItem>
-          <SelectItem value="custom">Custom Range</SelectItem>
-        </SelectContent>
-      </Select>
+    <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr] items-end">
+      <div>
+        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Range</Label>
+        <Select
+          value={state.range}
+          onValueChange={(v) => onChange({ ...state, range: v as ReportRange })}
+        >
+          <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-slate-200">
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       {state.range === "daily" ? (
         <>
-          <Input
-            type="date"
-            value={state.date}
-            onChange={(e) => onChange({ ...state, date: e.target.value })}
-          />
+          <div>
+            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Date</Label>
+            <Input
+              type="date"
+              value={state.date}
+              onChange={(e) => onChange({ ...state, date: e.target.value })}
+              className="bg-slate-50 border-slate-200 rounded-xl"
+            />
+          </div>
           <div />
         </>
       ) : state.range === "monthly" ? (
         <>
-          <Input
-            type="month"
-            value={state.month}
-            onChange={(e) => onChange({ ...state, month: e.target.value })}
-          />
+          <div>
+            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Month</Label>
+            <Input
+              type="month"
+              value={state.month}
+              onChange={(e) => onChange({ ...state, month: e.target.value })}
+              className="bg-slate-50 border-slate-200 rounded-xl"
+            />
+          </div>
           <div />
         </>
       ) : (
         <>
-          <Input
-            type="date"
-            value={state.startDate}
-            onChange={(e) =>
-              onChange({ ...state, startDate: e.target.value })
-            }
-            aria-label="Start date"
-          />
-          <Input
-            type="date"
-            value={state.endDate}
-            onChange={(e) => onChange({ ...state, endDate: e.target.value })}
-            aria-label="End date"
-          />
+          <div>
+            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Start Date</Label>
+            <Input
+              type="date"
+              value={state.startDate}
+              onChange={(e) =>
+                onChange({ ...state, startDate: e.target.value })
+              }
+              aria-label="Start date"
+              className="bg-slate-50 border-slate-200 rounded-xl"
+            />
+          </div>
+          <div>
+            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">End Date</Label>
+            <Input
+              type="date"
+              value={state.endDate}
+              onChange={(e) => onChange({ ...state, endDate: e.target.value })}
+              aria-label="End date"
+              className="bg-slate-50 border-slate-200 rounded-xl"
+            />
+          </div>
         </>
       )}
     </div>
@@ -268,65 +288,75 @@ function RevenueReportTab() {
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle>Revenue Report</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                <Download className="h-4 w-4 mr-2" /> CSV
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-              >
-                <Printer className="h-4 w-4 mr-2" /> Print
-              </Button>
-            </div>
+    <div className="space-y-6">
+      {/* Filter Area */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <h3 className="text-sm font-bold text-slate-800">Report Filters</h3>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCSV} className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white border-0 rounded-xl">
+              <Download className="h-4 w-4 mr-2" /> CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              <Printer className="h-4 w-4 mr-2" /> Print
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <RangeFilter state={filter} onChange={setFilter} />
-          {errorMessage ? (
-            <p className="text-sm text-destructive">{errorMessage}</p>
-          ) : null}
+        </div>
+        <RangeFilter state={filter} onChange={setFilter} />
+      </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : data ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Period:{" "}
-                <span className="font-medium text-foreground">
-                  {data.period}
-                </span>
-              </p>
+      {errorMessage ? (
+        <p className="text-sm text-destructive">{errorMessage}</p>
+      ) : null}
 
-              <div className="grid gap-3 md:grid-cols-4">
-                <KpiCard
-                  label="Total Revenue"
-                  value={`₹${parseFloat(data.summary.total_revenue).toLocaleString("en-IN")}`}
-                  trend
-                />
-                <KpiCard
-                  label="Cash Sales"
-                  value={`₹${parseFloat(data.summary.total_cash).toLocaleString("en-IN")}`}
-                />
-                <KpiCard
-                  label="Online Sales"
-                  value={`₹${parseFloat(data.summary.total_online).toLocaleString("en-IN")}`}
-                />
-                <KpiCard
-                  label="Transactions"
-                  value={data.summary.total_transactions}
-                />
-              </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : data ? (
+        <>
+          <p className="text-sm text-slate-500">
+            Period:{" "}
+            <span className="font-semibold text-slate-800">
+              {data.period}
+            </span>
+          </p>
 
-              {chartData.length > 0 ? (
+          <div className="grid gap-5 md:grid-cols-4">
+            <KpiCard
+              label="Total Revenue"
+              value={`₹${parseFloat(data.summary.total_revenue).toLocaleString("en-IN")}`}
+              trend
+              accent="bg-emerald-500"
+            />
+            <KpiCard
+              label="Cash Sales"
+              value={`₹${parseFloat(data.summary.total_cash).toLocaleString("en-IN")}`}
+              accent="bg-amber-500"
+            />
+            <KpiCard
+              label="Online Sales"
+              value={`₹${parseFloat(data.summary.total_online).toLocaleString("en-IN")}`}
+              accent="bg-blue-500"
+            />
+            <KpiCard
+              label="Transactions"
+              value={data.summary.total_transactions}
+              accent="bg-purple-500"
+            />
+          </div>
+
+          {chartData.length > 0 ? (
+            <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-50 p-6">
+                <CardTitle className="text-base font-bold text-slate-800">Daily Revenue Trend</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
@@ -340,89 +370,95 @@ function RevenueReportTab() {
                         >
                           <stop
                             offset="5%"
-                            stopColor="oklch(0.6 0.18 145)"
-                            stopOpacity={0.6}
+                            stopColor="#10b981"
+                            stopOpacity={0.2}
                           />
                           <stop
                             offset="95%"
-                            stopColor="oklch(0.6 0.18 145)"
-                            stopOpacity={0.05}
+                            stopColor="#10b981"
+                            stopOpacity={0}
                           />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis dataKey="label" fontSize={11} />
-                      <YAxis fontSize={11} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="label" fontSize={11} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                      <YAxis fontSize={11} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
                       <Tooltip
-                        formatter={(value: number) =>
-                          `₹${value.toLocaleString("en-IN")}`
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value) =>
+                          `₹${Number(value).toLocaleString("en-IN")}`
                         }
                       />
                       <Area
                         type="monotone"
                         dataKey="revenue"
-                        stroke="oklch(0.6 0.18 145)"
-                        strokeWidth={2}
+                        stroke="#10b981"
+                        strokeWidth={3}
                         fill="url(#revGradient)"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
 
-              <div className="overflow-x-auto rounded-lg border">
-                <Table>
-                  <TableHeader>
+          <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-50 p-6">
+              <CardTitle className="text-base font-bold text-slate-800">Revenue Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Sr.</TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Date</TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Day</TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Cash</TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Online</TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-[#0d7377] text-right bg-teal-50/30">Revenue</TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Txns</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.breakdown.length === 0 ? (
                     <TableRow>
-                      <TableHead>Sr.</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Day</TableHead>
-                      <TableHead className="text-right">Cash</TableHead>
-                      <TableHead className="text-right">Online</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
-                      <TableHead className="text-right">Txns</TableHead>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center text-sm text-slate-500 py-8"
+                      >
+                        No transactions in this period
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.breakdown.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center text-sm text-muted-foreground py-6"
-                        >
-                          No transactions in this period
+                  ) : (
+                    data.breakdown.map((row, idx) => (
+                      <TableRow key={`${row.date}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                        <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">{idx + 1}</TableCell>
+                        <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
+                          {new Date(row.date).toLocaleDateString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">{row.day_name}</TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-medium text-amber-600 text-sm">
+                          ₹{parseFloat(row.cash).toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-medium text-blue-600 text-sm">
+                          ₹{parseFloat(row.online).toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-black text-slate-900 text-sm bg-teal-50/30">
+                          ₹{parseFloat(row.revenue).toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-medium text-slate-600 text-sm">
+                          {row.transactions}
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      data.breakdown.map((row, idx) => (
-                        <TableRow key={`${row.date}-${idx}`}>
-                          <TableCell>{idx + 1}</TableCell>
-                          <TableCell>
-                            {new Date(row.date).toLocaleDateString("en-IN")}
-                          </TableCell>
-                          <TableCell>{row.day_name}</TableCell>
-                          <TableCell className="text-right">
-                            ₹{parseFloat(row.cash).toLocaleString("en-IN")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            ₹{parseFloat(row.online).toLocaleString("en-IN")}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            ₹{parseFloat(row.revenue).toLocaleString("en-IN")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {row.transactions}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -431,18 +467,21 @@ function KpiCard({
   label,
   value,
   trend,
+  accent = "bg-primary",
 }: {
   label: string;
   value: string | number;
   trend?: boolean;
+  accent?: string;
 }) {
   return (
-    <Card className="border-0 shadow-md">
-      <CardContent className="p-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-2xl font-bold mt-1">{value}</p>
+    <Card className="overflow-hidden rounded-2xl border-slate-100 shadow-sm bg-white">
+      <div className={`h-1.5 w-full ${accent}`} />
+      <CardContent className="p-5">
+        <p className="text-4xl font-black text-slate-800">{value}</p>
+        <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">{label}</p>
         {trend ? (
-          <p className="text-xs text-emerald-600 flex items-center gap-1 mt-1">
+          <p className="text-xs text-emerald-600 flex items-center gap-1 mt-2 font-medium">
             <TrendingUp className="h-3 w-3" />
             Live
           </p>
@@ -501,61 +540,67 @@ function ConsumptionReportTab() {
   }, [data, category]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Consumption Report</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-6">
+      {/* Filter Area */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">Report Filters</h3>
         <RangeFilter state={filter} onChange={setFilter} />
+      </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Label className="text-sm text-muted-foreground">Category:</Label>
+      {/* Category Selector */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category:</Label>
           {(["All", "Rx", "NRx", "BUP"] as const).map((c) => (
             <Button
               key={c}
               size="sm"
               variant={category === c ? "default" : "outline"}
               onClick={() => setCategory(c)}
+              className={category === c
+                ? "bg-[#0d7377] hover:bg-[#0a5c5f] text-white border-0 rounded-xl font-bold"
+                : "border-slate-200 rounded-xl font-bold hover:border-[#0d7377] hover:text-[#0d7377]"
+              }
             >
               {c}
             </Button>
           ))}
         </div>
+      </div>
 
-        {errorMessage ? (
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        ) : null}
+      {errorMessage ? (
+        <p className="text-sm text-destructive">{errorMessage}</p>
+      ) : null}
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : data ? (
-          <>
-            <p className="text-sm text-muted-foreground">
-              Period:{" "}
-              <span className="font-medium text-foreground">{data.period}</span>
-            </p>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : data ? (
+        <>
+          <p className="text-sm text-slate-500">
+            Period:{" "}
+            <span className="font-semibold text-slate-800">{data.period}</span>
+          </p>
 
-            {category === "BUP" && groupedBup ? (
-              Object.entries(groupedBup).map(([strength, rows]) => (
-                <div key={strength}>
-                  <h3 className="text-sm font-semibold mb-2">
-                    BUP {strength}{" "}
-                    <Badge variant="secondary" className="ml-2">
-                      {rows.length}
-                    </Badge>
-                  </h3>
-                  <MedicineBreakdownTable rows={rows} />
-                </div>
-              ))
-            ) : (
-              <MedicineBreakdownTable rows={data.medicine_breakdown} />
-            )}
-          </>
-        ) : null}
-      </CardContent>
-    </Card>
+          {category === "BUP" && groupedBup ? (
+            Object.entries(groupedBup).map(([strength, rows]) => (
+              <div key={strength}>
+                <h3 className="text-sm font-bold text-slate-700 mb-2">
+                  BUP {strength}{" "}
+                  <Badge variant="secondary" className="ml-2 rounded-lg">
+                    {rows.length}
+                  </Badge>
+                </h3>
+                <MedicineBreakdownTable rows={rows} />
+              </div>
+            ))
+          ) : (
+            <MedicineBreakdownTable rows={data.medicine_breakdown} />
+          )}
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -566,9 +611,13 @@ function MedicineBreakdownTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-4 text-center">
-        No consumption in this period
-      </p>
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+          <BarChart3 className="h-5 w-5 text-slate-400" />
+        </div>
+        <p className="text-sm font-bold text-slate-700">No consumption data</p>
+        <p className="text-xs text-slate-400 mt-1">No consumption recorded in this period</p>
+      </div>
     );
   }
   const totalQty = rows.reduce((s, r) => s + r.quantity, 0);
@@ -577,43 +626,43 @@ function MedicineBreakdownTable({
     0,
   );
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Sr.</TableHead>
-            <TableHead>Medicine</TableHead>
-            <TableHead>Salt</TableHead>
-            <TableHead className="text-right">Consumed</TableHead>
-            <TableHead className="text-right">Selling Value</TableHead>
+        <TableHeader className="bg-slate-50/50">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Sr.</TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine</TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Salt</TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Consumed</TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-[#0d7377] text-right bg-teal-50/30">Selling Value</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((r, idx) => (
-            <TableRow key={`${r.name}-${idx}`}>
-              <TableCell>{idx + 1}</TableCell>
-              <TableCell className="font-medium">{r.name}</TableCell>
-              <TableCell className="text-muted-foreground text-sm">
+            <TableRow key={`${r.name}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+              <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">{idx + 1}</TableCell>
+              <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">{r.name}</TableCell>
+              <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">
                 {r.salt}
               </TableCell>
-              <TableCell className="text-right">{r.quantity}</TableCell>
-              <TableCell className="text-right">
+              <TableCell className="px-6 py-3.5 text-right font-medium text-slate-700 text-sm">{r.quantity}</TableCell>
+              <TableCell className="px-6 py-3.5 text-right font-black text-slate-900 text-sm bg-teal-50/30">
                 ₹{parseFloat(r.selling_value).toLocaleString("en-IN")}
               </TableCell>
             </TableRow>
           ))}
-          <TableRow className="bg-muted/40 font-semibold">
-            <TableCell colSpan={3} className="text-right">
+          <TableRow className="bg-teal-50/20 hover:bg-teal-50/30 border-t-2 border-teal-100">
+            <TableCell colSpan={3} className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm uppercase tracking-wider">
               Totals
             </TableCell>
-            <TableCell className="text-right">{totalQty}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm">{totalQty}</TableCell>
+            <TableCell className="px-6 py-3.5 text-right font-black text-[#0d7377] text-sm bg-teal-50/40">
               ₹{totalValue.toLocaleString("en-IN")}
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }
 
@@ -640,65 +689,74 @@ function LowStockReportTab() {
   }, []);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Low Stock Report</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {errorMessage ? (
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        ) : null}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            All medicines are above their reorder level
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border">
+    <div className="space-y-6">
+      {errorMessage ? (
+        <p className="text-sm text-destructive">{errorMessage}</p>
+      ) : null}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : items.length === 0 ? (
+        <Card className="rounded-2xl border-slate-100 shadow-sm bg-white">
+          <CardContent className="p-0">
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-6 w-6 text-emerald-500" />
+              </div>
+              <p className="text-sm font-bold text-slate-700">All stock levels healthy</p>
+              <p className="text-xs text-slate-400 mt-1">All medicines are above their reorder level</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+          <CardHeader className="border-b border-slate-50 p-6">
+            <CardTitle className="text-base font-bold text-slate-800">Low Stock Report</CardTitle>
+            <p className="text-xs text-slate-500 mt-1">Medicines that are at or below their reorder level</p>
+          </CardHeader>
+          <CardContent className="p-0">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sr.</TableHead>
-                  <TableHead>Medicine</TableHead>
-                  <TableHead>Salt</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
-                  <TableHead className="text-right">Reorder Level</TableHead>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Sr.</TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine</TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Salt</TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Remaining</TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Reorder Level</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((it, idx) => (
-                  <TableRow key={it.id}>
-                    <TableCell>{idx + 1}</TableCell>
-                    <TableCell className="font-medium">{it.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                  <TableRow key={it.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">{idx + 1}</TableCell>
+                    <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">{it.name}</TableCell>
+                    <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">
                       {it.salt}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{it.category}</Badge>
+                    <TableCell className="px-6 py-3.5">
+                      <Badge variant="outline" className="rounded-lg border-slate-200">{it.category}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="px-6 py-3.5 text-right">
                       <Badge
                         variant="outline"
-                        className="border-rose-500 text-rose-700 bg-rose-50"
+                        className="border-rose-500 text-rose-700 bg-rose-50 rounded-lg"
                       >
                         {it.current_stock} u
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="px-6 py-3.5 text-right font-medium text-slate-500 text-sm">
                       {it.reorder_level} u
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
