@@ -350,10 +350,10 @@ export default function RegisterPatientPage() {
       return;
     }
 
-    if (!instantFormData.relative_phone) {
-      toast.error("Relative mobile number is required");
-      return;
-    }
+    // if (!instantFormData.relative_phone) {
+    //   toast.error("Relative mobile number is required");
+    //   return;
+    // }
 
     if (!instantFormData.address) {
       toast.error("Address is required");
@@ -369,9 +369,7 @@ export default function RegisterPatientPage() {
       return;
     }
     if (!FILE_NUMBER_REGEX.test(fileNumber)) {
-      toast.error(
-        "File number may only contain letters, digits and hyphens.",
-      );
+      toast.error("File number may only contain letters, digits and hyphens.");
       return;
     }
 
@@ -438,9 +436,10 @@ export default function RegisterPatientPage() {
         const hint =
           (error.payload?.last_file_number as string | undefined) ?? undefined;
         toast.error(
-          hint
-            ? `File number "${fileNumber}" is already in use. Most recent file number is "${hint}".`
-            : `File number "${fileNumber}" is already in use. Please choose another.`,
+          // hint
+          //   ? `File number "${fileNumber}" is already in use. Most recent file number is "${hint}".`
+          //   : `File number "${fileNumber}" is already in use. Please choose another.`,
+          error.payload?.message,
         );
       } else {
         toastApiError(error, "Registration failed");
@@ -730,8 +729,8 @@ export default function RegisterPatientPage() {
                     <FieldError message={apiErrors.get("file_number")} />
                     <p className="text-xs text-muted-foreground mt-1">
                       Letters, digits and hyphens only. Uniqueness is verified
-                      on save — if the number is already taken the most
-                      recently used one will be shown.
+                      on save — if the number is already taken the most recently
+                      used one will be shown.
                     </p>
                   </div>
 
@@ -860,9 +859,9 @@ export default function RegisterPatientPage() {
                         htmlFor="relative_phone"
                         className="flex items-center gap-2"
                       >
-                        <Phone className="h-4 w-4 text-orange-600" />
+                        <Phone className="h-4 w-4 text-teal-600" />
                         Relative Mobile{" "}
-                        <span className="text-destructive">*</span>
+                        {/* <span className="text-destructive">*</span> */}
                       </Label>
                       <Input
                         id="relative_phone"
@@ -872,9 +871,9 @@ export default function RegisterPatientPage() {
                         onChange={handleInstantChange}
                         placeholder="Relative's mobile"
                         className="mt-1.5"
-                        required
+                        // required
                       />
-                      <FieldError message={apiErrors.get("relative_phone")} />
+                      {/* <FieldError message={apiErrors.get("relative_phone")} /> */}
                     </div>
                   </div>
 
@@ -930,7 +929,10 @@ export default function RegisterPatientPage() {
                       </div>
 
                       <div>
-                        <Label htmlFor="city" className="flex items-center gap-2">
+                        <Label
+                          htmlFor="city"
+                          className="flex items-center gap-2"
+                        >
                           <MapPin className="h-4 w-4 text-teal-600" />
                           City/Village
                         </Label>
