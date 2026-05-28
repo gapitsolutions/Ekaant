@@ -7,6 +7,7 @@ import { captureFingerprint } from "@/lib/biometric";
 import { getIndiaCitiesByStateName, getIndiaStates } from "@/lib/address-data";
 import {
   getPatientById,
+  getPatientFilterOptions,
   getPatientVisits,
   getPatientsList,
   deletePatient,
@@ -35,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
 import {
   Dialog,
   DialogContent,
@@ -151,12 +153,28 @@ export default function PatientDataPage() {
   const [activeTab, setActiveTab] = useState("profile");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filter states
+  // Filter states.
+  //
+  // Categorical filters are arrays so the user can pick several values at
+  // once. The backend (``_apply_reception_list_filters``) reads them with
+  // ``getlist(...)`` and OR-combines within a field, AND across fields. An
+  // empty array means "no filter on this field". Dates stay as a from/to
+  // range — they aren't a multi-pick.
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
-  const [filterAddictionType, setFilterAddictionType] = useState<string>("all");
-  const [filterDistrict, setFilterDistrict] = useState<string>("all");
-  const [filterState, setFilterState] = useState<string>("all");
+  const [filterAddictionType, setFilterAddictionType] = useState<string[]>([]);
+  const [filterDistrict, setFilterDistrict] = useState<string[]>([]);
+  const [filterState, setFilterState] = useState<string[]>([]);
+
+  // Authoritative ``state → districts`` mapping for the State and District
+  // multi-selects. Sourced from the backend (distinct values across all
+  // patient rows) — NOT from the country-state-city package. Fetched once
+  // on mount (and whenever the auth token changes); the panel never falls
+  // back to deriving options from the currently loaded patients, which
+  // would self-narrow as filters tightened.
+  const [districtsByState, setDistrictsByState] = useState<
+    Record<string, string[]>
+  >({});
 
   const mapLookupPatient = (p: PatientLookupResponse): Patient => ({
     id: p.patient_id,
@@ -356,7 +374,11 @@ export default function PatientDataPage() {
     filterDateTo,
   ]);
 
-  // Load patient list (paginated)
+  // Load patient list (paginated).
+  // ``district`` / ``state`` / ``addiction_type`` are sent as arrays; the API
+  // client serialises each entry as a repeated query-string key (matches the
+  // backend's ``getlist`` contract). Empty arrays are sent as ``undefined``
+  // so the URL stays clean.
   useEffect(() => {
     if (!accessToken) return;
     setIsLoadingPatients(true);
@@ -364,10 +386,10 @@ export default function PatientDataPage() {
       q: debouncedSearchQuery || undefined,
       page: listPage,
       pageSize: listPageSize,
-      district: filterDistrict === "all" ? undefined : filterDistrict,
-      state: filterState === "all" ? undefined : filterState,
+      district: filterDistrict.length === 0 ? undefined : filterDistrict,
+      state: filterState.length === 0 ? undefined : filterState,
       addiction_type:
-        filterAddictionType === "all" ? undefined : filterAddictionType,
+        filterAddictionType.length === 0 ? undefined : filterAddictionType,
       registration_start: filterDateFrom || undefined,
       registration_end: filterDateTo || undefined,
     })
@@ -463,12 +485,15 @@ export default function PatientDataPage() {
   const resetFilters = () => {
     setFilterDateFrom("");
     setFilterDateTo("");
-    setFilterAddictionType("all");
-    setFilterDistrict("all");
-    setFilterState("all");
+    setFilterAddictionType([]);
+    setFilterDistrict([]);
+    setFilterState([]);
     setSearchQuery("");
   };
 
+  // Country-state-city master list. Used by the patient *registration form*
+  // for entering data — not by the filter panel, which sources its options
+  // from the backend's distinct-values endpoint instead.
   const stateOptions = useMemo(() => getIndiaStates(), []);
   const editingStateCityOptions = useMemo(() => {
     if (!editingPatient?.state) {
@@ -477,14 +502,72 @@ export default function PatientDataPage() {
     return getIndiaCitiesByStateName(editingPatient.state);
   }, [editingPatient?.state]);
 
-  // Get unique districts and states from patients for filter dropdowns
-  const uniqueDistricts = useMemo(() => {
-    const districts = new Set<string>();
-    patients.forEach((p) => {
-      if (p.district) districts.add(p.district);
-    });
-    return Array.from(districts).sort();
-  }, [patients]);
+  // Fetch the authoritative filter options once, then again whenever the
+  // auth token changes. The endpoint is cached server-side (~60s), so this
+  // is cheap even if a few components remount.
+  useEffect(() => {
+    if (!accessToken) return;
+    getPatientFilterOptions()
+      .then((data) => {
+        setDistrictsByState(data.districts_by_state || {});
+      })
+      .catch(() => {
+        setDistrictsByState({});
+      });
+  }, [accessToken]);
+
+  // States visible in the State filter: the keys of districts_by_state,
+  // i.e. every state that has at least one patient with a non-empty
+  // district. Sorted alphabetically.
+  const filterStateOptions = useMemo(
+    () => Object.keys(districtsByState).sort((a, b) => a.localeCompare(b)),
+    [districtsByState],
+  );
+
+  // Districts visible in the District filter.
+  //
+  // - With state(s) selected: union of ``districts_by_state[s]`` across the
+  //   selected states (cascade — narrows the choice set).
+  // - With no state selected: every district known to the backend, across
+  //   all states. That set is small (only what's actually in the DB) and
+  //   sorted, so rendering is cheap. The District filter is usable on its
+  //   own as a "patients in this district regardless of state" predicate.
+  const filterDistrictOptions = useMemo(() => {
+    const set = new Set<string>();
+    if (filterState.length === 0) {
+      for (const list of Object.values(districtsByState)) {
+        for (const d of list) set.add(d);
+      }
+    } else {
+      for (const stateName of filterState) {
+        const list = districtsByState[stateName];
+        if (!list) continue;
+        for (const d of list) set.add(d);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [filterState, districtsByState]);
+
+  // When the user narrows the *state* selection, drop any selected districts
+  // that no longer appear in the union for the new state set — otherwise
+  // the trigger silently keeps filtering on a stale district and the
+  // intersection (state ∩ district) yields zero results.
+  //
+  // Clearing the state selection entirely is NOT treated as narrowing: a
+  // standalone district filter (e.g. "Patna across any state") is a valid
+  // query and the user's explicit selection should be respected.
+  useEffect(() => {
+    if (filterDistrict.length === 0) return;
+    if (filterState.length === 0) return;
+    const valid = new Set(filterDistrictOptions);
+    const next = filterDistrict.filter((d) => valid.has(d));
+    if (next.length !== filterDistrict.length) {
+      setFilterDistrict(next);
+    }
+    // We only re-run on state-set changes; ``filterDistrict`` is intentionally
+    // omitted to avoid a toggle loop when the user checks a district below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterState, filterDistrictOptions]);
 
   // Sort current server-filtered page
   const filteredPatients = useMemo(() => {
@@ -2561,57 +2644,64 @@ export default function PatientDataPage() {
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
                   <Label className="text-xs text-slate-500 font-bold mb-1.5 block">State</Label>
-                  <Select value={filterState} onValueChange={setFilterState}>
-                    <SelectTrigger className="h-10 bg-[#f9fafb] border-slate-200">
-                      <SelectValue placeholder="All States" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All States</SelectItem>
-                      {stateOptions.map((state) => (
-                        <SelectItem key={state.code} value={state.name}>
-                          {state.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <MultiSelect
+                    options={filterStateOptions.map<MultiSelectOption>((s) => ({
+                      value: s,
+                      label: s,
+                    }))}
+                    value={filterState}
+                    onChange={setFilterState}
+                    placeholder="All States"
+                    selectedNoun="states"
+                    searchPlaceholder="Search states…"
+                    emptyText="No states with patients yet"
+                  />
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500 font-bold mb-1.5 block">District</Label>
-                  <Select
+                  <MultiSelect
+                    options={filterDistrictOptions.map<MultiSelectOption>((d) => ({
+                      value: d,
+                      label: d,
+                    }))}
                     value={filterDistrict}
-                    onValueChange={setFilterDistrict}
-                  >
-                    <SelectTrigger className="h-10 bg-[#f9fafb] border-slate-200">
-                      <SelectValue placeholder="All Districts" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Districts</SelectItem>
-                      {uniqueDistricts.map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={setFilterDistrict}
+                    // No cascade gate: with the option list sourced from the
+                    // backend (only districts actually present in the DB,
+                    // small finite set), the control renders fine without
+                    // first picking a state. Selecting a state still narrows
+                    // the list via ``filterDistrictOptions``.
+                    placeholder={
+                      filterState.length === 0
+                        ? "All Districts"
+                        : "All districts in selected states"
+                    }
+                    selectedNoun="districts"
+                    searchPlaceholder="Search districts…"
+                    emptyText={
+                      filterState.length === 0
+                        ? "No districts in patient data yet"
+                        : "No districts for selected states"
+                    }
+                  />
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Addiction Type</Label>
-                  <Select
+                  <MultiSelect
+                    // Closed enum from patients/models.py::AddictionType.
+                    options={[
+                      { value: "alcohol", label: "Alcohol" },
+                      { value: "drugs", label: "Drugs" },
+                      { value: "tobacco", label: "Tobacco" },
+                      { value: "gambling", label: "Gambling" },
+                      { value: "other", label: "Other" },
+                    ]}
                     value={filterAddictionType}
-                    onValueChange={setFilterAddictionType}
-                  >
-                    <SelectTrigger className="h-10 bg-[#f9fafb] border-slate-200">
-                      <SelectValue placeholder="All Types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="alcohol">Alcohol</SelectItem>
-                      <SelectItem value="drugs">Drugs</SelectItem>
-                      <SelectItem value="tobacco">Tobacco</SelectItem>
-                      <SelectItem value="gambling">Gambling</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={setFilterAddictionType}
+                    placeholder="All Types"
+                    selectedNoun="types"
+                    searchPlaceholder="Search types…"
+                  />
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Reg. Date From</Label>

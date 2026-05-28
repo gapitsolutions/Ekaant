@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     PatientDetailView,
+    PatientFilterOptionsView,
     PatientFingerprintTemplateView,
     PatientFollowUpDateUpdateView,
     PatientPhotoView,
@@ -38,6 +39,11 @@ urlpatterns = [
         "receptionist/patients/summary/",
         ReceptionistPatientSummaryListView.as_view(),
         name="receptionist-patients-summary",
+    ),
+    path(
+        "receptionist/patients/filter-options/",
+        PatientFilterOptionsView.as_view(),
+        name="receptionist-patients-filter-options",
     ),
     path("receptionist/patients/", ReceptionistPatientListView.as_view(), name="receptionist-patients"),
 ]

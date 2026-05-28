@@ -671,38 +671,51 @@ export async function deleteReceptionCheckinHistoryVisit(
 }
 
 // ── Reception: Patient list (paginated, searchable) ──
+//
+// ``district``, ``state`` and ``addiction_type`` accept either a single string
+// (legacy callers) or a list. The backend reads them with ``getlist(...)`` and
+// applies OR-within-field / AND-across-fields semantics — see
+// API_BLUEPRINT §5.5.
+type PatientListFilter = string | string[] | undefined;
+
+type GetPatientsListOpts = {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  district?: PatientListFilter;
+  state?: PatientListFilter;
+  addiction_type?: PatientListFilter;
+  registration_start?: string;
+  registration_end?: string;
+};
+
+function _appendMulti(
+  params: URLSearchParams,
+  key: string,
+  value: PatientListFilter,
+): void {
+  if (value === undefined || value === null) return;
+  if (typeof value === "string") {
+    if (value) params.append(key, value);
+    return;
+  }
+  for (const v of value) {
+    if (v) params.append(key, v);
+  }
+}
+
 export async function getPatientsList(
-  optsOrToken:
-    | {
-        q?: string;
-        page?: number;
-        pageSize?: number;
-        district?: string;
-        state?: string;
-        addiction_type?: string;
-        registration_start?: string;
-        registration_end?: string;
-      }
-    | string = {},
-  maybeOpts: {
-    q?: string;
-    page?: number;
-    pageSize?: number;
-    district?: string;
-    state?: string;
-    addiction_type?: string;
-    registration_start?: string;
-    registration_end?: string;
-  } = {},
+  optsOrToken: GetPatientsListOpts | string = {},
+  maybeOpts: GetPatientsListOpts = {},
 ) {
   const opts = typeof optsOrToken === "string" ? maybeOpts : optsOrToken;
   const params = new URLSearchParams();
   if (opts.q) params.set("q", opts.q);
   params.set("page", String(opts.page ?? 1));
   params.set("pageSize", String(opts.pageSize ?? 100));
-  if (opts.district) params.set("district", opts.district);
-  if (opts.state) params.set("state", opts.state);
-  if (opts.addiction_type) params.set("addiction_type", opts.addiction_type);
+  _appendMulti(params, "district", opts.district);
+  _appendMulti(params, "state", opts.state);
+  _appendMulti(params, "addiction_type", opts.addiction_type);
   if (opts.registration_start) {
     params.set("registration_start", opts.registration_start);
   }
@@ -712,6 +725,27 @@ export async function getPatientsList(
     items: PatientLookupResponse[];
     pagination?: { page: number; pageSize: number; total: number };
   }>(`/api/v1/receptionist/patients/?${params.toString()}`, {});
+}
+
+// ── Reception: Patient filter options ──
+//
+// Returns the authoritative ``state → districts`` mapping for the filter
+// panel — sourced from distinct values in the database, NOT from the
+// country-state-city package. Cached server-side for ~60 seconds.
+//
+// The receptionist patient page calls this once on mount and again whenever
+// the auth token changes. The response drives both the State and District
+// multi-select option lists; the panel never falls back to deriving options
+// from the currently-loaded patients (which would self-narrow).
+export type PatientFilterOptionsResponse = {
+  districts_by_state: Record<string, string[]>;
+};
+
+export async function getPatientFilterOptions() {
+  return apiRequest<PatientFilterOptionsResponse>(
+    "/api/v1/receptionist/patients/filter-options/",
+    {},
+  );
 }
 
 export async function getReceptionPatientSummaries(

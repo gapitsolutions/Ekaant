@@ -323,7 +323,26 @@ Behavior:
 
 View: `ReceptionistPatientListView.get`
 
-Query params: `q`, `page` (default 1), `pageSize` (default 100, clamped).
+Query params:
+
+- `q` — free-text search (file_number, full_name, phone, aadhaar).
+- `page` (default 1), `pageSize` (default 100, clamped).
+- `state`, `district`, `addiction_type` — **multi-value**. Repeat the key once per
+  selected value: `?state=Bihar&state=Assam&district=Patna`. A single value is
+  also accepted for backwards compatibility (`?state=Bihar`).
+- `registration_start`, `registration_end` — single ISO dates (range endpoints).
+
+Filter semantics (implemented by `_apply_reception_list_filters`):
+
+- **Within a field:** values are OR-combined (row matches if its value is in
+  the selected set).
+- **Across fields:** filters are AND-combined (every selected facet must match).
+- **Empty selection / missing key:** that field is unconstrained.
+- `state` and `district` are matched case-insensitively via a `Lower(field) IN
+  (...)` annotation. `addiction_type` uses an exact `IN` against the canonical
+  lowercase `AddictionType` choices.
+- A stray empty value (`?state=`) is ignored — it does **not** collapse the
+  result set to "rows with empty state".
 
 Response:
 
@@ -337,7 +356,49 @@ Serializer: `PatientSummarySerializer`
 
 Lightweight paginated list for patient cards/listing UI.
 
+Accepts the same multi-value filter params as §5.5 (same helper).
+
 Summary item fields: `patient_id`, `file_number`, `hdams_id`, `full_name`, `phone_number`, `date_of_birth`, `sex`, `status`, `photo_url`.
+
+### 5.6a `GET /api/v1/receptionist/patients/filter-options/`
+
+View: `PatientFilterOptionsView.get`
+
+Authoritative `state → districts` mapping for the reception filter panel.
+The State and District multi-select option lists on the patient page are
+sourced from this endpoint — **not** from any third-party address-data
+package — so that:
+
+- Districts the package doesn't ship with (legacy spellings, renamed/new
+  districts, alternate transliterations) are still selectable, mapped to
+  the state they actually belong to according to real patient rows.
+- The option list cannot self-narrow as the user tightens filters — this
+  endpoint takes no filter params on purpose; its result is stable
+  regardless of what the user is currently filtering on.
+
+Query params: **none**. Any params passed are ignored.
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "districts_by_state": {
+      "Assam": ["Dibrugarh", "Guwahati"],
+      "Bihar": ["Gaya", "Patna", "Pataliputra"]
+    }
+  }
+}
+```
+
+- Keys are distinct non-empty `Patient.state` values.
+- Values are sorted lists of distinct non-empty `Patient.district` values
+  for patients in that state.
+- Permission: `IsReceptionAdminOrPharmacist` (matches the list endpoint).
+- Cached in-process for ~60s via `django.core.cache` (low-level API, not
+  `cache_page` — the latter would bypass the auth check by serving cached
+  responses to unauthenticated callers).
 
 ### 5.7 `GET /api/v1/patients/<patient_id>/`
 

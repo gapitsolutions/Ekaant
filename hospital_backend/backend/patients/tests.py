@@ -449,3 +449,227 @@ class PatientRegistrationPhotoTests(APITestCase):
         self.assertTrue(response.data["success"])
         self.assertTrue(response.data["data"]["deleted"])
         self.assertFalse(Patient.objects.filter(pk=patient.id).exists())
+
+
+class ReceptionPatientListFilterTests(APITestCase):
+    """Multi-value filter semantics for ``GET /api/v1/receptionist/patients/``.
+
+    Contract: state/district/addiction_type accept the query key repeated
+    once per selected value. Within a field the predicates are OR'd; across
+    fields they are AND'd. Single-value form remains supported for backwards
+    compatibility with old callers.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            email="filters.reception@example.com",
+            password="test-password",
+            role="reception",
+            full_name="Filters Reception",
+        )
+
+        # Three patients deliberately spread across two states / three
+        # districts / three addiction types so every filter combination has
+        # at least one hit and at least one miss.
+        cls.alpha = Patient.objects.create(
+            file_number="F-A1",
+            patient_category="psychiatric",
+            full_name="Alpha One",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000001",
+            address_line1="addr 1",
+            state="Bihar",
+            district="Patna",
+            addiction_type="alcohol",
+        )
+        cls.bravo = Patient.objects.create(
+            file_number="F-B1",
+            patient_category="deaddiction",
+            full_name="Bravo Two",
+            date_of_birth=timezone.localdate(),
+            sex="female",
+            phone_number="9000000002",
+            address_line1="addr 2",
+            state="Assam",
+            district="Guwahati",
+            addiction_type="drugs",
+        )
+        cls.charlie = Patient.objects.create(
+            file_number="F-C1",
+            patient_category="psychiatric",
+            full_name="Charlie Three",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000003",
+            address_line1="addr 3",
+            state="Bihar",
+            district="Gaya",
+            addiction_type="tobacco",
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user)
+
+    def _file_numbers(self, response):
+        return sorted(item["file_number"] for item in response.data["data"]["items"])
+
+    def test_no_filters_returns_all_patients(self):
+        response = self.client.get("/api/v1/receptionist/patients/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-B1", "F-C1"])
+
+    def test_single_state_value_backwards_compat(self):
+        # The old ``?state=Bihar`` form must keep working.
+        response = self.client.get("/api/v1/receptionist/patients/?state=Bihar")
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-C1"])
+
+    def test_multi_state_unions_within_field(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?state=Bihar&state=Assam"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-B1", "F-C1"])
+
+    def test_state_filter_is_case_insensitive(self):
+        response = self.client.get("/api/v1/receptionist/patients/?state=bihar")
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-C1"])
+
+    def test_state_and_district_intersect_across_fields(self):
+        # Bihar ∩ Patna → only Alpha (Charlie is Bihar+Gaya).
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?state=Bihar&district=Patna"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-A1"])
+
+    def test_multi_district_unions_within_field(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?district=Patna&district=Guwahati"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-B1"])
+
+    def test_multi_addiction_type_unions_within_field(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?addiction_type=alcohol&addiction_type=tobacco"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-C1"])
+
+    def test_all_three_multi_filters_combined(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/"
+            "?state=Bihar&state=Assam"
+            "&district=Patna&district=Guwahati"
+            "&addiction_type=alcohol&addiction_type=drugs"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-B1"])
+
+    def test_empty_value_is_ignored(self):
+        response = self.client.get("/api/v1/receptionist/patients/?state=")
+        self.assertEqual(self._file_numbers(response), ["F-A1", "F-B1", "F-C1"])
+
+    def test_summary_endpoint_honors_same_filter_contract(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/summary/?state=Bihar&state=Assam"
+            "&addiction_type=alcohol"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-A1"])
+
+
+class PatientFilterOptionsEndpointTests(APITestCase):
+    """Contract tests for the ``/filter-options/`` endpoint.
+
+    This endpoint is the single source of truth for the State and District
+    multi-select option lists on the reception patient page. Its result
+    must:
+
+    * Be shaped ``{success, data: {districts_by_state}}``.
+    * Group every (state, district) pair seen on a Patient row, with both
+      sorted and de-duplicated.
+    * Exclude rows where state OR district is blank/null.
+    * Be **stable regardless of caller-supplied filter params** — that
+      stability is exactly what prevents the option list from self-narrowing
+      when the user picks a value.
+    """
+
+    URL = "/api/v1/receptionist/patients/filter-options/"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            email="filter-options.reception@example.com",
+            password="test-password",
+            role="reception",
+            full_name="Filter Options Reception",
+        )
+
+        # Coverage: two states with multiple districts (Bihar), one state
+        # with a single district (Assam), a duplicate to prove distinct,
+        # one row with empty district (should be excluded), one with empty
+        # state (should be excluded).
+        common = dict(
+            patient_category="psychiatric",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000000",
+            address_line1="addr",
+            addiction_type="other",
+        )
+        Patient.objects.create(file_number="FO-1", full_name="P1", state="Bihar", district="Patna", **common)
+        Patient.objects.create(file_number="FO-2", full_name="P2", state="Bihar", district="Patna", **common)  # duplicate
+        Patient.objects.create(file_number="FO-3", full_name="P3", state="Bihar", district="Gaya", **common)
+        Patient.objects.create(file_number="FO-4", full_name="P4", state="Bihar", district="Pataliputra", **common)
+        Patient.objects.create(file_number="FO-5", full_name="P5", state="Assam", district="Guwahati", **common)
+        Patient.objects.create(file_number="FO-6", full_name="P6", state="Assam", district="", **common)        # excluded
+        Patient.objects.create(file_number="FO-7", full_name="P7", state="", district="Anything", **common)    # excluded
+
+    def setUp(self):
+        # The view caches the queryset result via ``django.core.cache``. Tests
+        # mutate the underlying data (via setUpTestData) so we must start each
+        # test with a clean cache, otherwise the second test in the class would
+        # see whatever the first one populated.
+        from django.core.cache import cache
+
+        cache.clear()
+        self.client.force_authenticate(user=self.user)
+
+    def test_returns_expected_shape_and_grouping(self):
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertTrue(body["success"])
+        data = body["data"]
+        self.assertIn("districts_by_state", data)
+        # Postgres orders strings byte-wise, which puts "Pataliputra" before
+        # "Patna" (shared "Pat" prefix, then 'a' < 'n'). Reflect that here.
+        self.assertEqual(
+            data["districts_by_state"],
+            {
+                "Assam": ["Guwahati"],
+                "Bihar": ["Gaya", "Pataliputra", "Patna"],
+            },
+        )
+
+    def test_excludes_blank_state_or_district(self):
+        # Re-check after-the-fact: no key/value blanks in the response.
+        response = self.client.get(self.URL)
+        mapping = response.json()["data"]["districts_by_state"]
+        self.assertNotIn("", mapping)
+        for districts in mapping.values():
+            self.assertNotIn("", districts)
+
+    def test_filter_params_have_no_effect_on_result(self):
+        # The whole point of the endpoint: stable regardless of what the
+        # caller is currently filtering on. If the user has Patna selected,
+        # they still need to see Gaya and Pataliputra as options.
+        baseline = self.client.get(self.URL).json()["data"]
+        # Bust the cache_page() wrapper across calls by varying an irrelevant
+        # query param too — Django's per-view cache keys on URL+vary headers.
+        filtered = self.client.get(
+            self.URL + "?state=Bihar&district=Patna&addiction_type=alcohol"
+        ).json()["data"]
+        self.assertEqual(baseline, filtered)
+
+    def test_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

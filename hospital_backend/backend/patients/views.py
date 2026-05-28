@@ -1,9 +1,12 @@
 import mimetypes
 import shutil
+from collections import defaultdict
 from pathlib import Path
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
+from django.db.models.functions import Lower
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
@@ -42,21 +45,51 @@ def _patient_media_dir(patient_id):
     return candidate
 
 
+def _multi_values(request, key: str) -> list[str]:
+    """Collect repeated query-string values for ``key`` and normalise them.
+
+    Accepts both ``?state=Bihar&state=Assam`` (the contract) and the legacy
+    single-value form ``?state=Bihar``. Whitespace is stripped and empty entries
+    dropped so a stray ``?state=`` doesn't add a "match empty string" clause.
+    """
+    values = request.query_params.getlist(key)
+    return [v.strip() for v in values if v and v.strip()]
+
+
 def _apply_reception_list_filters(request, queryset):
-    district = request.query_params.get("district", "").strip()
-    state = request.query_params.get("state", "").strip()
-    addiction_type = request.query_params.get("addiction_type", "").strip()
+    """Apply optional list-page filters with multi-value semantics.
+
+    Wire format: each categorical filter accepts the key repeated once per
+    value (``?state=Bihar&state=Assam``). Within a field the predicates are
+    OR-combined (a row matches if its value equals any selection); across
+    fields they are AND-combined. An empty selection means "no filter on
+    that field".
+
+    State and district are matched case-insensitively. Postgres has no native
+    case-insensitive ``IN``, so we lowercase both sides via an annotation —
+    cheaper than building a ``Q(state__iexact=v1) | Q(state__iexact=v2) | …``
+    chain that grows with the selection.
+    """
+    districts = _multi_values(request, "district")
+    states = _multi_values(request, "state")
+    addiction_types = _multi_values(request, "addiction_type")
     registration_start = request.query_params.get("registration_start", "").strip()
     registration_end = request.query_params.get("registration_end", "").strip()
 
-    if district:
-        queryset = queryset.filter(district__iexact=district)
+    if states:
+        queryset = queryset.annotate(_state_lower=Lower("state")).filter(
+            _state_lower__in=[s.lower() for s in states]
+        )
 
-    if state:
-        queryset = queryset.filter(state__iexact=state)
+    if districts:
+        queryset = queryset.annotate(_district_lower=Lower("district")).filter(
+            _district_lower__in=[d.lower() for d in districts]
+        )
 
-    if addiction_type:
-        queryset = queryset.filter(addiction_type=addiction_type)
+    if addiction_types:
+        # ``addiction_type`` is a TextChoices column (canonical lowercase
+        # values), so exact ``__in`` is enough.
+        queryset = queryset.filter(addiction_type__in=addiction_types)
 
     if registration_start:
         start_date = parse_date(registration_start)
@@ -69,6 +102,58 @@ def _apply_reception_list_filters(request, queryset):
             queryset = queryset.filter(registration_date__lte=end_date)
 
     return queryset
+
+
+class PatientFilterOptionsView(APIView):
+    """Distinct ``state → districts`` mapping for the reception filter panel.
+
+    The reception patient list lets the user filter by State and District as
+    multi-selects. Their option lists are *not* derived from any third-party
+    address-data package — they come straight from the database so that:
+
+    * Districts the package doesn't ship with (legacy spellings, renamed/new
+      districts, alternate transliterations) are still selectable, mapped to
+      the state they actually belong to according to real patient rows.
+    * The option list cannot self-narrow as filters tighten — this endpoint
+      takes no filter params on purpose; its result is stable regardless of
+      what the user is currently filtering on.
+
+    Shape:
+        ``{ "districts_by_state": { "<state>": ["<district>", ...], ... } }``
+
+    Cached in-process for 60s via the low-level ``django.core.cache`` API so
+    100 concurrent page loads collapse into a single ``SELECT DISTINCT``. We
+    deliberately do *not* use ``cache_page`` here: that decorator wraps the
+    whole HTTP dispatch and would serve cached responses to unauthenticated
+    callers (the auth check runs after the cache lookup). Caching the data
+    instead of the response keeps the permission gate effective.
+    """
+
+    permission_classes = [IsReceptionAdminOrPharmacist]
+
+    CACHE_KEY = "patients:filter_options:districts_by_state:v1"
+    CACHE_TTL_SECONDS = 60
+
+    def get(self, request):
+        cached = cache.get(self.CACHE_KEY)
+        if cached is None:
+            rows = (
+                Patient.objects.exclude(state__isnull=True)
+                .exclude(state__exact="")
+                .exclude(district__isnull=True)
+                .exclude(district__exact="")
+                .values_list("state", "district")
+                .distinct()
+                .order_by("state", "district")
+            )
+
+            grouped: dict[str, list[str]] = defaultdict(list)
+            for state_name, district_name in rows:
+                grouped[state_name].append(district_name)
+            cached = dict(grouped)
+            cache.set(self.CACHE_KEY, cached, self.CACHE_TTL_SECONDS)
+
+        return success_response({"districts_by_state": cached})
 
 
 class PatientRegistrationView(APIView):
