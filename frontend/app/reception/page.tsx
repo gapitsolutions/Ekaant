@@ -60,7 +60,6 @@ interface StatData {
 }
 
 interface DashboardVisitItem extends QueueItem {
-  file_number?: string;
   date_of_birth?: string;
   gender?: "male" | "female" | "other";
   phone?: string;
@@ -414,7 +413,15 @@ export default function ReceptionDashboard() {
                             .slice(0, 2)}
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground text-sm">{q.patient_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground text-sm">{q.patient_name}</p>
+                            {q.file_number && (
+                              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#0d7377] bg-[#e0f2f1] px-1.5 py-0.5 rounded">
+                                <FileText className="h-3 w-3" />
+                                {q.file_number}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             Checked in at{" "}
                             {q.checked_in_at

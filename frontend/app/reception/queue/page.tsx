@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, Loader2, Search, Trash2, Camera, ShieldCheck, RotateCcw, Calendar } from "lucide-react";
+import { Eye, Loader2, Search, Trash2, Camera, ShieldCheck, RotateCcw, Calendar, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   deleteReceptionCheckinHistoryVisit,
@@ -56,6 +56,8 @@ export default function ReceptionQueuePage() {
     useState<CheckinHistoryItem | null>(null);
   const [isDeletingVisit, setIsDeletingVisit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -108,6 +110,7 @@ export default function ReceptionQueuePage() {
             total: response.items?.length || 0,
           },
         );
+        setLastRefreshedAt(new Date());
       })
       .catch((error: unknown) => {
         setErrorMessage(
@@ -134,20 +137,74 @@ export default function ReceptionQueuePage() {
     loadCheckinHistory();
   }, [loadCheckinHistory]);
 
-  useEffect(() => {
+  const handleManualRefresh = useCallback(() => {
     if (!accessToken) return;
+    setIsRefreshing(true);
+    setErrorMessage("");
 
-    const refreshTimer = window.setInterval(() => {
-      loadCheckinHistory();
-    }, 10000);
-    const onFocus = () => loadCheckinHistory();
-    window.addEventListener("focus", onFocus);
+    getReceptionCheckinHistory(accessToken, {
+      q: debouncedSearchQuery || undefined,
+      page,
+      pageSize,
+      verification_method:
+        verificationFilter === "all" ? undefined : verificationFilter,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+    })
+      .then((response) => {
+        setHistoryItems(response.items || []);
+        setPagination(
+          response.pagination || {
+            page,
+            pageSize,
+            total: response.items?.length || 0,
+          },
+        );
+        setLastRefreshedAt(new Date());
+      })
+      .catch((error: unknown) => {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to refresh check-in history.",
+        );
+      })
+      .finally(() => {
+        setIsRefreshing(false);
+      });
+  }, [
+    accessToken,
+    debouncedSearchQuery,
+    page,
+    pageSize,
+    verificationFilter,
+    statusFilter,
+    startDate,
+    endDate,
+  ]);
 
-    return () => {
-      window.clearInterval(refreshTimer);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [accessToken, loadCheckinHistory]);
+  const formatLastRefreshed = (date: Date | null) => {
+    if (!date) return "";
+    const now = new Date();
+    const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSeconds < 5) return "Just now";
+    if (diffSeconds < 60) return `${diffSeconds}s ago`;
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    return date.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Re-render the "X ago" label periodically
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!lastRefreshedAt) return;
+    const timer = window.setInterval(() => setTick((t) => t + 1), 15000);
+    return () => window.clearInterval(timer);
+  }, [lastRefreshedAt]);
 
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / pageSize));
 
@@ -404,6 +461,29 @@ export default function ReceptionQueuePage() {
             >
               <RotateCcw className="h-5 w-5" />
             </Button>
+
+            <div className="border-l border-slate-200 h-7 mx-1" />
+
+            <Button
+              variant="outline"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing || isLoading}
+              className="h-11 px-3 border-[#0d7377]/20 text-[#0d7377] hover:bg-[#0d7377]/5 hover:text-[#0a5c5f] hover:border-[#0d7377]/40 transition-all gap-2"
+              title="Refresh data"
+            >
+              <RefreshCw
+                className={cn(
+                  "h-4 w-4",
+                  isRefreshing && "animate-spin",
+                )}
+              />
+              {isRefreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+            {lastRefreshedAt && (
+              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                {formatLastRefreshed(lastRefreshedAt)}
+              </span>
+            )}
           </div>
 
           {errorMessage ? (

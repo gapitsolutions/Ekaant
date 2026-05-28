@@ -49,7 +49,6 @@ import {
   MapPin,
   Calendar,
   CreditCard,
-  Users,
   Camera,
   ShieldCheck,
   ArrowRight,
@@ -67,7 +66,6 @@ interface LookupPatient {
   aadhaar_last4?: string;
   address?: string;
   emergency_contact_phone?: string;
-  relative_phone?: string;
   photo?: string;
   fingerprint_template?: string;
   next_followup_date?: string;
@@ -369,10 +367,6 @@ export default function CheckinPage() {
             emergency_contact_phone:
               typeof patient.emergency_contact_phone === "string"
                 ? patient.emergency_contact_phone
-                : undefined,
-            relative_phone:
-              typeof patient.relative_phone === "string"
-                ? patient.relative_phone
                 : undefined,
             photo: photoUrl,
             next_followup_date:
@@ -918,23 +912,6 @@ export default function CheckinPage() {
                         </p>
                         <p className="font-bold text-slate-700 text-[15px] mt-0.5">
                           {selectedPatient.phone}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Relative Mobile */}
-                    <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
-                        <Users className="h-5 w-5 text-[#0d7377]" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-                          Relative Mobile
-                        </p>
-                        <p className="font-bold text-slate-700 text-[15px] mt-0.5">
-                          {selectedPatient.emergency_contact_phone ||
-                            selectedPatient.relative_phone ||
-                            "Not provided"}
                         </p>
                       </div>
                     </div>

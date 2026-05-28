@@ -44,7 +44,7 @@ class PatientRegistrationSerializer(serializers.Serializer):
     sex = serializers.ChoiceField(choices=Patient._meta.get_field("sex").choices)
     fingerprint_template = serializers.CharField()
     aadhaar_number = serializers.CharField(required=False, allow_blank=True)
-    relative_phone = serializers.CharField()
+    relative_phone = serializers.CharField(required=False, allow_blank=True)
     address_line1 = serializers.CharField()
     city = serializers.CharField(required=False, allow_blank=True)
     district = serializers.CharField(required=False, allow_blank=True)
@@ -113,10 +113,7 @@ class PatientRegistrationSerializer(serializers.Serializer):
         return digits
 
     def validate_relative_phone(self, value):
-        digits = _digits_only(value)
-        if not digits:
-            raise serializers.ValidationError("Relative phone is required.")
-        return digits
+        return _digits_only(value) if value else ""
 
     def validate_aadhaar_number(self, value):
         if not value:

@@ -571,6 +571,7 @@ export interface QueueItem {
   session_id: string;
   patient_id: string;
   patient_name: string;
+  file_number: string;
   checked_in_at: string;
   checked_in_by_name: string;
   status: string;
