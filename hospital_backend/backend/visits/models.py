@@ -22,6 +22,7 @@ class VisitStage(models.TextChoices):
 class CheckinVerificationMethod(models.TextChoices):
     FINGERPRINT = "fingerprint", "Fingerprint"
     PHOTO = "photo", "Photo"
+    MANUAL = "manual", "Manual"
 
 
 def visit_verification_photo_upload_path(instance, filename):

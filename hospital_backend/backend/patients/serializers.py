@@ -42,7 +42,7 @@ class PatientRegistrationSerializer(serializers.Serializer):
     phone_number = serializers.CharField()
     date_of_birth = serializers.DateField()
     sex = serializers.ChoiceField(choices=Patient._meta.get_field("sex").choices)
-    fingerprint_template = serializers.CharField()
+    fingerprint_template = serializers.CharField(required=False, allow_blank=True)
     aadhaar_number = serializers.CharField(required=False, allow_blank=True)
     relative_phone = serializers.CharField(required=False, allow_blank=True)
     address_line1 = serializers.CharField()
@@ -162,7 +162,9 @@ class PatientRegistrationSerializer(serializers.Serializer):
         try:
             with transaction.atomic():
                 patient = Patient.objects.create(
-                    fingerprint_enrolled_at=timezone.now(),
+                    fingerprint_enrolled_at=(
+                        timezone.now() if validated_data.get("fingerprint_template") else None
+                    ),
                     emergency_contact_phone=validated_data.get("relative_phone", ""),
                     **validated_data,
                 )

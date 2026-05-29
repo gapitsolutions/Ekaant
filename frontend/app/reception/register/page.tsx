@@ -30,6 +30,12 @@ import {
   checkRDService,
   type RDServiceInfo,
 } from "@/lib/biometric";
+import {
+  ENABLE_FINGERPRINT,
+  ENABLE_CAMERA,
+  FINGERPRINT_REQUIRED,
+  CAMERA_REQUIRED,
+} from "@/lib/feature-flags";
 import { getIndiaCitiesByStateName, getIndiaStates } from "@/lib/address-data";
 import type { Gender, PatientCategory } from "@/lib/types";
 import { registerPatientTier1 } from "@/lib/hms-api";
@@ -122,7 +128,9 @@ export default function RegisterPatientPage() {
   };
 
   useEffect(() => {
-    void refreshFingerprintService();
+    if (ENABLE_FINGERPRINT) {
+      void refreshFingerprintService();
+    }
   }, []);
 
   const handleInstantChange = (
@@ -388,8 +396,13 @@ export default function RegisterPatientPage() {
       return;
     }
 
-    if (!instantFormData.fingerprint_template) {
+    if (FINGERPRINT_REQUIRED && !instantFormData.fingerprint_template) {
       toast.error("Fingerprint scan is required before registration.");
+      return;
+    }
+
+    if (CAMERA_REQUIRED && !instantFormData.photo) {
+      toast.error("Patient photo is required before registration.");
       return;
     }
 
@@ -413,7 +426,7 @@ export default function RegisterPatientPage() {
         phone_number: instantFormData.phone,
         date_of_birth: instantFormData.date_of_birth,
         sex: instantFormData.sex,
-        fingerprint_template: instantFormData.fingerprint_template,
+        fingerprint_template: instantFormData.fingerprint_template || undefined,
         aadhaar_number: aadhaarDigits || undefined,
         relative_phone: instantFormData.relative_phone,
         address_line1: instantFormData.address,
@@ -1020,6 +1033,7 @@ export default function RegisterPatientPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {ENABLE_FINGERPRINT && (
                   <Alert
                     className={
                       fingerprintService?.available
@@ -1065,12 +1079,14 @@ export default function RegisterPatientPage() {
                       </div>
                     </AlertDescription>
                   </Alert>
+                  )}
 
                   {/* Photo Capture Section */}
+                  {ENABLE_CAMERA && (
                   <div>
                     <Label className="mb-3 block flex items-center gap-2">
                       <Camera className="h-4 w-4 text-blue-600" />
-                      Patient Photo
+                      Patient Photo{CAMERA_REQUIRED && <span className="text-destructive">*</span>}
                     </Label>
 
                     {!isCameraOpen && !photoPreview && (
@@ -1225,12 +1241,14 @@ export default function RegisterPatientPage() {
 
                     <canvas ref={canvasRef} className="hidden" />
                   </div>
+                  )}
 
                   {/* Fingerprint Section */}
+                  {ENABLE_FINGERPRINT && (
                   <div className="pt-4 border-t">
                     <Label className="mb-3 block flex items-center gap-2">
                       <Fingerprint className="h-4 w-4 text-teal-600" />
-                      Fingerprint Scan
+                      Fingerprint Scan{FINGERPRINT_REQUIRED && <span className="text-destructive">*</span>}
                     </Label>
                     <div className="flex items-center gap-4">
                       <div
@@ -1289,6 +1307,16 @@ export default function RegisterPatientPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+
+                  {/* Message when both biometric methods are disabled */}
+                  {!ENABLE_FINGERPRINT && !ENABLE_CAMERA && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">
+                        Biometric and photo capture are not enabled at this centre.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -85,7 +85,7 @@ type RegisterPatientTier1Payload = {
   phone_number: string;
   date_of_birth: string;
   sex: "male" | "female" | "other";
-  fingerprint_template: string;
+  fingerprint_template?: string;
   aadhaar_number?: string;
   relative_phone: string;
   address_line1: string;
@@ -107,13 +107,13 @@ export interface CheckinResponse {
   current_stage?: "completed";
   completed_at?: string;
   outstanding_debt_at_checkin: number;
-  verification_method?: "fingerprint" | "photo";
+  verification_method?: "fingerprint" | "photo" | "manual";
   verification_photo_captured_at?: string;
 }
 
 export interface CheckinRequestPayload {
   patient_id: string;
-  verification_method?: "fingerprint" | "photo";
+  verification_method?: "fingerprint" | "photo" | "manual";
   verification_photo_base64?: string;
   verification_photo_mime_type?: string;
   verification_photo_captured_at?: string;

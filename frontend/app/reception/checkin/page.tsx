@@ -33,6 +33,12 @@ import {
   type RDServiceInfo,
   verifyFingerprint,
 } from "@/lib/biometric";
+import {
+  ENABLE_FINGERPRINT,
+  ENABLE_CAMERA,
+  HAS_ANY_VERIFICATION_METHOD,
+  DEFAULT_CHECKIN_VERIFICATION_METHOD,
+} from "@/lib/feature-flags";
 import { navigate } from "@/lib/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { toastApiError } from "@/lib/api-errors";
@@ -90,15 +96,40 @@ const getVisitStatus = (dateStr?: string): VisitStatus => {
 const getBannerStyle = (status: VisitStatus) => {
   switch (status) {
     case "early":
-      return { bg: "bg-blue-50 border-blue-100", text: "text-blue-700", label: "EARLY VISIT", badge: "bg-slate-100 text-slate-700" };
+      return {
+        bg: "bg-blue-50 border-blue-100",
+        text: "text-blue-700",
+        label: "EARLY VISIT",
+        badge: "bg-slate-100 text-slate-700",
+      };
     case "on_time":
-      return { bg: "bg-[#0d7377]/10 border-[#0d7377]/10", text: "text-[#0d7377]", label: "ON TIME VISIT", badge: null };
+      return {
+        bg: "bg-[#0d7377]/10 border-[#0d7377]/10",
+        text: "text-[#0d7377]",
+        label: "ON TIME VISIT",
+        badge: null,
+      };
     case "missed":
-      return { bg: "bg-orange-50 border-orange-100", text: "text-orange-700", label: "MISSED VISIT", badge: "bg-blue-50 text-blue-700" };
+      return {
+        bg: "bg-orange-50 border-orange-100",
+        text: "text-orange-700",
+        label: "MISSED VISIT",
+        badge: "bg-blue-50 text-blue-700",
+      };
     case "late":
-      return { bg: "bg-red-50 border-red-100", text: "text-red-700", label: "LATE VISIT (>1.5 MONTHS)", badge: "bg-red-600 text-white" };
+      return {
+        bg: "bg-red-50 border-red-100",
+        text: "text-red-700",
+        label: "LATE VISIT (>1.5 MONTHS)",
+        badge: "bg-red-600 text-white",
+      };
     default:
-      return { bg: "bg-slate-50 border-slate-100", text: "text-slate-500", label: "LATEST FOLLOW-UP DATE", badge: null };
+      return {
+        bg: "bg-slate-50 border-slate-100",
+        text: "text-slate-500",
+        label: "LATEST FOLLOW-UP DATE",
+        badge: null,
+      };
   }
 };
 
@@ -123,8 +154,8 @@ export default function CheckinPage() {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [biometricVerified, setBiometricVerified] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<
-    "fingerprint" | "photo"
-  >("fingerprint");
+    "fingerprint" | "photo" | "manual"
+  >(DEFAULT_CHECKIN_VERIFICATION_METHOD);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isCameraPickerOpen, setIsCameraPickerOpen] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>(
@@ -146,18 +177,22 @@ export default function CheckinPage() {
   const streamRef = useRef<MediaStream | null>(null);
 
   const isIdentityVerified =
-    verificationMethod === "fingerprint"
-      ? biometricVerified
-      : Boolean(checkinPhotoBase64);
+    verificationMethod === "manual"
+      ? true
+      : verificationMethod === "fingerprint"
+        ? biometricVerified
+        : Boolean(checkinPhotoBase64);
 
   const refreshServiceStatus = async () => {
     const status = await checkRDService();
     setRdService(status);
   };
 
-  // Check RD Service status on mount
+  // Check RD Service status on mount (only if fingerprint is enabled)
   useEffect(() => {
-    void refreshServiceStatus();
+    if (ENABLE_FINGERPRINT) {
+      void refreshServiceStatus();
+    }
   }, []);
 
   const stopCamera = () => {
@@ -385,7 +420,7 @@ export default function CheckinPage() {
       })
       .finally(() => {
         setSelectedPatient(null);
-        setVerificationMethod("fingerprint");
+        setVerificationMethod(DEFAULT_CHECKIN_VERIFICATION_METHOD);
         resetPhotoCapture();
         setBiometricVerified(false);
         setVerificationStep("search");
@@ -395,17 +430,21 @@ export default function CheckinPage() {
   // Select patient and move to confirmation step
   const handleSelectPatient = (patient: LookupPatient) => {
     setSelectedPatient(patient);
-    setVerificationMethod("fingerprint");
+    setVerificationMethod(DEFAULT_CHECKIN_VERIFICATION_METHOD);
     resetPhotoCapture();
     setBiometricVerified(false);
-    setVerificationStep("confirm");
+    setVerificationStep(
+      DEFAULT_CHECKIN_VERIFICATION_METHOD === "manual" ? "verified" : "confirm",
+    );
   };
 
-  const handleVerificationMethodChange = (method: "fingerprint" | "photo") => {
+  const handleVerificationMethodChange = (
+    method: "fingerprint" | "photo" | "manual",
+  ) => {
     setVerificationMethod(method);
     setBiometricVerified(false);
     resetPhotoCapture();
-    setVerificationStep("confirm");
+    setVerificationStep(method === "manual" ? "verified" : "confirm");
   };
 
   // Fingerprint verification
@@ -480,10 +519,15 @@ export default function CheckinPage() {
               verification_photo_mime_type: checkinPhotoMimeType,
               verification_photo_captured_at: checkinPhotoCapturedAt,
             }
-          : {
-              patient_id: selectedPatient.id,
-              verification_method: "fingerprint" as const,
-            };
+          : verificationMethod === "manual"
+            ? {
+                patient_id: selectedPatient.id,
+                verification_method: "manual" as const,
+              }
+            : {
+                patient_id: selectedPatient.id,
+                verification_method: "fingerprint" as const,
+              };
 
       await checkinPatient(accessToken, payload);
       toast.success(
@@ -494,7 +538,7 @@ export default function CheckinPage() {
       setSelectedPatient(null);
       setSearchQuery("");
       setSearchResults([]);
-      setVerificationMethod("fingerprint");
+      setVerificationMethod(DEFAULT_CHECKIN_VERIFICATION_METHOD);
       setBiometricVerified(false);
       setVerificationStep("search");
     } catch (error) {
@@ -508,7 +552,7 @@ export default function CheckinPage() {
   const handleCancel = () => {
     resetPhotoCapture();
     setSelectedPatient(null);
-    setVerificationMethod("fingerprint");
+    setVerificationMethod(DEFAULT_CHECKIN_VERIFICATION_METHOD);
     setBiometricVerified(false);
     setVerificationStep("search");
   };
@@ -590,10 +634,14 @@ export default function CheckinPage() {
         >
           {verificationMethod === "photo" ? (
             <Camera className="h-4 w-4" />
+          ) : verificationMethod === "manual" ? (
+            <User className="h-4 w-4" />
           ) : (
             <ShieldCheck className="h-4 w-4" />
           )}
-          <span>3. Verify/Capture</span>
+          <span>
+            3. {verificationMethod === "manual" ? "Confirm" : "Verify/Capture"}
+          </span>
         </div>
       </div>
 
@@ -610,8 +658,8 @@ export default function CheckinPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
-            {/* RD Service Status */}
-            {rdService && !rdService.available && (
+            {/* RD Service Status — only when fingerprint is enabled */}
+            {ENABLE_FINGERPRINT && rdService && !rdService.available && (
               <Alert className="border-amber-200 bg-amber-50">
                 <AlertCircle className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800">
@@ -633,27 +681,29 @@ export default function CheckinPage() {
               </Alert>
             )}
 
-            {rdService?.available && rdService.deviceInfo && (
-              <Alert className="border-emerald-200 bg-emerald-50">
-                <CheckCircle className="h-4 w-4 text-emerald-600" />
-                <AlertDescription className="text-emerald-800">
-                  {rdService.deviceInfo.name} connected via{" "}
-                  {rdService.secure ? "secure" : "non-secure"} SDK
-                  <div className="mt-2 flex items-center gap-2 text-xs">
-                    <span>{rdService.endpoint}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void refreshServiceStatus()}
-                      className="h-7 px-2"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+            {ENABLE_FINGERPRINT &&
+              rdService?.available &&
+              rdService.deviceInfo && (
+                <Alert className="border-emerald-200 bg-emerald-50">
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  <AlertDescription className="text-emerald-800">
+                    {rdService.deviceInfo.name} connected via{" "}
+                    {rdService.secure ? "secure" : "non-secure"} SDK
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <span>{rdService.endpoint}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void refreshServiceStatus()}
+                        className="h-7 px-2"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
 
             {/* Search Input */}
             <div className="flex gap-2">
@@ -711,7 +761,10 @@ export default function CheckinPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-foreground">
-                            {formatPatientNameWithStatus(patient.full_name, patient.next_followup_date)}
+                            {formatPatientNameWithStatus(
+                              patient.full_name,
+                              patient.next_followup_date,
+                            )}
                           </p>
                           <div className="flex flex-wrap gap-2 mt-1">
                             <Badge
@@ -783,7 +836,9 @@ export default function CheckinPage() {
                 ? "Patient verified. Click to complete check-in."
                 : verificationMethod === "photo"
                   ? "Capture verification photo with timestamp to complete check-in"
-                  : "Verify patient details and confirm with biometric"}
+                  : verificationMethod === "manual"
+                    ? "Confirm patient identity visually to complete check-in"
+                    : "Verify patient details and confirm with biometric"}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
@@ -799,12 +854,18 @@ export default function CheckinPage() {
                 >
                   {/* Latest Follow-Up Date Banner */}
                   {(() => {
-                    const status = getVisitStatus(selectedPatient.next_followup_date);
+                    const status = getVisitStatus(
+                      selectedPatient.next_followup_date,
+                    );
                     const style = getBannerStyle(status);
 
-                    let displayDate = selectedPatient.next_followup_date || "NO PREVIOUS RECORD";
+                    let displayDate =
+                      selectedPatient.next_followup_date ||
+                      "NO PREVIOUS RECORD";
                     if (selectedPatient.next_followup_date) {
-                      displayDate = new Date(selectedPatient.next_followup_date).toLocaleDateString("en-GB", {
+                      displayDate = new Date(
+                        selectedPatient.next_followup_date,
+                      ).toLocaleDateString("en-GB", {
                         day: "numeric",
                         month: "long",
                         year: "numeric",
@@ -812,20 +873,28 @@ export default function CheckinPage() {
                     }
 
                     return (
-                      <div className={`${style.bg} px-5 py-4 border-b flex items-center justify-between gap-3`}>
+                      <div
+                        className={`${style.bg} px-5 py-4 border-b flex items-center justify-between gap-3`}
+                      >
                         <div className="flex items-center gap-3">
                           <RefreshCw className={`h-5 w-5 ${style.text}`} />
                           <div>
-                            <p className={`text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 ${style.text} opacity-80`}>
+                            <p
+                              className={`text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5 ${style.text} opacity-80`}
+                            >
                               {style.label}
                             </p>
-                            <p className={`font-extrabold text-lg tracking-tight ${style.text}`}>
+                            <p
+                              className={`font-extrabold text-lg tracking-tight ${style.text}`}
+                            >
                               {displayDate}
                             </p>
                           </div>
                         </div>
                         {style.badge && (
-                          <Badge className={`${style.badge} border-0 text-[10px] font-bold tracking-wider shadow-none`}>
+                          <Badge
+                            className={`${style.badge} border-0 text-[10px] font-bold tracking-wider shadow-none`}
+                          >
                             {style.label}
                           </Badge>
                         )}
@@ -859,7 +928,10 @@ export default function CheckinPage() {
 
                     <div className="flex-1 text-center sm:text-left">
                       <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">
-                        {formatPatientNameWithStatus(selectedPatient.full_name, selectedPatient.next_followup_date)}
+                        {formatPatientNameWithStatus(
+                          selectedPatient.full_name,
+                          selectedPatient.next_followup_date,
+                        )}
                       </h3>
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2 mb-3">
                         <Badge className="bg-[#0d7377] hover:bg-[#0d7377] text-white font-mono px-3 py-1 rounded-md text-xs border-0">
@@ -891,7 +963,9 @@ export default function CheckinPage() {
                           Date of Birth / Age
                         </p>
                         <p className="font-bold text-slate-700 text-[15px] mt-0.5">
-                          {new Date(selectedPatient.date_of_birth).toLocaleDateString("en-IN", {
+                          {new Date(
+                            selectedPatient.date_of_birth,
+                          ).toLocaleDateString("en-IN", {
                             day: "2-digit",
                             month: "short",
                             year: "numeric",
@@ -954,45 +1028,78 @@ export default function CheckinPage() {
                     Verification Method
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant={
-                        verificationMethod === "fingerprint"
-                          ? "default"
-                          : "outline"
-                      }
-                      className={
-                        verificationMethod === "fingerprint"
-                          ? "bg-[#0d7377] hover:bg-[#0a5c5f]"
-                          : ""
-                      }
-                      onClick={() =>
-                        handleVerificationMethodChange("fingerprint")
-                      }
-                    >
-                      <Fingerprint className="h-4 w-4 mr-2" />
-                      Fingerprint (Recommended)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={
-                        verificationMethod === "photo" ? "default" : "outline"
-                      }
-                      className={
-                        verificationMethod === "photo"
-                          ? "bg-[#14919b] hover:bg-[#0f6f77]"
-                          : ""
-                      }
-                      onClick={() => handleVerificationMethodChange("photo")}
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Photo with Timestamp
-                    </Button>
+                    {ENABLE_FINGERPRINT && (
+                      <Button
+                        type="button"
+                        variant={
+                          verificationMethod === "fingerprint"
+                            ? "default"
+                            : "outline"
+                        }
+                        className={
+                          verificationMethod === "fingerprint"
+                            ? "bg-[#0d7377] hover:bg-[#0a5c5f]"
+                            : ""
+                        }
+                        onClick={() =>
+                          handleVerificationMethodChange("fingerprint")
+                        }
+                      >
+                        <Fingerprint className="h-4 w-4 mr-2" />
+                        Fingerprint
+                        {ENABLE_FINGERPRINT && !ENABLE_CAMERA
+                          ? ""
+                          : " (Recommended)"}
+                      </Button>
+                    )}
+                    {ENABLE_CAMERA && (
+                      <Button
+                        type="button"
+                        variant={
+                          verificationMethod === "photo" ? "default" : "outline"
+                        }
+                        className={
+                          verificationMethod === "photo"
+                            ? "bg-[#14919b] hover:bg-[#0f6f77]"
+                            : ""
+                        }
+                        onClick={() => handleVerificationMethodChange("photo")}
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Photo with Timestamp
+                      </Button>
+                    )}
+                    {!HAS_ANY_VERIFICATION_METHOD && (
+                      <Button
+                        type="button"
+                        variant="default"
+                        className="bg-slate-600 hover:bg-slate-700"
+                        disabled
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        Manual Verification
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 {/* Verification Section */}
-                {verificationMethod === "fingerprint" ? (
+                {verificationMethod === "manual" ? (
+                  <div className="text-center space-y-4 py-4">
+                    <div className="w-24 h-24 mx-auto rounded-full flex items-center justify-center bg-emerald-100 border-4 border-emerald-500">
+                      <CheckCircle className="h-12 w-12 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-emerald-600 text-lg">
+                        Manual Check-in
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        No biometric verification available. Confirm identity
+                        visually.
+                      </p>
+                    </div>
+                  </div>
+                ) : verificationMethod === "fingerprint" ? (
                   !biometricVerified ? (
                     <div className="text-center space-y-4 py-4">
                       <div
