@@ -66,6 +66,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { navigate } from "@/lib/navigation";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export default function RegisterPatientPage() {
   const apiErrors = useApiErrors();
@@ -905,22 +906,18 @@ export default function RegisterPatientPage() {
                           <MapPin className="h-4 w-4 text-teal-600" />
                           State
                         </Label>
-                        <Input
-                          id="state"
-                          name="state"
+                        <SearchableSelect
+                          options={stateOptions.map((s) => ({
+                            value: s.name,
+                            label: s.name,
+                          }))}
                           value={instantFormData.state}
-                          onChange={(e) =>
-                            handleAddressStateChange(e.target.value)
-                          }
-                          list="state-suggestions"
-                          placeholder="Type to search state"
+                          onValueChange={handleAddressStateChange}
+                          placeholder="Select state"
+                          searchPlaceholder="Search states…"
+                          emptyMessage="No matching state."
                           className="mt-1.5"
                         />
-                        <datalist id="state-suggestions">
-                          {stateOptions.map((state) => (
-                            <option key={state.code} value={state.name} />
-                          ))}
-                        </datalist>
                       </div>
 
                       <div>
@@ -949,25 +946,29 @@ export default function RegisterPatientPage() {
                           <MapPin className="h-4 w-4 text-teal-600" />
                           City/Village
                         </Label>
-                        <Input
-                          id="city"
-                          name="city"
+                        <SearchableSelect
+                          options={cityOptions.map((c) => ({
+                            value: c,
+                            label: c,
+                          }))}
                           value={instantFormData.city}
-                          onChange={handleInstantChange}
-                          list="city-suggestions"
+                          onValueChange={(val) =>
+                            setInstantFormData((prev) => ({
+                              ...prev,
+                              city: val,
+                            }))
+                          }
                           placeholder={
                             instantFormData.state
-                              ? "Type to search city"
+                              ? "Search or type city"
                               : "Select state first"
                           }
+                          searchPlaceholder="Search cities…"
+                          emptyMessage="No matching city."
                           disabled={!instantFormData.state}
-                          className="mt-1.5 disabled:cursor-not-allowed disabled:opacity-60"
+                          allowCustomValue
+                          className="mt-1.5"
                         />
-                        <datalist id="city-suggestions">
-                          {cityOptions.map((city) => (
-                            <option key={city} value={city} />
-                          ))}
-                        </datalist>
                       </div>
 
                       <div>
