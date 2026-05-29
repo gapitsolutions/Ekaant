@@ -577,6 +577,9 @@ export interface QueueItem {
   status: string;
   current_stage: string;
   outstanding_debt: number;
+  date_of_birth?: string;
+  gender?: string;
+  phone?: string;
 }
 
 export async function getQueueStatus(_token?: string) {

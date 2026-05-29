@@ -43,10 +43,7 @@ import {
   TrendingUp,
   Clock,
   Phone,
-  MapPin,
   FileText,
-  Eye,
-  X,
   Link,
 } from "lucide-react";
 
@@ -59,11 +56,7 @@ interface StatData {
   }>;
 }
 
-interface DashboardVisitItem extends QueueItem {
-  date_of_birth?: string;
-  gender?: "male" | "female" | "other";
-  phone?: string;
-}
+type DashboardVisitItem = QueueItem;
 
 export default function ReceptionDashboard() {
   const { accessToken } = useAuth();
@@ -74,8 +67,6 @@ export default function ReceptionDashboard() {
   );
   const [selectedStat, setSelectedStat] = useState<StatData | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [patientDetailOpen, setPatientDetailOpen] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -191,11 +182,6 @@ export default function ReceptionDashboard() {
     const data = getStatData(statType);
     setSelectedStat(data);
     setSheetOpen(true);
-  };
-
-  const handleViewPatient = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setPatientDetailOpen(true);
   };
 
   const quickActions = [
@@ -506,7 +492,6 @@ export default function ReceptionDashboard() {
                       <TableHead>Age/Gender</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -571,16 +556,6 @@ export default function ReceptionDashboard() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewPatient(patient)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -591,206 +566,6 @@ export default function ReceptionDashboard() {
         </SheetContent>
       </Sheet>
 
-      {/* Patient Detail Sheet */}
-      <Sheet open={patientDetailOpen} onOpenChange={setPatientDetailOpen}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Patient Details
-            </SheetTitle>
-            <SheetDescription>
-              Complete information for {selectedPatient?.full_name}
-            </SheetDescription>
-          </SheetHeader>
-
-          {selectedPatient && (
-            <ScrollArea className="h-[calc(100vh-120px)] mt-6">
-              <div className="space-y-6 pr-4">
-                {/* Basic Info */}
-                <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-xl font-bold text-primary">
-                      {selectedPatient.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      {selectedPatient.full_name}
-                    </h3>
-                    <p className="text-primary font-medium">
-                      {selectedPatient.file_number}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {calculateAge(selectedPatient.date_of_birth)} years,{" "}
-                      {selectedPatient.gender}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Contact Information */}
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    Contact Information
-                  </h4>
-                  <div className="grid gap-3">
-                    <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Phone</p>
-                        <p className="font-medium">{selectedPatient.phone}</p>
-                      </div>
-                    </div>
-                    {selectedPatient.email && (
-                      <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Email</p>
-                          <p className="font-medium">{selectedPatient.email}</p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Address</p>
-                        <p className="font-medium">
-                          {selectedPatient.address}, {selectedPatient.city},{" "}
-                          {selectedPatient.state} - {selectedPatient.pincode}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Medical Information */}
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    Medical Information
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        Blood Group
-                      </p>
-                      <p className="font-medium">
-                        {selectedPatient.blood_group || "Not specified"}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        Addiction Type
-                      </p>
-                      <p className="font-medium capitalize">
-                        {selectedPatient.addiction_type}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        Addiction Duration
-                      </p>
-                      <p className="font-medium">
-                        {selectedPatient.addiction_duration}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        First Visit
-                      </p>
-                      <p className="font-medium">
-                        {new Date(
-                          selectedPatient.first_visit_date,
-                        ).toLocaleDateString("en-IN")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Emergency Contact */}
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    Emergency Contact
-                  </h4>
-                  <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg">
-                    <p className="font-medium">
-                      {selectedPatient.emergency_contact_name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedPatient.emergency_contact_relation}
-                    </p>
-                    <p className="text-sm font-medium text-rose-600 mt-1">
-                      {selectedPatient.emergency_contact_phone}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Medical History */}
-                {(selectedPatient.medical_history ||
-                  selectedPatient.allergies ||
-                  selectedPatient.family_history) && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                      Medical History
-                    </h4>
-                    <div className="space-y-3">
-                      {selectedPatient.medical_history && (
-                        <div className="p-3 bg-muted/30 rounded-lg">
-                          <p className="text-sm text-muted-foreground">
-                            Medical History
-                          </p>
-                          <p className="font-medium">
-                            {selectedPatient.medical_history}
-                          </p>
-                        </div>
-                      )}
-                      {selectedPatient.allergies && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-sm text-amber-600">Allergies</p>
-                          <p className="font-medium text-amber-800">
-                            {selectedPatient.allergies}
-                          </p>
-                        </div>
-                      )}
-                      {selectedPatient.family_history && (
-                        <div className="p-3 bg-muted/30 rounded-lg">
-                          <p className="text-sm text-muted-foreground">
-                            Family History
-                          </p>
-                          <p className="font-medium">
-                            {selectedPatient.family_history}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t">
-                  <Button asChild className="flex-1">
-                    <span
-                      onClick={() => navigate("/reception/patients")}
-                      className="cursor-pointer"
-                    >
-                      Edit Patient
-                    </span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setPatientDetailOpen(false)}
-                  >
-                    Close
-                  </Button>
-                </div>
-              </div>
-            </ScrollArea>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

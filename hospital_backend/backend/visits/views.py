@@ -153,18 +153,22 @@ def _report_patient_payload(patient: Patient):
 
 
 def _queue_item_payload(session: VisitSession):
+    patient = session.patient
     return {
         "session_id": str(session.pk),
         "patient_id": str(session.patient_id),
-        "patient_name": session.patient.full_name,
+        "patient_name": patient.full_name,
         "file_number": session.file_number,
         "checked_in_at": session.checkin_time,
         "checked_in_by_name": session.checked_in_by.full_name,
         "status": session.status,
         "current_stage": session.current_stage,
         "outstanding_debt": session.outstanding_debt_at_checkin,
+        "date_of_birth": str(patient.date_of_birth) if patient.date_of_birth else None,
+        "gender": patient.sex,
+        "phone": patient.phone_number or "",
         "patient": {
-            "file_number": session.patient.file_number,
+            "file_number": patient.file_number,
         },
     }
 
