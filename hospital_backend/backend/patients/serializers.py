@@ -21,6 +21,35 @@ MAX_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_PHOTO_MIME_TYPES = {"image/jpeg", "image/png"}
 
 
+def _decode_photo_payload(payload: str) -> bytes:
+    """Decode and validate a base64-encoded photo payload.
+
+    Shared by ``PatientRegistrationSerializer`` and
+    ``PatientGeneralUpdateSerializer``.
+    """
+    compact_payload = "".join(payload.split())
+    if not compact_payload:
+        raise serializers.ValidationError("Invalid photo_base64 payload")
+
+    # Base64 overhead is roughly 4/3. This avoids decoding unexpectedly huge payloads.
+    max_encoded_chars = ((MAX_PHOTO_BYTES * 4) // 3) + 8
+    if len(compact_payload) > max_encoded_chars:
+        raise serializers.ValidationError("Photo exceeds maximum allowed size (2 MB)")
+
+    try:
+        decoded = base64.b64decode(compact_payload, validate=True)
+    except (binascii.Error, ValueError):
+        raise serializers.ValidationError("Invalid photo_base64 payload")
+
+    if not decoded:
+        raise serializers.ValidationError("Invalid photo_base64 payload")
+
+    if len(decoded) > MAX_PHOTO_BYTES:
+        raise serializers.ValidationError("Photo exceeds maximum allowed size (2 MB)")
+
+    return decoded
+
+
 def _photo_url_for_patient(patient, request=None):
     if not getattr(patient, "photo", None):
         return None
@@ -74,32 +103,9 @@ class PatientRegistrationSerializer(serializers.Serializer):
             )
 
         if photo_base64:
-            attrs["_decoded_photo"] = self._decode_photo_payload(photo_base64)
+            attrs["_decoded_photo"] = _decode_photo_payload(photo_base64)
 
         return attrs
-
-    def _decode_photo_payload(self, payload: str) -> bytes:
-        compact_payload = "".join(payload.split())
-        if not compact_payload:
-            raise serializers.ValidationError("Invalid photo_base64 payload")
-
-        # Base64 overhead is roughly 4/3. This avoids decoding unexpectedly huge payloads.
-        max_encoded_chars = ((MAX_PHOTO_BYTES * 4) // 3) + 8
-        if len(compact_payload) > max_encoded_chars:
-            raise serializers.ValidationError("Photo exceeds maximum allowed size (2 MB)")
-
-        try:
-            decoded = base64.b64decode(compact_payload, validate=True)
-        except (binascii.Error, ValueError):
-            raise serializers.ValidationError("Invalid photo_base64 payload")
-
-        if not decoded:
-            raise serializers.ValidationError("Invalid photo_base64 payload")
-
-        if len(decoded) > MAX_PHOTO_BYTES:
-            raise serializers.ValidationError("Photo exceeds maximum allowed size (2 MB)")
-
-        return decoded
 
     def validate_date_of_birth(self, value):
         if value > timezone.localdate():
@@ -380,6 +386,21 @@ class PatientGeneralDataSerializer(serializers.ModelSerializer):
 
 
 class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
+    # Photo fields — same contract as PatientRegistrationSerializer.
+    # They are write-only and never part of the ModelSerializer's Meta.fields
+    # because the underlying model field is an ImageField, not a CharField.
+    photo_base64 = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        write_only=True,
+    )
+    photo_mime_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        write_only=True,
+    )
+
     class Meta:
         model = Patient
         fields = (
@@ -439,7 +460,33 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
             "first_visit_date",
             "fingerprint_template",
             "fingerprint_template_key_version",
+            # photo_base64 / photo_mime_type are declared as explicit fields
+            # above (write_only) so DRF picks them up even though they aren't
+            # model columns.
+            "photo_base64",
+            "photo_mime_type",
         )
+
+    def validate(self, attrs):
+        photo_base64 = attrs.get("photo_base64", "")
+        photo_mime_type = (attrs.get("photo_mime_type") or "").strip().lower()
+        if photo_mime_type:
+            attrs["photo_mime_type"] = photo_mime_type
+
+        if bool(photo_base64) != bool(photo_mime_type):
+            raise serializers.ValidationError(
+                "photo_base64 and photo_mime_type must be provided together"
+            )
+
+        if photo_mime_type and photo_mime_type not in ALLOWED_PHOTO_MIME_TYPES:
+            raise serializers.ValidationError(
+                "Unsupported photo_mime_type. Allowed: image/jpeg, image/png"
+            )
+
+        if photo_base64:
+            attrs["_decoded_photo"] = _decode_photo_payload(photo_base64)
+
+        return attrs
 
     def validate_date_of_birth(self, value):
         if value > timezone.localdate():
@@ -476,6 +523,12 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
         return digits
 
     def update(self, instance, validated_data):
+        # --- photo handling ---
+        photo_bytes = validated_data.pop("_decoded_photo", None)
+        photo_mime_type = validated_data.pop("photo_mime_type", None)
+        validated_data.pop("photo_base64", None)
+
+        # --- fingerprint handling ---
         has_fingerprint_update = "fingerprint_template" in validated_data
         fingerprint_template = validated_data.get("fingerprint_template") if has_fingerprint_update else None
 
@@ -484,7 +537,27 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
                 timezone.now() if fingerprint_template else None
             )
 
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+
+        # Save new photo (replaces existing file on disk).
+        if photo_bytes and photo_mime_type:
+            old_photo_name = instance.photo.name if instance.photo else None
+            storage = instance.photo.storage
+
+            extension = "jpg" if photo_mime_type == "image/jpeg" else "png"
+            timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+            filename = f"profile_{timestamp}.{extension}"
+            instance.photo.save(filename, ContentFile(photo_bytes), save=False)
+            instance.save(update_fields=["photo", "updated_at"])
+
+            # Remove the old file so orphaned images don't accumulate.
+            if old_photo_name and old_photo_name != instance.photo.name:
+                try:
+                    storage.delete(old_photo_name)
+                except Exception:
+                    pass  # best-effort cleanup
+
+        return instance
 
 
 class PatientFollowUpDateUpdateSerializer(serializers.Serializer):

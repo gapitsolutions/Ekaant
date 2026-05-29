@@ -36,7 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
+import {
+  MultiSelect,
+  type MultiSelectOption,
+} from "@/components/ui/multi-select";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +81,7 @@ import {
   Activity,
   Download,
   Filter,
+  Camera,
   RotateCcw,
   Loader2,
   Trash2,
@@ -105,6 +109,10 @@ import {
   RELIGION_OPTIONS,
   NATIONALITY_OPTIONS,
 } from "@/lib/types";
+import {
+  PhotoCaptureDialog,
+  type CapturedPhoto,
+} from "@/components/photo-capture-dialog";
 
 export default function PatientDataPage() {
   const { accessToken } = useAuth();
@@ -148,6 +156,8 @@ export default function PatientDataPage() {
   const [isDeletePatientConfirmOpen, setIsDeletePatientConfirmOpen] =
     useState(false);
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
+  const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false);
+  const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
@@ -566,7 +576,7 @@ export default function PatientDataPage() {
     }
     // We only re-run on state-set changes; ``filterDistrict`` is intentionally
     // omitted to avoid a toggle loop when the user checks a district below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    /// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterState, filterDistrictOptions]);
 
   // Sort current server-filtered page
@@ -574,9 +584,7 @@ export default function PatientDataPage() {
     const result = [...patients];
 
     result.sort((a, b) => {
-      const comparison = a.file_number.localeCompare(
-        b.file_number,
-      );
+      const comparison = a.file_number.localeCompare(b.file_number);
       return sortOrder === "asc" ? comparison : -comparison;
     });
 
@@ -889,6 +897,33 @@ export default function PatientDataPage() {
     }
   };
 
+  const handlePhotoConfirm = async (photo: CapturedPhoto) => {
+    if (!selectedPatient || !accessToken) return;
+
+    setIsUpdatingPhoto(true);
+    try {
+      const updated = await updatePatientProfile(
+        accessToken,
+        selectedPatient.id,
+        {
+          photo_base64: photo.base64,
+          photo_mime_type: photo.mimeType,
+        },
+      );
+      const mapped = mapPatientDetail(updated);
+
+      setLoadedPatientDetails((prev) => ({ ...prev, [mapped.id]: mapped }));
+      setSelectedPatient(mapped);
+      syncPatientInLists(mapped);
+
+      toast.success("Patient photo updated successfully");
+    } catch {
+      toast.error("Failed to update patient photo. Please try again.");
+    } finally {
+      setIsUpdatingPhoto(false);
+    }
+  };
+
   const handleDeletePatient = async () => {
     if (!selectedPatient || !accessToken) return;
 
@@ -1099,6 +1134,18 @@ export default function PatientDataPage() {
               {isUpdatingFingerprint ? "Updating..." : "Update Fingerprint"}
             </Button>
             <Button
+              variant="outline"
+              onClick={() => setIsPhotoCaptureOpen(true)}
+              disabled={isLoadingPatientDetail || isUpdatingPhoto}
+            >
+              {isUpdatingPhoto ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4 mr-2" />
+              )}
+              {isUpdatingPhoto ? "Updating..." : "Update Photo"}
+            </Button>
+            <Button
               variant="destructive"
               onClick={() => setIsDeletePatientConfirmOpen(true)}
               disabled={isDeletingPatient || isLoadingPatientDetail}
@@ -1218,6 +1265,14 @@ export default function PatientDataPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <PhotoCaptureDialog
+          open={isPhotoCaptureOpen}
+          onOpenChange={setIsPhotoCaptureOpen}
+          onConfirm={handlePhotoConfirm}
+          title="Update Patient Photo"
+          description={`Capture a new photo for ${selectedPatient.full_name} (${selectedPatient.file_number}).`}
+        />
 
         <Dialog
           open={isDeletePatientConfirmOpen}
@@ -1852,10 +1907,7 @@ export default function PatientDataPage() {
                           <Input
                             value={editingPatient.file_number}
                             onChange={(e) =>
-                              handleEditChange(
-                                "file_number",
-                                e.target.value,
-                              )
+                              handleEditChange("file_number", e.target.value)
                             }
                             className="font-mono"
                           />
@@ -2554,9 +2606,7 @@ export default function PatientDataPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[#0d7377]">
-            Patient Data
-          </h1>
+          <h1 className="text-3xl font-bold text-[#0d7377]">Patient Data</h1>
           <p className="text-muted-foreground">
             Click on any patient to view their complete profile and visit
             history
@@ -2630,7 +2680,9 @@ export default function PatientDataPage() {
           {showFilters && (
             <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Filter Options</h4>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+                  Filter Options
+                </h4>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2643,7 +2695,9 @@ export default function PatientDataPage() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
-                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">State</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">
+                    State
+                  </Label>
                   <MultiSelect
                     options={filterStateOptions.map<MultiSelectOption>((s) => ({
                       value: s,
@@ -2658,12 +2712,16 @@ export default function PatientDataPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">District</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">
+                    District
+                  </Label>
                   <MultiSelect
-                    options={filterDistrictOptions.map<MultiSelectOption>((d) => ({
-                      value: d,
-                      label: d,
-                    }))}
+                    options={filterDistrictOptions.map<MultiSelectOption>(
+                      (d) => ({
+                        value: d,
+                        label: d,
+                      }),
+                    )}
                     value={filterDistrict}
                     onChange={setFilterDistrict}
                     // No cascade gate: with the option list sourced from the
@@ -2686,7 +2744,9 @@ export default function PatientDataPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Addiction Type</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">
+                    Addiction Type
+                  </Label>
                   <MultiSelect
                     // Closed enum from patients/models.py::AddictionType.
                     options={[
@@ -2704,7 +2764,9 @@ export default function PatientDataPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Reg. Date From</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">
+                    Reg. Date From
+                  </Label>
                   <Input
                     type="date"
                     value={filterDateFrom}
@@ -2713,7 +2775,9 @@ export default function PatientDataPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">Reg. Date To</Label>
+                  <Label className="text-xs text-slate-500 font-bold mb-1.5 block">
+                    Reg. Date To
+                  </Label>
                   <Input
                     type="date"
                     value={filterDateTo}
@@ -2792,12 +2856,20 @@ export default function PatientDataPage() {
 
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-100">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">File No:</span>
-                          <span className="text-xs font-mono font-bold text-[#0d7377]">{patient.file_number}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                            File No:
+                          </span>
+                          <span className="text-xs font-mono font-bold text-[#0d7377]">
+                            {patient.file_number}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-100">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">HDAMS:</span>
-                          <span className="text-xs font-mono font-bold text-[#14919b]">{patient.hdams_id || "N/A"}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                            HDAMS:
+                          </span>
+                          <span className="text-xs font-mono font-bold text-[#14919b]">
+                            {patient.hdams_id || "N/A"}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -2805,20 +2877,37 @@ export default function PatientDataPage() {
                     {/* Bottom Grid: Patient Details */}
                     <div className="grid grid-cols-2 gap-y-3 gap-x-12 mt-4">
                       <div className="flex items-center gap-3 text-slate-600">
-                        <div className="w-8 flex justify-center"><Phone className="h-4 w-4 text-[#0d7377]" /></div>
-                        <span className="text-sm font-bold text-slate-700">{patient.phone || "N/A"}</span>
+                        <div className="w-8 flex justify-center">
+                          <Phone className="h-4 w-4 text-[#0d7377]" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">
+                          {patient.phone || "N/A"}
+                        </span>
                       </div>
                       <div className="flex items-center gap-3 text-slate-600">
-                        <div className="w-8 flex justify-center"><Calendar className="h-4 w-4 text-slate-400" /></div>
-                        <span className="text-sm font-medium">{getAge(patient.date_of_birth)} yrs / {patient.gender?.charAt(0).toUpperCase()}</span>
+                        <div className="w-8 flex justify-center">
+                          <Calendar className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <span className="text-sm font-medium">
+                          {getAge(patient.date_of_birth)} yrs /{" "}
+                          {patient.gender?.charAt(0).toUpperCase()}
+                        </span>
                       </div>
                       <div className="flex items-start gap-3 text-slate-600">
-                        <div className="w-8 flex justify-center mt-0.5"><MapPin className="h-4 w-4 text-slate-400" /></div>
-                        <span className="text-sm font-medium line-clamp-1">{patient.address || "N/A"}</span>
+                        <div className="w-8 flex justify-center mt-0.5">
+                          <MapPin className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <span className="text-sm font-medium line-clamp-1">
+                          {patient.address || "N/A"}
+                        </span>
                       </div>
                       <div className="flex items-center gap-3 text-slate-600">
-                        <div className="w-8 flex justify-center"><Droplet className="h-4 w-4 text-slate-400" /></div>
-                        <span className="text-sm font-medium capitalize">{patient.addiction_type || "N/A"}</span>
+                        <div className="w-8 flex justify-center">
+                          <Droplet className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <span className="text-sm font-medium capitalize">
+                          {patient.addiction_type || "N/A"}
+                        </span>
                       </div>
                     </div>
                   </div>

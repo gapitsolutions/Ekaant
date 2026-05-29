@@ -268,6 +268,8 @@ export interface PatientProfileUpdatePayload {
   first_visit_date?: string;
   fingerprint_template?: string;
   fingerprint_template_key_version?: string;
+  photo_base64?: string;
+  photo_mime_type?: string;
 }
 
 function unwrapNestedData<T>(
