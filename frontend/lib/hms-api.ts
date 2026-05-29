@@ -1,5 +1,6 @@
 import { apiRequest } from "./api-client";
 import type { PatientCategory, PatientStatus } from "./types";
+import type { VerificationMethod } from "./verification-methods";
 
 export interface AuthUser {
   id: string;
@@ -107,13 +108,13 @@ export interface CheckinResponse {
   current_stage?: "completed";
   completed_at?: string;
   outstanding_debt_at_checkin: number;
-  verification_method?: "fingerprint" | "photo" | "manual";
+  verification_method?: VerificationMethod;
   verification_photo_captured_at?: string;
 }
 
 export interface CheckinRequestPayload {
   patient_id: string;
-  verification_method?: "fingerprint" | "photo" | "manual";
+  verification_method?: VerificationMethod;
   verification_photo_base64?: string;
   verification_photo_mime_type?: string;
   verification_photo_captured_at?: string;
@@ -589,7 +590,8 @@ export async function getQueueStatus(_token?: string) {
   );
 }
 
-export type CheckinHistoryVerificationMethod = "fingerprint" | "photo";
+/** Re-exported from the single source of truth. */
+export type CheckinHistoryVerificationMethod = VerificationMethod;
 
 export interface CheckinHistoryPatientSnapshot {
   file_number: string;

@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, Loader2, Search, Trash2, Camera, ShieldCheck, RotateCcw, Calendar, RefreshCw } from "lucide-react";
+import { Eye, Loader2, Search, Trash2, RotateCcw, Calendar, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   deleteReceptionCheckinHistoryVisit,
@@ -44,6 +44,10 @@ import {
   type CheckinHistoryItem,
   type CheckinHistoryVerificationMethod,
 } from "@/lib/hms-api";
+import {
+  ALL_VERIFICATION_METHODS,
+  getMethodMeta,
+} from "@/lib/verification-methods";
 import { useAuth } from "@/lib/auth-context";
 
 export default function ReceptionQueuePage() {
@@ -212,16 +216,13 @@ export default function ReceptionQueuePage() {
   const pageEnd = Math.min(page * pageSize, pagination.total || 0);
 
   const verificationCounts = useMemo(() => {
-    let fingerprint = 0;
-    let photo = 0;
-    historyItems.forEach((item) => {
-      if (item.verification_method === "photo") {
-        photo += 1;
-      } else {
-        fingerprint += 1;
-      }
-    });
-    return { fingerprint, photo };
+    const counts: Record<string, number> = {};
+    for (const m of ALL_VERIFICATION_METHODS) counts[m] = 0;
+    for (const item of historyItems) {
+      counts[item.verification_method] =
+        (counts[item.verification_method] ?? 0) + 1;
+    }
+    return counts;
   }, [historyItems]);
 
   const formatTime = (value?: string | null) => {
@@ -310,7 +311,8 @@ export default function ReceptionQueuePage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* 1 total-records card + 1 card per verification method */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="border-none shadow-sm bg-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">Total Records</CardTitle>
@@ -322,32 +324,26 @@ export default function ReceptionQueuePage() {
             </p>
           </CardContent>
         </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
-              Fingerprint Verified
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-slate-800">
-              {verificationCounts.fingerprint}
-            </p>
-            <p className="text-muted-foreground text-xs mt-1">Current page count</p>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Camera className="h-4 w-4 text-purple-600" />
-              Photo Verified
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-slate-800">{verificationCounts.photo}</p>
-            <p className="text-muted-foreground text-xs mt-1">Current page count</p>
-          </CardContent>
-        </Card>
+        {ALL_VERIFICATION_METHODS.map((method) => {
+          const meta = getMethodMeta(method);
+          const Icon = meta.icon;
+          return (
+            <Card key={method} className="border-none shadow-sm bg-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                  <Icon className={cn("h-4 w-4", meta.iconColor)} />
+                  {meta.label} Verified
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-slate-800">
+                  {verificationCounts[method] ?? 0}
+                </p>
+                <p className="text-muted-foreground text-xs mt-1">Current page count</p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <Card className="border-none shadow-sm bg-white">
@@ -376,8 +372,11 @@ export default function ReceptionQueuePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Methods</SelectItem>
-                <SelectItem value="fingerprint">Fingerprint</SelectItem>
-                <SelectItem value="photo">Photo</SelectItem>
+                {ALL_VERIFICATION_METHODS.map((method) => (
+                  <SelectItem key={method} value={method}>
+                    {getMethodMeta(method).label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select
@@ -542,19 +541,19 @@ export default function ReceptionQueuePage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {visit.verification_method === "photo" ? (
-                            <div className="flex items-center gap-1.5 bg-purple-50 text-purple-700 px-2 py-1 rounded-md border border-purple-100 text-xs font-bold">
-                              <Camera className="h-3 w-3" />
-                              Photo
+                        {(() => {
+                          const meta = getMethodMeta(visit.verification_method);
+                          const Icon = meta.icon;
+                          return (
+                            <div className={cn(
+                              "inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-bold",
+                              meta.badgeBg, meta.badgeText, meta.badgeBorder,
+                            )}>
+                              <Icon className="h-3 w-3" />
+                              {meta.label}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-100 text-xs font-bold">
-                              <ShieldCheck className="h-3 w-3" />
-                              Fingerprint
-                            </div>
-                          )}
-                        </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -761,63 +760,66 @@ export default function ReceptionQueuePage() {
                                     </div>
                                   </div>
 
-                                  <div className="rounded-lg border p-4 space-y-3">
-                                    <h4 className="font-semibold text-sm">
-                                      Verification
-                                    </h4>
-                                    <div className="space-y-2 text-sm">
-                                      <p>
-                                        <span className="text-muted-foreground">
-                                          Method:
-                                        </span>{" "}
-                                        <span className="font-medium capitalize">
-                                          {selectedVisit.verification_method}
-                                        </span>
-                                      </p>
-                                      <p>
-                                        <span className="text-muted-foreground">
-                                          Captured At:
-                                        </span>{" "}
-                                        <span className="font-medium">
-                                          {formatDate(
-                                            selectedVisit.verification_photo_captured_at,
-                                          )}{" "}
-                                          {formatTime(
-                                            selectedVisit.verification_photo_captured_at,
-                                          )}
-                                        </span>
-                                      </p>
-                                    </div>
-
-                                    {selectedVisit.verification_method ===
-                                    "photo" ? (
-                                      selectedVisit.verification_photo_available &&
-                                      selectedVisit.verification_photo_url ? (
-                                        <div className="space-y-2">
-                                          <p className="text-xs text-muted-foreground">
-                                            Secure verification photo
+                                  {(() => {
+                                    const meta = getMethodMeta(selectedVisit.verification_method);
+                                    const Icon = meta.icon;
+                                    return (
+                                      <div className="rounded-lg border p-4 space-y-3">
+                                        <h4 className="font-semibold text-sm">
+                                          Verification
+                                        </h4>
+                                        <div className="space-y-2 text-sm">
+                                          <p className="flex items-center gap-2">
+                                            <span className="text-muted-foreground">
+                                              Method:
+                                            </span>
+                                            <span className={cn(
+                                              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs font-bold",
+                                              meta.badgeBg, meta.badgeText, meta.badgeBorder,
+                                            )}>
+                                              <Icon className="h-3 w-3" />
+                                              {meta.label}
+                                            </span>
                                           </p>
-                                          <img
-                                            src={
-                                              selectedVisit.verification_photo_url
-                                            }
-                                            alt="Verification photo"
-                                            className="w-full rounded-md border object-cover max-h-72"
-                                          />
+                                          {selectedVisit.verification_photo_captured_at && (
+                                            <p>
+                                              <span className="text-muted-foreground">
+                                                Captured At:
+                                              </span>{" "}
+                                              <span className="font-medium">
+                                                {formatDate(selectedVisit.verification_photo_captured_at)}{" "}
+                                                {formatTime(selectedVisit.verification_photo_captured_at)}
+                                              </span>
+                                            </p>
+                                          )}
                                         </div>
-                                      ) : (
-                                        <p className="text-sm text-muted-foreground">
-                                          Verification photo is not available
-                                          for this record.
-                                        </p>
-                                      )
-                                    ) : (
-                                      <p className="text-sm text-muted-foreground">
-                                        Fingerprint verification was used for
-                                        this visit.
-                                      </p>
-                                    )}
-                                  </div>
+
+                                        {selectedVisit.verification_method === "photo" ? (
+                                          selectedVisit.verification_photo_available &&
+                                          selectedVisit.verification_photo_url ? (
+                                            <div className="space-y-2">
+                                              <p className="text-xs text-muted-foreground">
+                                                Secure verification photo
+                                              </p>
+                                              <img
+                                                src={selectedVisit.verification_photo_url}
+                                                alt="Verification photo"
+                                                className="w-full rounded-md border object-cover max-h-72"
+                                              />
+                                            </div>
+                                          ) : (
+                                            <p className="text-sm text-muted-foreground">
+                                              Verification photo is not available for this record.
+                                            </p>
+                                          )
+                                        ) : (
+                                          <p className="text-sm text-muted-foreground">
+                                            {meta.detailText}
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </SheetContent>

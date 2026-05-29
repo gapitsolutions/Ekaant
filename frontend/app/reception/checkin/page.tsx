@@ -39,6 +39,7 @@ import {
   HAS_ANY_VERIFICATION_METHOD,
   DEFAULT_CHECKIN_VERIFICATION_METHOD,
 } from "@/lib/feature-flags";
+import type { VerificationMethod } from "@/lib/verification-methods";
 import { navigate } from "@/lib/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { toastApiError } from "@/lib/api-errors";
@@ -153,9 +154,9 @@ export default function CheckinPage() {
   );
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [biometricVerified, setBiometricVerified] = useState(false);
-  const [verificationMethod, setVerificationMethod] = useState<
-    "fingerprint" | "photo" | "manual"
-  >(DEFAULT_CHECKIN_VERIFICATION_METHOD);
+  const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>(
+    DEFAULT_CHECKIN_VERIFICATION_METHOD,
+  );
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isCameraPickerOpen, setIsCameraPickerOpen] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>(
@@ -438,9 +439,7 @@ export default function CheckinPage() {
     );
   };
 
-  const handleVerificationMethodChange = (
-    method: "fingerprint" | "photo" | "manual",
-  ) => {
+  const handleVerificationMethodChange = (method: VerificationMethod) => {
     setVerificationMethod(method);
     setBiometricVerified(false);
     resetPhotoCapture();

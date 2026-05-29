@@ -17,6 +17,8 @@
  *   NEXT_PUBLIC_CAMERA_REQUIRED      – block registration without photo
  */
 
+import type { VerificationMethod } from "./verification-methods";
+
 function parseBool(raw: string | undefined, fallback: boolean): boolean {
   if (raw === undefined || raw === "") return fallback;
   return raw.toLowerCase() === "true" || raw === "1";
@@ -65,5 +67,5 @@ export const HAS_ANY_VERIFICATION_METHOD =
  * The default verification method for check-in, based on what's enabled.
  * Falls back to "manual" when neither fingerprint nor camera is available.
  */
-export const DEFAULT_CHECKIN_VERIFICATION_METHOD: "fingerprint" | "photo" | "manual" =
+export const DEFAULT_CHECKIN_VERIFICATION_METHOD: VerificationMethod =
   ENABLE_FINGERPRINT ? "fingerprint" : ENABLE_CAMERA ? "photo" : "manual";
