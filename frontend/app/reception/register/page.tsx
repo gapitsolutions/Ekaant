@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -14,14 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-// Generate registration number locally
+  PhotoCaptureDialog,
+  type CapturedPhoto,
+} from "@/components/photo-capture-dialog";
 // File numbers are entered by the receptionist (e.g. "A1", "A2", ...) and
 // validated for uniqueness server-side. There is no auto-generation.
 const FILE_NUMBER_REGEX = /^[A-Za-z0-9-]+$/;
@@ -81,17 +76,7 @@ export default function RegisterPatientPage() {
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [newRegistrationNumber, setNewRegistrationNumber] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isCameraPickerOpen, setIsCameraPickerOpen] = useState(false);
-  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>(
-    [],
-  );
-  const [selectedCameraId, setSelectedCameraId] = useState("");
-  const [isLoadingCameras, setIsLoadingCameras] = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false);
 
   // Instant registration form data
   const [instantFormData, setInstantFormData] = useState({
@@ -198,144 +183,15 @@ export default function RegisterPatientPage() {
     setIsCapturingFingerprint(false);
   };
 
-  const parsePhotoDataUrl = (
-    dataUrl: string,
-  ): { mimeType: string; base64: string } | null => {
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) {
-      return null;
-    }
-    return {
-      mimeType: match[1],
-      base64: match[2],
-    };
-  };
-
-  const openCameraPicker = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.error("Camera is not supported in this browser.");
-      return;
-    }
-
-    setIsLoadingCameras(true);
-    try {
-      // Prompt permission once so device labels become available.
-      const tempStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
-      tempStream.getTracks().forEach((track) => track.stop());
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cameras = devices.filter((d) => d.kind === "videoinput");
-
-      if (cameras.length === 0) {
-        toast.error("No camera devices detected.");
-        return;
-      }
-
-      setAvailableCameras(cameras);
-      setSelectedCameraId((prev) => {
-        if (prev && cameras.some((camera) => camera.deviceId === prev)) {
-          return prev;
-        }
-        return cameras[0].deviceId;
-      });
-      setIsCameraPickerOpen(true);
-    } catch {
-      toast.error("Unable to access camera. Please check permissions.");
-    } finally {
-      setIsLoadingCameras(false);
-    }
-  };
-
-  // Camera functions
-  const startCamera = async (deviceId?: string) => {
-    try {
-      stopCamera();
-      setIsCameraReady(false);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: 640, height: 480 }
-          : { facingMode: "user", width: 640, height: 480 },
-      });
-      streamRef.current = stream;
-      setIsCameraOpen(true);
-      setIsCameraPickerOpen(false);
-    } catch {
-      toast.error("Unable to access camera. Please check permissions.");
-    }
-  };
-
-  const stopCamera = () => {
-    setIsCameraReady(false);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOpen(false);
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      if (!isCameraReady || video.videoWidth === 0 || video.videoHeight === 0) {
-        toast.error(
-          "Camera is still loading. Please wait a moment and try again.",
-        );
-        return;
-      }
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-        setPhotoPreview(dataUrl);
-        setInstantFormData((prev) => ({ ...prev, photo: dataUrl }));
-        stopCamera();
-        toast.success("Photo captured successfully!");
-      }
-    }
+  const handlePhotoCaptured = (photo: CapturedPhoto) => {
+    setPhotoPreview(photo.dataUrl);
+    setInstantFormData((prev) => ({ ...prev, photo: photo.dataUrl }));
   };
 
   const removePhoto = () => {
     setPhotoPreview(null);
     setInstantFormData((prev) => ({ ...prev, photo: "" }));
   };
-
-  // Cleanup camera on unmount
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
-
-  // Attach stream only after the <video> element is mounted.
-  useEffect(() => {
-    if (!isCameraOpen || !videoRef.current || !streamRef.current) {
-      return;
-    }
-
-    const video = videoRef.current;
-    video.srcObject = streamRef.current;
-
-    const markReady = () => setIsCameraReady(true);
-    video.addEventListener("loadedmetadata", markReady);
-    void video
-      .play()
-      .then(markReady)
-      .catch(() => undefined);
-
-    return () => {
-      video.removeEventListener("loadedmetadata", markReady);
-    };
-  }, [isCameraOpen]);
 
   const handleInstantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,8 +263,11 @@ export default function RegisterPatientPage() {
       return;
     }
 
-    const parsedPhoto = instantFormData.photo
-      ? parsePhotoDataUrl(instantFormData.photo)
+    const photoMatch = instantFormData.photo
+      ? instantFormData.photo.match(/^data:([^;]+);base64,(.+)$/)
+      : null;
+    const parsedPhoto = photoMatch
+      ? { mimeType: photoMatch[1], base64: photoMatch[2] }
       : null;
 
     setIsSubmitting(true);
@@ -1090,7 +949,7 @@ export default function RegisterPatientPage() {
                       Patient Photo{CAMERA_REQUIRED && <span className="text-destructive">*</span>}
                     </Label>
 
-                    {!isCameraOpen && !photoPreview && (
+                    {!photoPreview ? (
                       <div className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-8 text-center">
                         <Camera className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
                         <p className="text-sm text-muted-foreground mb-4">
@@ -1099,55 +958,13 @@ export default function RegisterPatientPage() {
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => void openCameraPicker()}
-                          disabled={isLoadingCameras}
+                          onClick={() => setIsPhotoCaptureOpen(true)}
                         >
-                          {isLoadingCameras ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Camera className="h-4 w-4 mr-2" />
-                          )}
-                          Select Camera
+                          <Camera className="h-4 w-4 mr-2" />
+                          Capture Photo
                         </Button>
                       </div>
-                    )}
-
-                    {isCameraOpen && (
-                      <div className="space-y-3">
-                        <div className="relative rounded-xl overflow-hidden bg-black">
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full aspect-[4/3] object-cover"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            onClick={capturePhoto}
-                            disabled={!isCameraReady}
-                            className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600"
-                          >
-                            <Camera className="h-4 w-4 mr-2" />
-                            {isCameraReady
-                              ? "Capture Photo"
-                              : "Loading Camera..."}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={stopCamera}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {photoPreview && (
+                    ) : (
                       <div className="space-y-3">
                         <div className="relative rounded-xl overflow-hidden">
                           <img
@@ -1162,7 +979,7 @@ export default function RegisterPatientPage() {
                               variant="secondary"
                               onClick={() => {
                                 removePhoto();
-                                void openCameraPicker();
+                                setIsPhotoCaptureOpen(true);
                               }}
                             >
                               <RefreshCw className="h-4 w-4 mr-1" />
@@ -1185,62 +1002,13 @@ export default function RegisterPatientPage() {
                       </div>
                     )}
 
-                    <Dialog
-                      open={isCameraPickerOpen}
-                      onOpenChange={setIsCameraPickerOpen}
-                    >
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Select Camera Source</DialogTitle>
-                          <DialogDescription>
-                            Choose which connected camera to use for patient
-                            photo capture.
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="camera-source">
-                            Available Cameras
-                          </Label>
-                          <select
-                            id="camera-source"
-                            value={selectedCameraId}
-                            onChange={(e) =>
-                              setSelectedCameraId(e.target.value)
-                            }
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          >
-                            {availableCameras.map((camera, index) => (
-                              <option
-                                key={camera.deviceId}
-                                value={camera.deviceId}
-                              >
-                                {camera.label || `Camera ${index + 1}`}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <DialogFooter>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsCameraPickerOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => void startCamera(selectedCameraId)}
-                            disabled={!selectedCameraId}
-                          >
-                            Open Selected Camera
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    <canvas ref={canvasRef} className="hidden" />
+                    <PhotoCaptureDialog
+                      open={isPhotoCaptureOpen}
+                      onOpenChange={setIsPhotoCaptureOpen}
+                      onConfirm={handlePhotoCaptured}
+                      title="Patient Photo"
+                      description="Capture a photo for the patient profile."
+                    />
                   </div>
                   )}
 

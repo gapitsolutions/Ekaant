@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -14,13 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  PhotoCaptureDialog,
+  type CapturedPhoto,
+} from "@/components/photo-capture-dialog";
 import {
   checkinPatient,
   getPatientFingerprintTemplate,
@@ -157,14 +153,7 @@ export default function CheckinPage() {
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>(
     DEFAULT_CHECKIN_VERIFICATION_METHOD,
   );
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isCameraPickerOpen, setIsCameraPickerOpen] = useState(false);
-  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>(
-    [],
-  );
-  const [selectedCameraId, setSelectedCameraId] = useState("");
-  const [isLoadingCameras, setIsLoadingCameras] = useState(false);
-  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false);
   const [checkinPhotoPreview, setCheckinPhotoPreview] = useState("");
   const [checkinPhotoBase64, setCheckinPhotoBase64] = useState("");
   const [checkinPhotoMimeType, setCheckinPhotoMimeType] =
@@ -173,9 +162,6 @@ export default function CheckinPage() {
   const [verificationStep, setVerificationStep] = useState<
     "search" | "confirm" | "verify" | "verified"
   >("search");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   const isIdentityVerified =
     verificationMethod === "manual"
@@ -196,173 +182,21 @@ export default function CheckinPage() {
     }
   }, []);
 
-  const stopCamera = () => {
-    setIsCameraReady(false);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOpen(false);
-  };
-
   const resetPhotoCapture = () => {
     setCheckinPhotoPreview("");
     setCheckinPhotoBase64("");
     setCheckinPhotoCapturedAt("");
     setCheckinPhotoMimeType("image/jpeg");
-    setIsCameraPickerOpen(false);
-    stopCamera();
+    setIsPhotoCaptureOpen(false);
   };
 
-  const openCameraPicker = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.error("Camera is not supported in this browser.");
-      return;
-    }
-
-    setIsLoadingCameras(true);
-    try {
-      const tempStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
-      tempStream.getTracks().forEach((track) => track.stop());
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cameras = devices.filter((d) => d.kind === "videoinput");
-
-      if (cameras.length === 0) {
-        toast.error("No camera devices detected.");
-        return;
-      }
-
-      setAvailableCameras(cameras);
-      setSelectedCameraId((prev) => {
-        if (prev && cameras.some((camera) => camera.deviceId === prev)) {
-          return prev;
-        }
-        return cameras[0].deviceId;
-      });
-      setIsCameraPickerOpen(true);
-    } catch {
-      toast.error("Unable to access camera. Please check permissions.");
-    } finally {
-      setIsLoadingCameras(false);
-    }
-  };
-
-  const startCamera = async (deviceId?: string) => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.error("Camera is not supported in this browser.");
-      return;
-    }
-
-    try {
-      stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: 1280, height: 720 }
-          : { facingMode: "user", width: 1280, height: 720 },
-      });
-      streamRef.current = stream;
-      setIsCameraOpen(true);
-      setIsCameraPickerOpen(false);
-      setIsCameraReady(false);
-      setVerificationStep("verify");
-    } catch {
-      toast.error("Unable to access camera. Please check permissions.");
-    }
-  };
-
-  const captureVerificationPhoto = () => {
-    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
-      toast.error("Camera is still loading. Please wait.");
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      toast.error("Could not process captured photo.");
-      return;
-    }
-
-    const capturedAt = new Date();
-    const timestampLabel = capturedAt.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const padding = Math.max(16, Math.round(canvas.width * 0.02));
-    const fontSize = Math.max(18, Math.round(canvas.width * 0.028));
-    ctx.font = `700 ${fontSize}px sans-serif`;
-    ctx.textBaseline = "bottom";
-    const text = `Captured: ${timestampLabel}`;
-    const textMetrics = ctx.measureText(text);
-    const boxHeight = fontSize + 14;
-    const boxWidth = Math.ceil(textMetrics.width) + 20;
-    const boxX = padding;
-    const boxY = canvas.height - padding - boxHeight;
-
-    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(text, boxX + 10, canvas.height - padding - 8);
-
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    const parsed = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!parsed) {
-      toast.error("Failed to prepare captured photo.");
-      return;
-    }
-
-    setCheckinPhotoPreview(dataUrl);
-    setCheckinPhotoMimeType(parsed[1]);
-    setCheckinPhotoBase64(parsed[2]);
-    setCheckinPhotoCapturedAt(capturedAt.toISOString());
+  const handleCheckinPhotoCaptured = (photo: CapturedPhoto) => {
+    setCheckinPhotoPreview(photo.dataUrl);
+    setCheckinPhotoBase64(photo.base64);
+    setCheckinPhotoMimeType(photo.mimeType);
+    setCheckinPhotoCapturedAt(photo.capturedAt);
     setVerificationStep("verified");
-    stopCamera();
-    toast.success("Photo captured with timestamp.");
   };
-
-  useEffect(() => {
-    if (!isCameraOpen || !videoRef.current || !streamRef.current) {
-      return;
-    }
-
-    const video = videoRef.current;
-    video.srcObject = streamRef.current;
-
-    const markReady = () => setIsCameraReady(true);
-    video.addEventListener("loadedmetadata", markReady);
-    void video
-      .play()
-      .then(markReady)
-      .catch(() => undefined);
-
-    return () => {
-      video.removeEventListener("loadedmetadata", markReady);
-    };
-  }, [isCameraOpen]);
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
 
   // Search patients
   const handleSearch = () => {
@@ -1159,37 +993,7 @@ export default function CheckinPage() {
                 ) : (
                   <div className="space-y-4 py-2">
                     <div className="rounded-xl border bg-white/70 p-3">
-                      {isCameraOpen ? (
-                        <div className="space-y-3">
-                          <div className="rounded-lg overflow-hidden bg-black">
-                            <video
-                              ref={videoRef}
-                              className="w-full max-h-[300px] object-cover"
-                              autoPlay
-                              playsInline
-                              muted
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              className="flex-1 bg-[#14919b] hover:bg-[#0f6f77]"
-                              onClick={captureVerificationPhoto}
-                              disabled={!isCameraReady}
-                            >
-                              <Camera className="h-4 w-4 mr-2" />
-                              Capture Photo
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={stopCamera}
-                            >
-                              Close Camera
-                            </Button>
-                          </div>
-                        </div>
-                      ) : checkinPhotoPreview ? (
+                      {checkinPhotoPreview ? (
                         <div className="space-y-3">
                           <img
                             src={checkinPhotoPreview}
@@ -1200,8 +1004,10 @@ export default function CheckinPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => void openCameraPicker()}
-                              disabled={isLoadingCameras}
+                              onClick={() => {
+                                resetPhotoCapture();
+                                setIsPhotoCaptureOpen(true);
+                              }}
                             >
                               <RefreshCw className="h-4 w-4 mr-2" />
                               Retake Photo
@@ -1227,74 +1033,22 @@ export default function CheckinPage() {
                           <Button
                             type="button"
                             className="bg-[#14919b] hover:bg-[#0f6f77]"
-                            onClick={() => void openCameraPicker()}
-                            disabled={isLoadingCameras}
+                            onClick={() => setIsPhotoCaptureOpen(true)}
                           >
-                            {isLoadingCameras ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Camera className="h-4 w-4 mr-2" />
-                            )}
-                            Select Camera
+                            <Camera className="h-4 w-4 mr-2" />
+                            Capture Photo
                           </Button>
                         </div>
                       )}
                     </div>
-                    <Dialog
-                      open={isCameraPickerOpen}
-                      onOpenChange={setIsCameraPickerOpen}
-                    >
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Select Camera Source</DialogTitle>
-                          <DialogDescription>
-                            Choose which connected camera to use for check-in
-                            photo capture.
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="checkin-camera-source">
-                            Available Cameras
-                          </Label>
-                          <select
-                            id="checkin-camera-source"
-                            value={selectedCameraId}
-                            onChange={(e) =>
-                              setSelectedCameraId(e.target.value)
-                            }
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          >
-                            {availableCameras.map((camera, index) => (
-                              <option
-                                key={camera.deviceId}
-                                value={camera.deviceId}
-                              >
-                                {camera.label || `Camera ${index + 1}`}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <DialogFooter>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsCameraPickerOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => void startCamera(selectedCameraId)}
-                            disabled={!selectedCameraId}
-                          >
-                            Open Selected Camera
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    <canvas ref={canvasRef} className="hidden" />
+                    <PhotoCaptureDialog
+                      open={isPhotoCaptureOpen}
+                      onOpenChange={setIsPhotoCaptureOpen}
+                      onConfirm={handleCheckinPhotoCaptured}
+                      addTimestamp
+                      title="Check-In Verification Photo"
+                      description="Capture a timestamped photo for check-in verification."
+                    />
                   </div>
                 )}
 

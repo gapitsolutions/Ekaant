@@ -25,6 +25,8 @@ export interface CapturedPhoto {
   mimeType: string;
   /** Full data-url for preview. */
   dataUrl: string;
+  /** ISO-8601 timestamp of when the photo was captured. */
+  capturedAt: string;
 }
 
 export interface PhotoCaptureDialogProps {
@@ -36,6 +38,11 @@ export interface PhotoCaptureDialogProps {
   title?: string;
   /** Optional description override. */
   description?: string;
+  /**
+   * When true a human-readable timestamp is burned into the bottom-left
+   * corner of the captured image.  Used by check-in verification.
+   */
+  addTimestamp?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +67,7 @@ export function PhotoCaptureDialog({
   onConfirm,
   title = "Capture Photo",
   description = "Select a camera and capture a photo.",
+  addTimestamp = false,
 }: PhotoCaptureDialogProps) {
   // ---- Camera picker state ----
   const [step, setStep] = useState<"pick" | "capture" | "preview">("pick");
@@ -77,6 +85,7 @@ export function PhotoCaptureDialog({
 
   // ---- Captured photo ----
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const capturedAtRef = useRef<string>("");
 
   // ------------------------------------------------------------------
   // Cleanup helpers
@@ -96,6 +105,7 @@ export function PhotoCaptureDialog({
     setStep("pick");
     setPhotoPreview(null);
     setIsCameraReady(false);
+    capturedAtRef.current = "";
   }, [stopStream]);
 
   // Reset everything when the dialog closes.
@@ -208,7 +218,38 @@ export function PhotoCaptureDialog({
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
+    // Optionally burn a timestamp watermark into the image.
+    if (addTimestamp) {
+      const now = new Date();
+      const label = `Captured: ${now.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })}`;
+
+      const padding = Math.max(16, Math.round(canvas.width * 0.02));
+      const fontSize = Math.max(18, Math.round(canvas.width * 0.028));
+      ctx.font = `700 ${fontSize}px sans-serif`;
+      ctx.textBaseline = "bottom";
+      const metrics = ctx.measureText(label);
+      const boxH = fontSize + 14;
+      const boxW = Math.ceil(metrics.width) + 20;
+      const boxX = padding;
+      const boxY = canvas.height - padding - boxH;
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, boxX + 10, canvas.height - padding - 8);
+    }
+
+    const dataUrl = canvas.toDataURL("image/jpeg", addTimestamp ? 0.9 : 0.8);
+    capturedAtRef.current = new Date().toISOString();
     setPhotoPreview(dataUrl);
     stopStream();
     setStep("preview");
@@ -236,6 +277,7 @@ export function PhotoCaptureDialog({
       base64: parsed.base64,
       mimeType: parsed.mimeType,
       dataUrl: photoPreview,
+      capturedAt: capturedAtRef.current,
     });
     onOpenChange(false);
   };
