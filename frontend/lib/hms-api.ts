@@ -26,6 +26,7 @@ export interface PatientLookupResponse {
   hdams_id?: string | null;
   patient_category?: PatientCategory;
   full_name: string;
+  father_name?: string | null;
   phone_number: string;
   aadhaar_number_last4?: string | null;
   phone?: string;

@@ -234,6 +234,7 @@ class PatientLookupSerializer(serializers.ModelSerializer):
             "hdams_id",
             "patient_category",
             "full_name",
+            "father_name",
             "phone_number",
             "phone",
             "date_of_birth",

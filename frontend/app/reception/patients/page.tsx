@@ -61,7 +61,6 @@ import {
   Edit,
   ArrowUpDown,
   FileText,
-  Droplet,
   Users,
   Save,
   X,
@@ -192,6 +191,7 @@ export default function PatientDataPage() {
     hdams_id: p.hdams_id || "",
     patient_category: (p.patient_category as PatientCategory) || "deaddiction",
     full_name: p.full_name,
+    father_name: p.father_name || "",
     date_of_birth: p.date_of_birth,
     phone: p.phone_number || p.phone || "",
     gender: (p.sex || p.gender || "male") as Gender,
@@ -2903,10 +2903,12 @@ export default function PatientDataPage() {
                       </div>
                       <div className="flex items-center gap-3 text-slate-600">
                         <div className="w-8 flex justify-center">
-                          <Droplet className="h-4 w-4 text-slate-400" />
+                          <Users className="h-4 w-4 text-slate-400" />
                         </div>
-                        <span className="text-sm font-medium capitalize">
-                          {patient.addiction_type || "N/A"}
+                        <span className="text-sm font-medium">
+                          {patient.father_name
+                            ? `S/O: ${patient.father_name}`
+                            : "S/O: N/A"}
                         </span>
                       </div>
                     </div>
