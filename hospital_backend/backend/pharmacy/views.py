@@ -316,12 +316,16 @@ class InventoryStatsView(APIView):
             or Decimal("0")
         )
 
-        todays_revenue = (
-            DispenseInvoice.objects.filter(
-                dispense_date=today, status=DispenseStatus.SUCCESS
-            ).aggregate(total=Coalesce(Sum("net_payable"), Decimal("0")))["total"]
-            or Decimal("0")
+        todays_dispenses = DispenseInvoice.objects.filter(
+            dispense_date=today, status=DispenseStatus.SUCCESS
         )
+        # Single aggregate query — pulls both revenue and count in one round-trip.
+        todays_dispense_agg = todays_dispenses.aggregate(
+            revenue=Coalesce(Sum("net_payable"), Decimal("0")),
+            count=Count("pk"),
+        )
+        todays_revenue = todays_dispense_agg["revenue"] or Decimal("0")
+        dispensed_today_count = todays_dispense_agg["count"] or 0
 
         return success_response(
             {
@@ -331,6 +335,7 @@ class InventoryStatsView(APIView):
                 "expired_count": expired_count,
                 "total_stock_value": total_stock_value,
                 "todays_revenue": todays_revenue,
+                "dispensed_today_count": dispensed_today_count,
             }
         )
 

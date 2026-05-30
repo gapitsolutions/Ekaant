@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-05-30
+> **Last Updated:** 2026-05-31
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -832,7 +832,8 @@ Response:
     "near_expiry_count": 3,
     "expired_count": 1,
     "total_stock_value": "145600.00",
-    "todays_revenue": "8400.00"
+    "todays_revenue": "8400.00",
+    "dispensed_today_count": 5
   }
 }
 ```
@@ -845,6 +846,7 @@ Computation:
 - `expired_count` — active batches with `expiry_date < today`
 - `total_stock_value` — `Sum(batch.quantity * medicine.selling_price)` over active batches of active medicines
 - `todays_revenue` — `Sum(DispenseInvoice.net_payable)` where `dispense_date = today` and `status = success`
+- `dispensed_today_count` — count of successful `DispenseInvoice` rows where `dispense_date = today` (same queryset as `todays_revenue`, aggregated together in a single round-trip)
 
 ### 7.9 `POST /api/v1/pharmacy/inventory/invoices/`
 

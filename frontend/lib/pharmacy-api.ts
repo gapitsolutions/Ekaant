@@ -119,6 +119,7 @@ export interface InventoryStats {
   expired_count: number;
   total_stock_value: string;
   todays_revenue: string;
+  dispensed_today_count: number;
 }
 
 export async function getInventoryStats(): Promise<InventoryStats> {
