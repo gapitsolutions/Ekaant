@@ -171,7 +171,7 @@ export default function PatientDataPage() {
   // range — they aren't a multi-pick.
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
-  const [filterAddictionType, setFilterAddictionType] = useState<string[]>([]);
+  const [filterCategory, setFilterCategory] = useState<string[]>([]);
   const [filterDistrict, setFilterDistrict] = useState<string[]>([]);
   const [filterState, setFilterState] = useState<string[]>([]);
 
@@ -379,16 +379,16 @@ export default function PatientDataPage() {
     listPageSize,
     filterDistrict,
     filterState,
-    filterAddictionType,
+    filterCategory,
     filterDateFrom,
     filterDateTo,
   ]);
 
   // Load patient list (paginated).
-  // ``district`` / ``state`` / ``addiction_type`` are sent as arrays; the API
-  // client serialises each entry as a repeated query-string key (matches the
-  // backend's ``getlist`` contract). Empty arrays are sent as ``undefined``
-  // so the URL stays clean.
+  // ``district`` / ``state`` / ``patient_category`` are sent as arrays; the
+  // API client serialises each entry as a repeated query-string key (matches
+  // the backend's ``getlist`` contract). Empty arrays are sent as
+  // ``undefined`` so the URL stays clean.
   useEffect(() => {
     if (!accessToken) return;
     setIsLoadingPatients(true);
@@ -398,8 +398,8 @@ export default function PatientDataPage() {
       pageSize: listPageSize,
       district: filterDistrict.length === 0 ? undefined : filterDistrict,
       state: filterState.length === 0 ? undefined : filterState,
-      addiction_type:
-        filterAddictionType.length === 0 ? undefined : filterAddictionType,
+      patient_category:
+        filterCategory.length === 0 ? undefined : filterCategory,
       registration_start: filterDateFrom || undefined,
       registration_end: filterDateTo || undefined,
     })
@@ -421,7 +421,7 @@ export default function PatientDataPage() {
     debouncedSearchQuery,
     filterDistrict,
     filterState,
-    filterAddictionType,
+    filterCategory,
     filterDateFrom,
     filterDateTo,
   ]);
@@ -495,7 +495,7 @@ export default function PatientDataPage() {
   const resetFilters = () => {
     setFilterDateFrom("");
     setFilterDateTo("");
-    setFilterAddictionType([]);
+    setFilterCategory([]);
     setFilterDistrict([]);
     setFilterState([]);
     setSearchQuery("");
@@ -2745,22 +2745,19 @@ export default function PatientDataPage() {
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500 font-bold mb-1.5 block">
-                    Addiction Type
+                    Patient Category
                   </Label>
                   <MultiSelect
-                    // Closed enum from patients/models.py::AddictionType.
+                    // Closed enum from patients/models.py::PatientCategory.
                     options={[
-                      { value: "alcohol", label: "Alcohol" },
-                      { value: "drugs", label: "Drugs" },
-                      { value: "tobacco", label: "Tobacco" },
-                      { value: "gambling", label: "Gambling" },
-                      { value: "other", label: "Other" },
+                      { value: "psychiatric", label: "Psychiatric" },
+                      { value: "deaddiction", label: "De-Addiction" },
                     ]}
-                    value={filterAddictionType}
-                    onChange={setFilterAddictionType}
-                    placeholder="All Types"
-                    selectedNoun="types"
-                    searchPlaceholder="Search types…"
+                    value={filterCategory}
+                    onChange={setFilterCategory}
+                    placeholder="All Categories"
+                    selectedNoun="categories"
+                    searchPlaceholder="Search categories…"
                   />
                 </div>
                 <div>

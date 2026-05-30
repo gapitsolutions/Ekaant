@@ -681,10 +681,10 @@ export async function deleteReceptionCheckinHistoryVisit(
 
 // ── Reception: Patient list (paginated, searchable) ──
 //
-// ``district``, ``state`` and ``addiction_type`` accept either a single string
-// (legacy callers) or a list. The backend reads them with ``getlist(...)`` and
-// applies OR-within-field / AND-across-fields semantics — see
-// API_BLUEPRINT §5.5.
+// ``district``, ``state``, ``addiction_type`` and ``patient_category`` accept
+// either a single string (legacy callers) or a list. The backend reads them
+// with ``getlist(...)`` and applies OR-within-field / AND-across-fields
+// semantics — see API_BLUEPRINT §5.5.
 type PatientListFilter = string | string[] | undefined;
 
 type GetPatientsListOpts = {
@@ -694,6 +694,7 @@ type GetPatientsListOpts = {
   district?: PatientListFilter;
   state?: PatientListFilter;
   addiction_type?: PatientListFilter;
+  patient_category?: PatientListFilter;
   registration_start?: string;
   registration_end?: string;
 };
@@ -725,6 +726,7 @@ export async function getPatientsList(
   _appendMulti(params, "district", opts.district);
   _appendMulti(params, "state", opts.state);
   _appendMulti(params, "addiction_type", opts.addiction_type);
+  _appendMulti(params, "patient_category", opts.patient_category);
   if (opts.registration_start) {
     params.set("registration_start", opts.registration_start);
   }

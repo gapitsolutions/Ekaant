@@ -73,6 +73,7 @@ def _apply_reception_list_filters(request, queryset):
     districts = _multi_values(request, "district")
     states = _multi_values(request, "state")
     addiction_types = _multi_values(request, "addiction_type")
+    categories = _multi_values(request, "patient_category")
     registration_start = request.query_params.get("registration_start", "").strip()
     registration_end = request.query_params.get("registration_end", "").strip()
 
@@ -90,6 +91,11 @@ def _apply_reception_list_filters(request, queryset):
         # ``addiction_type`` is a TextChoices column (canonical lowercase
         # values), so exact ``__in`` is enough.
         queryset = queryset.filter(addiction_type__in=addiction_types)
+
+    if categories:
+        # ``patient_category`` is a TextChoices column (canonical lowercase
+        # values), so exact ``__in`` is enough.
+        queryset = queryset.filter(patient_category__in=categories)
 
     if registration_start:
         start_date = parse_date(registration_start)

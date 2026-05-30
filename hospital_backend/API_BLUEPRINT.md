@@ -327,8 +327,9 @@ Query params:
 
 - `q` — free-text search (file_number, full_name, phone, aadhaar).
 - `page` (default 1), `pageSize` (default 100, clamped).
-- `state`, `district`, `addiction_type` — **multi-value**. Repeat the key once per
-  selected value: `?state=Bihar&state=Assam&district=Patna`. A single value is
+- `state`, `district`, `addiction_type`, `patient_category` — **multi-value**.
+  Repeat the key once per selected value:
+  `?state=Bihar&state=Assam&patient_category=psychiatric`. A single value is
   also accepted for backwards compatibility (`?state=Bihar`).
 - `registration_start`, `registration_end` — single ISO dates (range endpoints).
 
@@ -339,8 +340,8 @@ Filter semantics (implemented by `_apply_reception_list_filters`):
 - **Across fields:** filters are AND-combined (every selected facet must match).
 - **Empty selection / missing key:** that field is unconstrained.
 - `state` and `district` are matched case-insensitively via a `Lower(field) IN
-  (...)` annotation. `addiction_type` uses an exact `IN` against the canonical
-  lowercase `AddictionType` choices.
+  (...)` annotation. `addiction_type` and `patient_category` use an exact `IN`
+  against their canonical lowercase `TextChoices` values.
 - A stray empty value (`?state=`) is ignored — it does **not** collapse the
   result set to "rows with empty state".
 
