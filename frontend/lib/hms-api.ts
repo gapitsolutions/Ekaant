@@ -877,3 +877,59 @@ export async function completeReceptionFollowUpCall(
     },
   );
 }
+
+// ── Reception: Follow-Up Calling Report ──
+//
+// Aggregated view of ``FollowUpCallAttempt`` data for a date range.
+// Returns total calls, outcome distribution, per-staff breakdown,
+// and individual call items.
+
+export interface CallingReportStaffRow {
+  staff_name: string;
+  total: number;
+  confirmed: number;
+  busy_later: number;
+  wrong_number: number;
+  not_reachable: number;
+  other: number;
+}
+
+export interface CallingReportItem {
+  id: string;
+  file_number: string;
+  patient_name: string;
+  phone: string;
+  called_at: string;
+  result: FollowUpCallResult;
+  note: string;
+  staff_name: string;
+}
+
+export interface CallingReportResponse {
+  start_date: string;
+  end_date: string;
+  total_calls: number;
+  outcome_distribution: {
+    confirmed: number;
+    busy_later: number;
+    wrong_number: number;
+    not_reachable: number;
+    other: number;
+  };
+  staff_breakdown: CallingReportStaffRow[];
+  items: CallingReportItem[];
+}
+
+export async function getReceptionCallingReport(
+  _token?: string,
+  options?: { start_date: string; end_date: string; patient_id?: string },
+): Promise<CallingReportResponse> {
+  const params = new URLSearchParams();
+  if (options?.start_date) params.set("start_date", options.start_date);
+  if (options?.end_date) params.set("end_date", options.end_date);
+  if (options?.patient_id) params.set("patient_id", options.patient_id);
+  return apiRequest<CallingReportResponse>(
+    `/api/v1/receptionist/follow-ups/report/?${params.toString()}`,
+    {},
+  );
+}

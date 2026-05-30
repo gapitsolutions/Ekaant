@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from patients.models import Patient
@@ -180,3 +180,88 @@ def followup_queryset(*, query: str = "", stage: str = ""):
         )
 
     return queryset
+
+
+# ---------------------------------------------------------------------------
+# Calling report aggregation
+# ---------------------------------------------------------------------------
+
+def build_calling_report_payload(*, start_date, end_date, patient_id=None):
+    """Aggregate ``FollowUpCallAttempt`` rows in [start_date, end_date].
+
+    The query filters on ``called_at`` (the datetime the call was logged).
+    When ``patient_id`` is supplied the report is scoped to a single patient.
+    All aggregation is performed in a single queryset annotation — no N+1.
+    """
+    base_qs = FollowUpCallAttempt.objects.filter(
+        called_at__date__gte=start_date,
+        called_at__date__lte=end_date,
+    )
+    if patient_id:
+        base_qs = base_qs.filter(ticket__patient_id=patient_id)
+
+    total_calls = base_qs.count()
+
+    # Outcome distribution — one aggregate query with conditional counts.
+    outcome_agg = base_qs.aggregate(
+        confirmed=Count("pk", filter=Q(result=FollowUpCallResult.CONFIRMED)),
+        busy_later=Count("pk", filter=Q(result=FollowUpCallResult.BUSY_LATER)),
+        wrong_number=Count("pk", filter=Q(result=FollowUpCallResult.WRONG_NUMBER)),
+        not_reachable=Count("pk", filter=Q(result=FollowUpCallResult.NOT_REACHABLE)),
+        other=Count("pk", filter=Q(result=FollowUpCallResult.OTHER)),
+    )
+
+    # Staff-level breakdown.
+    staff_rows = (
+        base_qs.values("called_by__full_name")
+        .annotate(
+            total=Count("pk"),
+            confirmed=Count("pk", filter=Q(result=FollowUpCallResult.CONFIRMED)),
+            busy_later=Count("pk", filter=Q(result=FollowUpCallResult.BUSY_LATER)),
+            wrong_number=Count("pk", filter=Q(result=FollowUpCallResult.WRONG_NUMBER)),
+            not_reachable=Count("pk", filter=Q(result=FollowUpCallResult.NOT_REACHABLE)),
+            other=Count("pk", filter=Q(result=FollowUpCallResult.OTHER)),
+        )
+        .order_by("-total")
+    )
+    staff_breakdown = [
+        {
+            "staff_name": row["called_by__full_name"] or "Unknown",
+            "total": row["total"],
+            "confirmed": row["confirmed"],
+            "busy_later": row["busy_later"],
+            "wrong_number": row["wrong_number"],
+            "not_reachable": row["not_reachable"],
+            "other": row["other"],
+        }
+        for row in staff_rows
+    ]
+
+    # Individual call items — select_related avoids N+1 on ticket→patient
+    # and called_by joins.
+    items_qs = (
+        base_qs.select_related("ticket__patient", "called_by")
+        .order_by("-called_at")
+    )
+    items = [
+        {
+            "id": str(attempt.pk),
+            "file_number": attempt.ticket.patient.file_number,
+            "patient_name": attempt.ticket.patient.full_name,
+            "phone": attempt.ticket.patient.phone_number,
+            "called_at": attempt.called_at,
+            "result": attempt.result,
+            "note": attempt.note,
+            "staff_name": attempt.called_by.full_name,
+        }
+        for attempt in items_qs
+    ]
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_calls": total_calls,
+        "outcome_distribution": outcome_agg,
+        "staff_breakdown": staff_breakdown,
+        "items": items,
+    }

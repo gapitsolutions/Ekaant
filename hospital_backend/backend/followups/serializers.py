@@ -43,6 +43,17 @@ class FollowUpCallCompleteSerializer(serializers.Serializer):
         return attrs
 
 
+class CallingReportQuerySerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=True)
+    end_date = serializers.DateField(required=True)
+    patient_id = serializers.UUIDField(required=False)
+
+    def validate(self, attrs):
+        if attrs["start_date"] > attrs["end_date"]:
+            raise serializers.ValidationError("start_date cannot be after end_date")
+        return attrs
+
+
 def followup_item_payload(ticket: FollowUpTicket):
     patient = ticket.patient
     latest_attempt = ticket.attempts.first()

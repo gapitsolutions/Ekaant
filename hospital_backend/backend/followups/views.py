@@ -7,11 +7,17 @@ from core.responses import success_response
 
 from .models import FollowUpStatus, FollowUpTicket
 from .serializers import (
+    CallingReportQuerySerializer,
     FollowUpCallCompleteSerializer,
     FollowUpListQuerySerializer,
     followup_item_payload,
 )
-from .services import complete_followup_call, followup_queryset, sync_followup_tickets
+from .services import (
+    build_calling_report_payload,
+    complete_followup_call,
+    followup_queryset,
+    sync_followup_tickets,
+)
 
 
 class ReceptionFollowUpListView(APIView):
@@ -65,3 +71,28 @@ class ReceptionFollowUpCallCompleteView(APIView):
             next_call_date=serializer.validated_data.get("next_call_date"),
         )
         return success_response(followup_item_payload(updated_ticket))
+
+
+class ReceptionFollowUpCallingReportView(APIView):
+    """Aggregated calling report for a date range, optionally per-patient.
+
+    ``GET /api/v1/receptionist/follow-ups/report/?start_date=…&end_date=…``
+    ``GET /api/v1/receptionist/follow-ups/report/?start_date=…&end_date=…&patient_id=<uuid>``
+
+    Returns total calls, outcome distribution, per-staff breakdown, and
+    individual call items — all derived from ``FollowUpCallAttempt``.
+    """
+
+    permission_classes = [IsReceptionOrAdmin]
+
+    def get(self, request):
+        serializer = CallingReportQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        return success_response(
+            build_calling_report_payload(
+                start_date=serializer.validated_data["start_date"],
+                end_date=serializer.validated_data["end_date"],
+                patient_id=serializer.validated_data.get("patient_id"),
+            )
+        )

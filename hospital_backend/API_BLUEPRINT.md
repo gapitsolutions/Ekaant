@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-05-23
+> **Last Updated:** 2026-05-30
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -1399,7 +1399,7 @@ To reactivate, send `PATCH` with `{ "is_active": true }`.
 
 ## 8. Follow-Ups API Blueprint
 
-Base module: `backend/followups/views.py`
+Base modules: `backend/followups/views.py`, `backend/followups/serializers.py`, `backend/followups/services.py`
 
 ### 8.1 `GET /api/v1/receptionist/follow-ups/`
 
@@ -1439,6 +1439,70 @@ Behavior:
 - Marks ticket `status = completed`.
 - Stores last call metadata on ticket.
 - For unsuccessful calls, schedules retry via `next_call_date`.
+
+### 8.3 `GET /api/v1/receptionist/follow-ups/report/`
+
+View: `ReceptionFollowUpCallingReportView.get`
+Serializer: `CallingReportQuerySerializer`
+Service: `build_calling_report_payload`
+Permission: `IsReceptionOrAdmin`
+
+Query params:
+
+- `start_date` (required): ISO date — beginning of reporting window.
+- `end_date` (required): ISO date — end of reporting window. Must be ≥ `start_date`.
+- `patient_id` (optional): UUID — when provided, scopes the entire report to a
+  single patient. Omit for the global calling-reports dashboard.
+
+Behavior:
+
+- Aggregates `FollowUpCallAttempt` rows where `called_at` falls within
+  `[start_date, end_date]`.
+- Returns summary statistics, per-staff breakdown, and individual call items.
+- All aggregation uses conditional `Count` annotations — no N+1 queries.
+- `select_related("ticket__patient", "called_by")` on the items query.
+
+Response:
+
+```json
+{
+  "start_date": "2026-05-01",
+  "end_date": "2026-05-30",
+  "total_calls": 45,
+  "outcome_distribution": {
+    "confirmed": 18,
+    "busy_later": 12,
+    "wrong_number": 5,
+    "not_reachable": 8,
+    "other": 2
+  },
+  "staff_breakdown": [
+    {
+      "staff_name": "Receptionist A",
+      "total": 25,
+      "confirmed": 10,
+      "busy_later": 8,
+      "wrong_number": 3,
+      "not_reachable": 3,
+      "other": 1
+    }
+  ],
+  "items": [
+    {
+      "id": "123",
+      "file_number": "A1",
+      "patient_name": "Rahul Sharma",
+      "phone": "9876543210",
+      "called_at": "2026-05-28T10:30:00Z",
+      "result": "confirmed",
+      "note": "Will visit tomorrow morning",
+      "staff_name": "Receptionist A"
+    }
+  ]
+}
+```
+
+`result` values: `confirmed` | `busy_later` | `wrong_number` | `not_reachable` | `other` (mirrors `FollowUpCallResult` choices).
 
 ---
 
@@ -1590,6 +1654,7 @@ Stock movement type reference:
 
 - `GET  /api/v1/receptionist/follow-ups/`
 - `POST /api/v1/receptionist/follow-ups/<ticket_id>/complete-call/`
+- `GET  /api/v1/receptionist/follow-ups/report/`
 
 **Pharmacy:**
 
