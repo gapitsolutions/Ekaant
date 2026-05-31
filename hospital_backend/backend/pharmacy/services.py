@@ -12,6 +12,8 @@ from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
+from django.core.files.base import ContentFile
+from django.utils.text import get_valid_filename
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
@@ -35,6 +37,7 @@ from .models import (
     StockMovement,
     Supplier,
 )
+from .serializers import ALLOWED_PURCHASE_INVOICE_DOCUMENT_MIME_TYPES
 
 logger = logging.getLogger("pharmacy")
 
@@ -76,6 +79,19 @@ def _log_stock_movement(
 # ────────────────────────────────────────────────────────────
 
 
+def _purchase_invoice_document_filename(data: dict, invoice: PurchaseInvoice) -> str:
+    mime_type = data.get("invoice_document_mime_type") or data.get(
+        "invoice_photo_mime_type"
+    )
+    extension = ALLOWED_PURCHASE_INVOICE_DOCUMENT_MIME_TYPES.get(mime_type, "bin")
+    raw_name = (data.get("invoice_document_filename") or "").strip()
+    if raw_name:
+        stem = get_valid_filename(raw_name.rsplit(".", 1)[0]) or "invoice-document"
+    else:
+        stem = get_valid_filename(invoice.invoice_number) or "invoice-document"
+    return f"{stem}.{extension}"
+
+
 @transaction.atomic
 def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
     invoice_number = data["invoice_number"]
@@ -91,6 +107,7 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
         invoice = PurchaseInvoice.objects.create(
             invoice_number=invoice_number,
             supplier=supplier,
+            order_date=data["order_date"],
             invoice_date=data["invoice_date"],
             delivery_date=data.get("delivery_date"),
             notes=data.get("notes", ""),
@@ -100,6 +117,15 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
         # Race: the pre-check above lost to a concurrent insert of the same
         # invoice_number. Surface the same 409 envelope the pre-check uses.
         raise ConflictError("Invoice number already exists.") from exc
+
+    document_bytes = data.get("_decoded_invoice_document")
+    if document_bytes:
+        invoice.invoice_photo.save(
+            _purchase_invoice_document_filename(data, invoice),
+            ContentFile(document_bytes),
+            save=False,
+        )
+        invoice.save(update_fields=["invoice_photo", "updated_at"])
 
     total_amount = Decimal("0")
     items_count = 0

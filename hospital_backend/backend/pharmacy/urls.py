@@ -44,6 +44,11 @@ urlpatterns = [
         name="pharmacy-purchase-invoice-create",
     ),
     path(
+        "pharmacy/inventory/invoices/<uuid:invoice_id>/document/",
+        views.PurchaseInvoiceDocumentView.as_view(),
+        name="pharmacy-purchase-invoice-document",
+    ),
+    path(
         "pharmacy/inventory/audit-removal/",
         views.AuditStockRemovalView.as_view(),
         name="pharmacy-audit-removal",

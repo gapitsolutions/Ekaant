@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,12 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -57,9 +58,12 @@ import {
   ShieldCheck,
   Archive,
   FileSpreadsheet,
+  FileImage,
   TrendingDown,
   Pencil,
   Eye,
+  Upload,
+  X,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { FieldError } from "@/components/ui/field-error";
@@ -124,9 +128,7 @@ export default function InventoryWorkstationPage() {
       .then((data) => setMedicines(data.items || []))
       .catch((error: unknown) => {
         setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to load inventory.",
+          error instanceof Error ? error.message : "Unable to load inventory.",
         );
       })
       .finally(() => setIsLoading(false));
@@ -149,8 +151,7 @@ export default function InventoryWorkstationPage() {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
         (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.salt.toLowerCase().includes(q),
+          m.name.toLowerCase().includes(q) || m.salt.toLowerCase().includes(q),
       );
     }
     return list;
@@ -330,11 +331,15 @@ export default function InventoryWorkstationPage() {
               }`}
             >
               <div className="flex justify-between items-start mb-2">
-                <div className={`text-xs font-bold ${stat.labelColor} uppercase tracking-wider`}>
+                <div
+                  className={`text-xs font-bold ${stat.labelColor} uppercase tracking-wider`}
+                >
                   {stat.title}
                 </div>
                 {active && (
-                  <Badge className={`${stat.badgeClass} border-0 font-bold text-[9px] px-1.5 py-0 rounded shadow-sm`}>
+                  <Badge
+                    className={`${stat.badgeClass} border-0 font-bold text-[9px] px-1.5 py-0 rounded shadow-sm`}
+                  >
                     Active
                   </Badge>
                 )}
@@ -396,8 +401,8 @@ export default function InventoryWorkstationPage() {
                   </p>
                   <p className="text-[11px] text-orange-600 font-bold leading-relaxed mt-0.5">
                     {nearExpiryBatches.length} batch
-                    {nearExpiryBatches.length === 1 ? "" : "es"} expiring
-                    within 180 days
+                    {nearExpiryBatches.length === 1 ? "" : "es"} expiring within
+                    180 days
                   </p>
                 </div>
               </div>
@@ -488,7 +493,9 @@ export default function InventoryWorkstationPage() {
                   {categoryFilter === "BUP" ? (
                     <Select
                       value={bupFilter}
-                      onValueChange={(v) => setBupFilter(v as BupStrength | "all")}
+                      onValueChange={(v) =>
+                        setBupFilter(v as BupStrength | "all")
+                      }
                     >
                       <SelectTrigger className="w-40 h-10 rounded-lg border-slate-200 bg-white font-medium text-sm text-[#0d7377]">
                         <SelectValue placeholder="Strength" />
@@ -509,19 +516,33 @@ export default function InventoryWorkstationPage() {
 
             <CardContent className="p-0 overflow-x-auto">
               {errorMessage ? (
-                <p className="text-sm text-destructive px-6 py-4">{errorMessage}</p>
+                <p className="text-sm text-destructive px-6 py-4">
+                  {errorMessage}
+                </p>
               ) : null}
 
               {isLoading ? (
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-200 hover:bg-transparent bg-slate-50/80">
-                      <TableHead className="px-6 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine &amp; Salt</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Active Batches &amp; Expiry</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Price</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Stock</TableHead>
-                      <TableHead className="px-6 h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">Manage</TableHead>
+                      <TableHead className="px-6 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Medicine &amp; Salt
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Category
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Active Batches &amp; Expiry
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">
+                        Price
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">
+                        Stock
+                      </TableHead>
+                      <TableHead className="px-6 h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Manage
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-slate-100">
@@ -536,11 +557,21 @@ export default function InventoryWorkstationPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell><div className="h-5 bg-slate-100 rounded w-16 animate-pulse" /></TableCell>
-                        <TableCell><div className="h-8 bg-slate-50 rounded w-48 animate-pulse" /></TableCell>
-                        <TableCell className="text-center"><div className="h-4 bg-slate-100 rounded w-12 mx-auto animate-pulse" /></TableCell>
-                        <TableCell className="text-center"><div className="h-6 bg-slate-50 rounded w-16 mx-auto animate-pulse" /></TableCell>
-                        <TableCell className="px-6"><div className="h-8 bg-slate-50 rounded w-8 ml-auto animate-pulse" /></TableCell>
+                        <TableCell>
+                          <div className="h-5 bg-slate-100 rounded w-16 animate-pulse" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="h-8 bg-slate-50 rounded w-48 animate-pulse" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="h-4 bg-slate-100 rounded w-12 mx-auto animate-pulse" />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="h-6 bg-slate-50 rounded w-16 mx-auto animate-pulse" />
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <div className="h-8 bg-slate-50 rounded w-8 ml-auto animate-pulse" />
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -559,12 +590,24 @@ export default function InventoryWorkstationPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-200 hover:bg-transparent bg-slate-50/80">
-                      <TableHead className="px-6 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine &amp; Salt</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Active Batches &amp; Expiry</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Price</TableHead>
-                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Stock</TableHead>
-                      <TableHead className="px-6 h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">Manage</TableHead>
+                      <TableHead className="px-6 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Medicine &amp; Salt
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Category
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Active Batches &amp; Expiry
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">
+                        Price
+                      </TableHead>
+                      <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">
+                        Stock
+                      </TableHead>
+                      <TableHead className="px-6 h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                        Manage
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-slate-100">
@@ -572,11 +615,18 @@ export default function InventoryWorkstationPage() {
                       const stock = stockFor(m);
                       const isLow = stock <= m.reorder_level;
                       return (
-                        <TableRow key={m.id} className="group hover:bg-slate-50/50 transition-colors border-slate-100">
+                        <TableRow
+                          key={m.id}
+                          className="group hover:bg-slate-50/50 transition-colors border-slate-100"
+                        >
                           <TableCell className="px-6 py-3">
                             <div className="min-w-0">
-                              <p className="font-bold text-slate-800 text-sm tracking-tight">{m.name}</p>
-                              <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-wide">{m.salt}</p>
+                              <p className="font-bold text-slate-800 text-sm tracking-tight">
+                                {m.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-wide">
+                                {m.salt}
+                              </p>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -605,9 +655,13 @@ export default function InventoryWorkstationPage() {
                               <div className="flex flex-col gap-1 max-w-[280px]">
                                 {m.batches.slice(0, 3).map((b) => {
                                   const expDate = new Date(b.expiry_date);
-                                  const diffTime = expDate.getTime() - Date.now();
-                                  const diffDays = Math.ceil(diffTime / 86400000);
-                                  const isNearExpiry = diffDays > 0 && diffDays <= 180;
+                                  const diffTime =
+                                    expDate.getTime() - Date.now();
+                                  const diffDays = Math.ceil(
+                                    diffTime / 86400000,
+                                  );
+                                  const isNearExpiry =
+                                    diffDays > 0 && diffDays <= 180;
                                   const isExpired = diffDays <= 0;
                                   return (
                                     <div
@@ -615,18 +669,38 @@ export default function InventoryWorkstationPage() {
                                       className="flex items-center justify-between text-[11px] font-medium"
                                     >
                                       <div className="flex items-center gap-2">
-                                        <span className="text-slate-700 font-mono">{b.batch_number}</span>
-                                        <span className="text-slate-300">&middot;</span>
-                                        <span className={`flex items-center gap-1 ${
-                                          isExpired ? "text-rose-600 font-bold" :
-                                          isNearExpiry ? "text-amber-600 font-bold" : "text-slate-500"
-                                        }`}>
-                                          Exp: {expDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })}
-                                          {isNearExpiry && <AlertTriangle className="h-3 w-3 text-amber-500" />}
-                                          {isExpired && <AlertTriangle className="h-3 w-3 text-rose-500" />}
+                                        <span className="text-slate-700 font-mono">
+                                          {b.batch_number}
+                                        </span>
+                                        <span className="text-slate-300">
+                                          &middot;
+                                        </span>
+                                        <span
+                                          className={`flex items-center gap-1 ${
+                                            isExpired
+                                              ? "text-rose-600 font-bold"
+                                              : isNearExpiry
+                                                ? "text-amber-600 font-bold"
+                                                : "text-slate-500"
+                                          }`}
+                                        >
+                                          Exp:{" "}
+                                          {expDate.toLocaleDateString("en-GB", {
+                                            day: "2-digit",
+                                            month: "short",
+                                            year: "2-digit",
+                                          })}
+                                          {isNearExpiry && (
+                                            <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                          )}
+                                          {isExpired && (
+                                            <AlertTriangle className="h-3 w-3 text-rose-500" />
+                                          )}
                                         </span>
                                       </div>
-                                      <span className="text-slate-600 font-semibold">{b.quantity} Tabs</span>
+                                      <span className="text-slate-600 font-semibold">
+                                        {b.quantity} Tabs
+                                      </span>
                                     </div>
                                   );
                                 })}
@@ -652,7 +726,9 @@ export default function InventoryWorkstationPage() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex flex-col items-center justify-center">
-                              <span className={`text-sm font-black ${isLow ? "text-rose-600" : "text-slate-800"}`}>
+                              <span
+                                className={`text-sm font-black ${isLow ? "text-rose-600" : "text-slate-800"}`}
+                              >
                                 {stock} Tabs
                               </span>
                               {isLow ? (
@@ -766,16 +842,27 @@ export default function InventoryWorkstationPage() {
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-100">
                   <TableRow>
-                    <TableHead className="font-bold text-slate-500 text-xs">Medicine</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs">Category</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs text-right">Current Stock</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs text-right">Reorder Level</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">
+                      Medicine
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">
+                      Category
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">
+                      Current Stock
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">
+                      Reorder Level
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-100 bg-white">
                   {lowStockItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-6 text-slate-400">
+                      <TableCell
+                        colSpan={4}
+                        className="text-center py-6 text-slate-400"
+                      >
                         No low stock medicines.
                       </TableCell>
                     </TableRow>
@@ -808,7 +895,10 @@ export default function InventoryWorkstationPage() {
       </Dialog>
 
       {/* Near Expiry Dialog */}
-      <Dialog open={nearExpiryDialogOpen} onOpenChange={setNearExpiryDialogOpen}>
+      <Dialog
+        open={nearExpiryDialogOpen}
+        onOpenChange={setNearExpiryDialogOpen}
+      >
         <DialogContent className="sm:max-w-[700px] rounded-2xl p-0 overflow-hidden bg-white">
           <div className="bg-gradient-to-r from-orange-400 to-orange-500 p-6 text-white">
             <DialogHeader>
@@ -833,17 +923,30 @@ export default function InventoryWorkstationPage() {
               <Table>
                 <TableHeader className="bg-slate-50 border-b border-slate-100">
                   <TableRow>
-                    <TableHead className="font-bold text-slate-500 text-xs">Medicine</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs">Batch No.</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs">Expiry Date</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs text-right">Days Left</TableHead>
-                    <TableHead className="font-bold text-slate-500 text-xs text-right">Stock</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">
+                      Medicine
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">
+                      Batch No.
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">
+                      Expiry Date
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">
+                      Days Left
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">
+                      Stock
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-100 bg-white">
                   {nearExpiryRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-slate-400">
+                      <TableCell
+                        colSpan={5}
+                        className="text-center py-6 text-slate-400"
+                      >
                         No near-expiry batches.
                       </TableCell>
                     </TableRow>
@@ -857,7 +960,9 @@ export default function InventoryWorkstationPage() {
                           {row.batch_number}
                         </TableCell>
                         <TableCell className="text-sm font-semibold text-orange-600">
-                          {new Date(row.expiry_date).toLocaleDateString("en-IN")}
+                          {new Date(row.expiry_date).toLocaleDateString(
+                            "en-IN",
+                          )}
                         </TableCell>
                         <TableCell className="text-right text-sm font-bold text-orange-600">
                           {row.days_until_expiry ?? "—"} d
@@ -999,7 +1104,9 @@ function MedicineFormDialog({
 
         <div className="grid grid-cols-2 gap-4 py-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500">Formulation Category</Label>
+            <Label className="text-xs font-bold text-slate-500">
+              Formulation Category
+            </Label>
             <Select
               value={category}
               onValueChange={(v) => setCategory(v as MedicineCategory)}
@@ -1037,8 +1144,12 @@ function MedicineFormDialog({
             </div>
           ) : (
             <div className="space-y-1.5 opacity-60">
-              <Label className="text-xs font-bold text-slate-400">BUP Strength Subcategory</Label>
-              <div className="h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center px-4 text-slate-400 text-xs font-bold">N/A</div>
+              <Label className="text-xs font-bold text-slate-400">
+                BUP Strength Subcategory
+              </Label>
+              <div className="h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center px-4 text-slate-400 text-xs font-bold">
+                N/A
+              </div>
             </div>
           )}
 
@@ -1079,7 +1190,9 @@ function MedicineFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500">MRP price (₹)</Label>
+            <Label className="text-xs font-bold text-slate-500">
+              MRP price (₹)
+            </Label>
             <Input
               type="number"
               min={0}
@@ -1174,6 +1287,38 @@ interface InvoiceItemDraft {
   gstPercentage: number;
 }
 
+interface InvoiceDocumentDraft {
+  filename: string;
+  mimeType: string;
+  base64: string;
+  previewUrl: string | null;
+}
+
+const PURCHASE_INVOICE_DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
+const PURCHASE_INVOICE_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Unable to read selected file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function parseDataUrl(
+  dataUrl: string,
+): { mimeType: string; base64: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], base64: match[2] };
+}
+
 function PurchaseInvoiceForm({
   medicines,
   suppliers,
@@ -1191,9 +1336,14 @@ function PurchaseInvoiceForm({
   const [invoiceDate, setInvoiceDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const [orderDate, setOrderDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [deliveryDate, setDeliveryDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const [invoiceDocument, setInvoiceDocument] =
+    useState<InvoiceDocumentDraft | null>(null);
   const [items, setItems] = useState<InvoiceItemDraft[]>([]);
   const [selectDialogOpen, setSelectDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -1228,17 +1378,47 @@ function PurchaseInvoiceForm({
   };
 
   const updateItem = (id: string, patch: Partial<InvoiceItemDraft>) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...patch } : i)),
-    );
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  };
+
+  const handleDocumentChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!PURCHASE_INVOICE_DOCUMENT_MIME_TYPES.has(file.type)) {
+      toast.error("Upload a PDF, JPG, PNG, or WEBP invoice document.");
+      return;
+    }
+
+    if (file.size > PURCHASE_INVOICE_DOCUMENT_MAX_BYTES) {
+      toast.error("Invoice document must be 5 MB or smaller.");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const parsed = parseDataUrl(dataUrl);
+      if (!parsed) {
+        toast.error("Unable to read the selected invoice document.");
+        return;
+      }
+      setInvoiceDocument({
+        filename: file.name,
+        mimeType: parsed.mimeType,
+        base64: parsed.base64,
+        previewUrl: file.type.startsWith("image/") ? dataUrl : null,
+      });
+    } catch {
+      toast.error("Unable to read the selected invoice document.");
+    }
   };
 
   const summary = useMemo(() => {
     const formCount = items.length;
     const totalQty = items.reduce((s, i) => s + i.quantity, 0);
     const gstTotal = items.reduce(
-      (s, i) =>
-        s + (i.quantity * i.purchasePrice * i.gstPercentage) / 100,
+      (s, i) => s + (i.quantity * i.purchasePrice * i.gstPercentage) / 100,
       0,
     );
     const subtotal = items.reduce(
@@ -1262,6 +1442,14 @@ function PurchaseInvoiceForm({
       toast.error("Supplier is required");
       return;
     }
+    if (!orderDate) {
+      toast.error("Order date is required");
+      return;
+    }
+    if (!invoiceDate) {
+      toast.error("Invoice date is required");
+      return;
+    }
     if (items.length === 0) {
       toast.error("Add at least one item");
       return;
@@ -1283,8 +1471,12 @@ function PurchaseInvoiceForm({
       await submitPurchaseInvoice({
         invoice_number: invoiceNo.trim(),
         supplier_id: supplierId,
+        order_date: orderDate,
         invoice_date: invoiceDate,
         delivery_date: deliveryDate || null,
+        invoice_document_base64: invoiceDocument?.base64,
+        invoice_document_mime_type: invoiceDocument?.mimeType,
+        invoice_document_filename: invoiceDocument?.filename,
         items: items.map((i) => ({
           medicine_id: i.medicineId,
           category: i.category,
@@ -1299,6 +1491,10 @@ function PurchaseInvoiceForm({
       toast.success("Purchase invoice submitted successfully");
       setInvoiceNo("");
       setSupplierId("");
+      setOrderDate(new Date().toISOString().slice(0, 10));
+      setInvoiceDate(new Date().toISOString().slice(0, 10));
+      setDeliveryDate(new Date().toISOString().slice(0, 10));
+      setInvoiceDocument(null);
       setItems([]);
       onSuccess();
     } catch (error) {
@@ -1313,12 +1509,13 @@ function PurchaseInvoiceForm({
     <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
       <CardHeader className="p-6 border-b border-slate-100 bg-slate-50/20">
         <CardTitle className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
-          <FileSpreadsheet className="h-5 w-5 text-[#0d7377]" /> Enter Purchase Invoice (Bulk Stock Entry)
+          <FileSpreadsheet className="h-5 w-5 text-[#0d7377]" /> Enter Purchase
+          Invoice (Bulk Stock Entry)
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
         {/* Invoice Metadata Header */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-500">
               Invoice / Challan No.
@@ -1381,6 +1578,18 @@ function PurchaseInvoiceForm({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-500">
+              Order Date
+            </Label>
+            <Input
+              type="date"
+              value={orderDate}
+              onChange={(e) => setOrderDate(e.target.value)}
+              className="h-11 rounded-xl bg-white border-slate-200 font-bold text-slate-700 text-xs text-center"
+            />
+            <FieldError message={apiErrors.get("order_date")} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500">
               Invoice Date
             </Label>
             <Input
@@ -1405,11 +1614,88 @@ function PurchaseInvoiceForm({
           </div>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4 rounded-2xl border border-slate-100 bg-white p-5">
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs font-bold text-slate-500">
+                Supplier Invoice Document
+              </Label>
+              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                PDF, JPG, PNG, or WEBP. Maximum 5 MB.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Input
+                id="purchase-invoice-document"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                onChange={handleDocumentChange}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  document.getElementById("purchase-invoice-document")?.click()
+                }
+                className="h-10 rounded-xl border-[#0d7377]/30 bg-teal-50/50 hover:bg-teal-50 text-xs font-black text-[#0d7377] flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                {invoiceDocument ? "Replace Document" : "Upload Document"}
+              </Button>
+              {invoiceDocument ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setInvoiceDocument(null)}
+                  className="h-10 rounded-xl text-xs font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <FieldError message={apiErrors.get("invoice_document_base64")} />
+            <FieldError message={apiErrors.get("invoice_document_mime_type")} />
+          </div>
+          <div className="min-h-[104px] rounded-xl border border-dashed border-slate-200 bg-slate-50/60 flex items-center justify-center overflow-hidden">
+            {invoiceDocument?.previewUrl ? (
+              /// eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={invoiceDocument.previewUrl}
+                alt={invoiceDocument.filename}
+                className="h-full max-h-32 w-full object-cover"
+              />
+            ) : invoiceDocument ? (
+              <div className="px-4 text-center">
+                <FileSpreadsheet className="h-8 w-8 text-[#0d7377] mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-700 truncate max-w-[220px]">
+                  {invoiceDocument.filename}
+                </p>
+                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                  {invoiceDocument.mimeType}
+                </p>
+              </div>
+            ) : (
+              <div className="px-4 text-center">
+                <FileImage className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-400">
+                  No document selected
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Invoice Items Header */}
         <div className="flex justify-between items-center px-1">
           <div>
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">Invoice Batch Details</h3>
-            <p className="text-[10px] text-slate-400 font-bold mt-0.5">Fill batch details, prices and GST for the selected items.</p>
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Invoice Batch Details
+            </h3>
+            <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+              Fill batch details, prices and GST for the selected items.
+            </p>
           </div>
           <Button
             variant="outline"
@@ -1429,7 +1715,8 @@ function PurchaseInvoiceForm({
               No items added yet.
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Click &quot;Select Medicines&quot; to pick items from the registry.
+              Click &quot;Select Medicines&quot; to pick items from the
+              registry.
             </p>
           </div>
         ) : (
@@ -1437,18 +1724,33 @@ function PurchaseInvoiceForm({
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-200 hover:bg-transparent bg-slate-50/80">
-                  <TableHead className="px-4 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine</TableHead>
-                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Batch No.</TableHead>
-                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Expiry</TableHead>
-                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Qty</TableHead>
-                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">Purchase ₹</TableHead>
-                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">GST %</TableHead>
+                  <TableHead className="px-4 h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                    Medicine
+                  </TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                    Batch No.
+                  </TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                    Expiry
+                  </TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                    Qty
+                  </TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                    Purchase ₹
+                  </TableHead>
+                  <TableHead className="h-10 font-bold uppercase text-[10px] tracking-wider text-slate-500">
+                    GST %
+                  </TableHead>
                   <TableHead className="h-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-slate-100">
                 {items.map((i) => (
-                  <TableRow key={i.id} className="group hover:bg-slate-50/40 transition-colors">
+                  <TableRow
+                    key={i.id}
+                    className="group hover:bg-slate-50/40 transition-colors"
+                  >
                     <TableCell className="px-4">
                       <div className="font-extrabold text-slate-800 text-sm">
                         {i.medicineName}
@@ -1543,23 +1845,41 @@ function PurchaseInvoiceForm({
         <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Unique Formulations</span>
-              <strong className="text-xs text-slate-800 block mt-1">{summary.formulations} Items</strong>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                Unique Formulations
+              </span>
+              <strong className="text-xs text-slate-800 block mt-1">
+                {summary.formulations} Items
+              </strong>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">Loaded Volume</span>
-              <strong className="text-xs text-teal-600 block mt-1">{summary.totalQty} units</strong>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                Loaded Volume
+              </span>
+              <strong className="text-xs text-teal-600 block mt-1">
+                {summary.totalQty} units
+              </strong>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
-              <span className="text-[8px] font-bold text-purple-400 uppercase tracking-wider block">GST Total</span>
+              <span className="text-[8px] font-bold text-purple-400 uppercase tracking-wider block">
+                GST Total
+              </span>
               <strong className="text-xs text-purple-600 block mt-1">
-                ₹{summary.gstTotal.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                ₹
+                {summary.gstTotal.toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                })}
               </strong>
             </div>
             <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 shadow-sm">
-              <span className="text-[8px] font-black text-[#0d7377] uppercase tracking-wider block">Grand Total</span>
+              <span className="text-[8px] font-black text-[#0d7377] uppercase tracking-wider block">
+                Grand Total
+              </span>
               <strong className="text-sm font-black text-[#0d7377] block mt-0.5">
-                ₹{summary.grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                ₹
+                {summary.grandTotal.toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                })}
               </strong>
             </div>
           </div>
@@ -1584,7 +1904,9 @@ function PurchaseInvoiceForm({
       <Dialog open={selectDialogOpen} onOpenChange={setSelectDialogOpen}>
         <DialogContent className="sm:max-w-[600px] bg-white rounded-2xl border-slate-100 p-0 overflow-hidden shadow-2xl">
           <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
-            <DialogTitle className="text-lg font-black text-slate-800">Select Medicines for Invoice</DialogTitle>
+            <DialogTitle className="text-lg font-black text-slate-800">
+              Select Medicines for Invoice
+            </DialogTitle>
             <DialogDescription className="text-xs font-semibold text-slate-500">
               Check all the items that are present on this invoice.
             </DialogDescription>
@@ -1617,13 +1939,20 @@ function PurchaseInvoiceForm({
                         className="mt-0.5 rounded-md border-slate-300 data-[state=checked]:bg-[#0d7377] data-[state=checked]:border-[#0d7377]"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-black text-slate-800 truncate">{m.name}</div>
+                        <div className="text-sm font-black text-slate-800 truncate">
+                          {m.name}
+                        </div>
                         <div className="text-xs text-slate-500 truncate">
                           {m.salt} · {m.category}
                           {m.bup_category ? ` · ${m.bup_category}` : ""}
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-[10px] uppercase font-bold text-slate-500">{m.category}</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase font-bold text-slate-500"
+                      >
+                        {m.category}
+                      </Badge>
                     </label>
                   );
                 })}
@@ -1716,8 +2045,8 @@ function AuditRemovalView({
                 Near-Expiry Awareness
               </p>
               <p className="text-xs text-amber-700 mt-1">
-                Use this workflow for batches expiring soon to maintain regulatory
-                compliance.
+                Use this workflow for batches expiring soon to maintain
+                regulatory compliance.
               </p>
             </div>
           </CardContent>
@@ -1731,8 +2060,8 @@ function AuditRemovalView({
                 Expired Stock Safeguard
               </p>
               <p className="text-xs text-rose-700 mt-1">
-                All removals create immutable StockMovement records (BUP removals
-                are flagged for NDPS audit).
+                All removals create immutable StockMovement records (BUP
+                removals are flagged for NDPS audit).
               </p>
             </div>
           </CardContent>
@@ -1744,12 +2073,14 @@ function AuditRemovalView({
         <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
           <CardHeader className="p-6 border-b border-slate-100 bg-slate-50/20">
             <CardTitle className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
-              <AlertTriangle className="h-5 w-5 text-rose-600" /> Controlled Stock Audited Removal
+              <AlertTriangle className="h-5 w-5 text-rose-600" /> Controlled
+              Stock Audited Removal
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             <div className="bg-rose-50/70 border border-rose-100 p-3 rounded-xl text-xs font-semibold text-rose-700 leading-normal">
-              Controlled deletion is strictly audited. All entries write directly to clinic compliance records.
+              Controlled deletion is strictly audited. All entries write
+              directly to clinic compliance records.
             </div>
 
             <div className="space-y-1.5">
@@ -1907,9 +2238,7 @@ function AuditRemovalView({
   );
 }
 
-
 const SUPPLIER_CATEGORY_OPTIONS: SupplierCategory[] = ["BUP", "Rx", "NRx"];
-
 
 function SupplierCreateDialog({
   open,
@@ -1994,8 +2323,8 @@ function SupplierCreateDialog({
         <DialogHeader>
           <DialogTitle>Add Supplier</DialogTitle>
           <DialogDescription>
-            New suppliers become immediately available in the picker.
-            Required: company name & mobile number.
+            New suppliers become immediately available in the picker. Required:
+            company name & mobile number.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 md:grid-cols-2">

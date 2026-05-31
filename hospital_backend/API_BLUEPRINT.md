@@ -864,8 +864,12 @@ Request body:
 {
   "invoice_number": "SUP-2026-0042",
   "supplier_id": "supplier-uuid",
+  "order_date": "2026-05-18",
   "invoice_date": "2026-05-20",
   "delivery_date": "2026-05-22",
+  "invoice_document_base64": "<optional-base64-payload>",
+  "invoice_document_mime_type": "application/pdf",
+  "invoice_document_filename": "supplier-bill.pdf",
   "notes": "",
   "items": [
     {
@@ -886,9 +890,13 @@ Validation:
 
 - `invoice_number` globally unique
 - `supplier_id` references an existing, active Supplier (see §7.20)
+- `order_date` is required for new submissions and cannot be in the future
 - `invoice_date` not in the future
+- `order_date <= invoice_date`
 - `delivery_date ≥ invoice_date` if provided
 - ≥ 1 item; each item references an active medicine; `expiry_date` in the future; `quantity > 0`; `0 ≤ gst_percentage ≤ 100`
+- `delivery_date >= order_date` if provided
+- Optional invoice document fields must be provided as a pair (`invoice_document_base64`, `invoice_document_mime_type`); allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; maximum decoded file size: 5 MB
 - No duplicate `(medicine_id, batch_number)` within items
 
 Side effects per item:
@@ -908,18 +916,37 @@ Response (201):
   "data": {
     "id": "uuid",
     "invoice_number": "SUP-2026-0042",
+    "order_date": "2026-05-18",
+    "invoice_date": "2026-05-20",
+    "delivery_date": "2026-05-22",
     "supplier": {
       "id": "supplier-uuid",
       "company_name": "Abbott Healthcare Ltd",
       "mobile_number": "9876543210"
     },
     "items_loaded": 1,
-    "total_amount": "179200.00"
+    "total_amount": "179200.00",
+    "invoice_document_url": "https://example.com/api/v1/pharmacy/inventory/invoices/<invoice_id>/document/"
   }
 }
 ```
 
 Errors: 400 validation, 404 supplier or medicine not found, 409 duplicate invoice number.
+
+### 7.9.1 `GET /api/v1/pharmacy/inventory/invoices/<invoice_id>/document/`
+
+View: `PurchaseInvoiceDocumentView.get`
+Permission: `IsPharmacistOrAdmin`
+
+**Use case:** Open or download the original supplier invoice document attached during purchase invoice creation.
+
+Behavior:
+
+- Looks up `PurchaseInvoice.invoice_photo` by invoice id.
+- Returns an authenticated `FileResponse`.
+- PDFs are returned as attachments for download; image documents are opened inline when the browser supports them.
+
+Errors: 400 no document attached, 404 invoice not found.
 
 ### 7.10 `POST /api/v1/pharmacy/inventory/audit-removal/`
 
@@ -1680,6 +1707,7 @@ Stock movement type reference:
 - `GET    /api/v1/pharmacy/inventory/medicines/<id>/dispense-history/`
 - `GET    /api/v1/pharmacy/inventory/stats/`
 - `POST   /api/v1/pharmacy/inventory/invoices/`
+- `GET    /api/v1/pharmacy/inventory/invoices/<invoice_id>/document/`
 - `POST   /api/v1/pharmacy/inventory/audit-removal/`
 - `GET    /api/v1/pharmacy/queue/`
 - `POST   /api/v1/pharmacy/dispense/`

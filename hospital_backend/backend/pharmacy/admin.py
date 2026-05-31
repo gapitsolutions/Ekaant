@@ -95,13 +95,14 @@ class PurchaseInvoiceAdmin(admin.ModelAdmin):
     list_display = (
         "invoice_number",
         "supplier",
+        "order_date",
         "invoice_date",
         "delivery_date",
         "items_count",
         "total_amount",
         "created_at",
     )
-    list_filter = ("invoice_date", "delivery_date", "supplier")
+    list_filter = ("order_date", "invoice_date", "delivery_date", "supplier")
     search_fields = (
         "invoice_number",
         "supplier__company_name",

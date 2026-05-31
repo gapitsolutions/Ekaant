@@ -1,3 +1,5 @@
+import base64
+import binascii
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -21,6 +23,42 @@ from .models import (
 
 def _digits_only(value: str) -> str:
     return "".join(ch for ch in value if ch.isdigit())
+
+
+MAX_PURCHASE_INVOICE_DOCUMENT_BYTES = 5 * 1024 * 1024
+ALLOWED_PURCHASE_INVOICE_DOCUMENT_MIME_TYPES = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
+
+
+def _decode_purchase_invoice_document_payload(payload: str) -> bytes:
+    compact_payload = "".join(payload.split())
+    if not compact_payload:
+        raise serializers.ValidationError("Invalid invoice_document_base64 payload")
+
+    max_encoded_chars = ((MAX_PURCHASE_INVOICE_DOCUMENT_BYTES * 4) // 3) + 8
+    if len(compact_payload) > max_encoded_chars:
+        raise serializers.ValidationError(
+            "Invoice document exceeds maximum allowed size (5 MB)"
+        )
+
+    try:
+        decoded = base64.b64decode(compact_payload, validate=True)
+    except (binascii.Error, ValueError):
+        raise serializers.ValidationError("Invalid invoice_document_base64 payload")
+
+    if not decoded:
+        raise serializers.ValidationError("Invalid invoice_document_base64 payload")
+
+    if len(decoded) > MAX_PURCHASE_INVOICE_DOCUMENT_BYTES:
+        raise serializers.ValidationError(
+            "Invoice document exceeds maximum allowed size (5 MB)"
+        )
+
+    return decoded
 
 
 # ────────────────────────────────────────────────────────────
@@ -297,10 +335,20 @@ class PurchaseInvoiceItemWriteSerializer(serializers.Serializer):
 class PurchaseInvoiceCreateSerializer(serializers.Serializer):
     invoice_number = serializers.CharField(max_length=50)
     supplier_id = serializers.UUIDField()
+    order_date = serializers.DateField()
     invoice_date = serializers.DateField()
     delivery_date = serializers.DateField(required=False, allow_null=True)
-    invoice_photo_base64 = serializers.CharField(
+    invoice_document_base64 = serializers.CharField(
+        required=False, allow_blank=True, default="", trim_whitespace=False
+    )
+    invoice_document_mime_type = serializers.CharField(
         required=False, allow_blank=True, default=""
+    )
+    invoice_document_filename = serializers.CharField(
+        required=False, allow_blank=True, default=""
+    )
+    invoice_photo_base64 = serializers.CharField(
+        required=False, allow_blank=True, default="", trim_whitespace=False
     )
     invoice_photo_mime_type = serializers.CharField(
         required=False, allow_blank=True, default=""
@@ -315,6 +363,11 @@ class PurchaseInvoiceCreateSerializer(serializers.Serializer):
             )
         return value
 
+    def validate_order_date(self, value):
+        if value > timezone.localdate():
+            raise serializers.ValidationError("Order date cannot be in the future.")
+        return value
+
     def validate_supplier_id(self, value):
         try:
             supplier = Supplier.objects.get(pk=value)
@@ -327,11 +380,47 @@ class PurchaseInvoiceCreateSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
+        order_date = attrs.get("order_date")
         invoice_date = attrs.get("invoice_date")
         delivery_date = attrs.get("delivery_date")
+        document_base64 = attrs.get("invoice_document_base64") or attrs.get(
+            "invoice_photo_base64", ""
+        )
+        document_mime_type = (
+            attrs.get("invoice_document_mime_type")
+            or attrs.get("invoice_photo_mime_type")
+            or ""
+        ).strip().lower()
+
+        if order_date and invoice_date and order_date > invoice_date:
+            raise serializers.ValidationError(
+                {"order_date": "Order date cannot be after invoice date."}
+            )
         if delivery_date and invoice_date and delivery_date < invoice_date:
             raise serializers.ValidationError(
                 {"delivery_date": "Delivery date cannot be before invoice date."}
+            )
+        if delivery_date and order_date and delivery_date < order_date:
+            raise serializers.ValidationError(
+                {"delivery_date": "Delivery date cannot be before order date."}
+            )
+
+        if bool(document_base64) != bool(document_mime_type):
+            raise serializers.ValidationError(
+                "invoice_document_base64 and invoice_document_mime_type must be provided together"
+            )
+
+        if document_mime_type:
+            if (
+                document_mime_type
+                not in ALLOWED_PURCHASE_INVOICE_DOCUMENT_MIME_TYPES
+            ):
+                raise serializers.ValidationError(
+                    "Unsupported invoice_document_mime_type. Allowed: application/pdf, image/jpeg, image/png, image/webp"
+                )
+            attrs["invoice_document_mime_type"] = document_mime_type
+            attrs["_decoded_invoice_document"] = (
+                _decode_purchase_invoice_document_payload(document_base64)
             )
         # Detect duplicate (medicine, batch_number) within items
         seen = set()
