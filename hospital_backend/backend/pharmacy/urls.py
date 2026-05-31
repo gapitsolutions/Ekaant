@@ -61,6 +61,11 @@ urlpatterns = [
         name="pharmacy-dispense-create",
     ),
     path(
+        "pharmacy/dispense/<uuid:session_id>/",
+        views.DispenseInvoiceDetailView.as_view(),
+        name="pharmacy-dispense-detail",
+    ),
+    path(
         "pharmacy/dispense/<uuid:session_id>/cancel/",
         views.DispenseCancelView.as_view(),
         name="pharmacy-dispense-cancel",

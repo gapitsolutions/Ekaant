@@ -531,6 +531,59 @@ class DispenseCreateView(APIView):
         )
 
 
+class DispenseInvoiceDetailView(APIView):
+    """Return the full dispense invoice (with line items) for a visit session.
+
+    Used by the patient profile's "View Invoice" expansion.
+    """
+
+    permission_classes = [IsReceptionAdminOrPharmacist]
+
+    def get(self, request, session_id):
+        invoice = get_object_or_404(
+            DispenseInvoice.objects.select_related("patient", "dispensed_by")
+            .prefetch_related("items__medicine"),
+            visit_session_id=session_id,
+        )
+        items = [
+            {
+                "id": str(item.id),
+                "medicine_name": item.medicine_name,
+                "salt": item.salt,
+                "category": item.category,
+                "batch_number": item.batch_number,
+                "dose": item.dose,
+                "days": item.days,
+                "quantity": item.quantity,
+                "unit_price": str(item.unit_price),
+                "total": str(item.total),
+            }
+            for item in invoice.items.all()
+        ]
+        return success_response(
+            {
+                "id": str(invoice.id),
+                "invoice_number": invoice.invoice_number,
+                "session_id": str(invoice.visit_session_id),
+                "patient_id": str(invoice.patient_id),
+                "patient_name": invoice.patient.full_name if invoice.patient_id else "",
+                "dispense_date": invoice.dispense_date,
+                "dispense_time": invoice.dispense_time,
+                "subtotal": str(invoice.subtotal),
+                "discount_percentage": str(invoice.discount_percentage),
+                "discount_amount": str(invoice.discount_amount),
+                "net_payable": str(invoice.net_payable),
+                "payment_method": invoice.payment_method,
+                "cash_amount": str(invoice.cash_amount),
+                "online_amount": str(invoice.online_amount),
+                "pharmacist": invoice.dispensed_by.full_name if invoice.dispensed_by_id else "",
+                "status": invoice.status,
+                "notes": invoice.notes,
+                "items": items,
+            }
+        )
+
+
 class DispenseCancelView(APIView):
     """Pharmacist marks a prescription as cancelled for a given visit.
 

@@ -77,6 +77,8 @@ import {
   Pill,
   MessageSquare,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Activity,
   Download,
   Filter,
@@ -84,6 +86,7 @@ import {
   RotateCcw,
   Loader2,
   Trash2,
+  Receipt,
 } from "lucide-react";
 import type {
   Patient,
@@ -112,6 +115,10 @@ import {
   PhotoCaptureDialog,
   type CapturedPhoto,
 } from "@/components/photo-capture-dialog";
+import { PatientCallingHistory } from "@/components/patients/PatientCallingHistory";
+import { PatientIdCard } from "@/components/patients/PatientIdCard";
+import { PatientInvoiceView } from "@/components/patients/PatientInvoiceView";
+import { generatePatientProfilePdf } from "@/lib/export/generatePatientProfilePdf";
 
 export default function PatientDataPage() {
   const { accessToken } = useAuth();
@@ -160,6 +167,9 @@ export default function PatientDataPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [expandedVisits, setExpandedVisits] = useState<Record<string, boolean>>(
+    {},
+  );
   const [showFilters, setShowFilters] = useState(false);
 
   // Filter states.
@@ -478,6 +488,7 @@ export default function PatientDataPage() {
           checkin_time: visit.checkin_time,
           completed_time: visit.completed_time || undefined,
           status: visit.status,
+          medicines_total: visit.medicines_total,
         }));
         setLoadedPatientVisits((prev) => ({
           ...prev,
@@ -1100,74 +1111,93 @@ export default function PatientDataPage() {
     return (
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Back Button & Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleBackToList}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">{selectedPatient.full_name}</h1>
-            <p className="text-muted-foreground">
-              File No:{" "}
-              <span className="font-mono text-[#0d7377]">
-                {selectedPatient.file_number}
-              </span>
-              {selectedPatient.hdams_id && (
-                <>
-                  {" "}
-                  | HDAMS:{" "}
-                  <span className="font-mono">{selectedPatient.hdams_id}</span>
-                </>
-              )}
-            </p>
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={handleBackToList}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold truncate">
+                {selectedPatient.full_name}
+              </h1>
+              <p className="text-muted-foreground">
+                File No:{" "}
+                <span className="font-mono text-[#0d7377]">
+                  {selectedPatient.file_number}
+                </span>
+                {selectedPatient.hdams_id && (
+                  <>
+                    {" "}
+                    | HDAMS:{" "}
+                    <span className="font-mono">
+                      {selectedPatient.hdams_id}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                onClick={handleOpenFingerprintConfirmation}
+                disabled={isLoadingPatientDetail || isUpdatingFingerprint}
+              >
+                {isUpdatingFingerprint ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Fingerprint className="h-4 w-4 mr-2" />
+                )}
+                {isUpdatingFingerprint ? "Updating..." : "Update Fingerprint"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsPhotoCaptureOpen(true)}
+                disabled={isLoadingPatientDetail || isUpdatingPhoto}
+              >
+                {isUpdatingPhoto ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4 mr-2" />
+                )}
+                {isUpdatingPhoto ? "Updating..." : "Update Photo"}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setIsDeletePatientConfirmOpen(true)}
+                disabled={isDeletingPatient || isLoadingPatientDetail}
+              >
+                {isDeletingPatient ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                {isDeletingPatient ? "Deleting..." : "Delete Patient"}
+              </Button>
+              <Button
+                onClick={() => handleEditPatient(selectedPatient)}
+                disabled={isLoadingPatientDetail}
+                className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+              >
+                {isLoadingPatientDetail ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Edit className="h-4 w-4 mr-2" />
+                )}
+                {isLoadingPatientDetail ? "Loading Profile..." : "Edit Profile"}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex justify-end pl-14">
             <Button
               variant="outline"
-              onClick={handleOpenFingerprintConfirmation}
-              disabled={isLoadingPatientDetail || isUpdatingFingerprint}
-            >
-              {isUpdatingFingerprint ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Fingerprint className="h-4 w-4 mr-2" />
-              )}
-              {isUpdatingFingerprint ? "Updating..." : "Update Fingerprint"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsPhotoCaptureOpen(true)}
-              disabled={isLoadingPatientDetail || isUpdatingPhoto}
-            >
-              {isUpdatingPhoto ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Camera className="h-4 w-4 mr-2" />
-              )}
-              {isUpdatingPhoto ? "Updating..." : "Update Photo"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setIsDeletePatientConfirmOpen(true)}
-              disabled={isDeletingPatient || isLoadingPatientDetail}
-            >
-              {isDeletingPatient ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4 mr-2" />
-              )}
-              {isDeletingPatient ? "Deleting..." : "Delete Patient"}
-            </Button>
-            <Button
-              onClick={() => handleEditPatient(selectedPatient)}
+              size="sm"
               disabled={isLoadingPatientDetail}
-              className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+              onClick={() =>
+                generatePatientProfilePdf(selectedPatient, patientVisits)
+              }
             >
-              {isLoadingPatientDetail ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Edit className="h-4 w-4 mr-2" />
-              )}
-              {isLoadingPatientDetail ? "Loading Profile..." : "Edit Profile"}
+              <Download className="h-4 w-4 mr-2" />
+              Export Patient Profile PDF
             </Button>
           </div>
         </div>
@@ -1471,7 +1501,7 @@ export default function PatientDataPage() {
 
         {/* Tabs for Profile & Visit History */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               Full Profile
@@ -1479,6 +1509,14 @@ export default function PatientDataPage() {
             <TabsTrigger value="visits" className="gap-2">
               <Activity className="h-4 w-4" />
               Visit History ({patientVisits.length})
+            </TabsTrigger>
+            <TabsTrigger value="calling" className="gap-2">
+              <Phone className="h-4 w-4" />
+              Calling History
+            </TabsTrigger>
+            <TabsTrigger value="idcard" className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              ID Card
             </TabsTrigger>
           </TabsList>
 
@@ -1821,38 +1859,68 @@ export default function PatientDataPage() {
                                 <div className="flex items-center gap-2 mt-1">
                                   <Badge
                                     variant="outline"
-                                    className={getStageColor(
-                                      visit.current_stage,
-                                    )}
-                                  >
-                                    {getStageIcon(visit.current_stage)}
-                                    <span className="ml-1 capitalize">
-                                      {visit.current_stage}
-                                    </span>
-                                  </Badge>
-                                  <Badge
-                                    variant={
+                                    className={
                                       visit.status === "completed"
-                                        ? "default"
-                                        : "secondary"
+                                        ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                                        : getStageColor(visit.current_stage)
                                     }
                                   >
-                                    {visit.status === "completed"
-                                      ? "Completed"
-                                      : "In Progress"}
+                                    {visit.status === "completed" ? (
+                                      <>
+                                        <Activity className="h-3.5 w-3.5 mr-1" />
+                                        Completed
+                                      </>
+                                    ) : (
+                                      <>
+                                        {getStageIcon(visit.current_stage)}
+                                        <span className="ml-1 capitalize">
+                                          {visit.current_stage}
+                                        </span>
+                                      </>
+                                    )}
                                   </Badge>
                                 </div>
                               </div>
                             </div>
-                            {visit.completed_time && (
-                              <div className="text-right text-sm text-muted-foreground">
-                                <p>Checked out</p>
-                                <p className="font-medium">
-                                  {formatDateTime(visit.completed_time)}
-                                </p>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-3">
+                              {visit.completed_time && (
+                                <div className="text-right text-sm text-muted-foreground">
+                                  <p>Checked out</p>
+                                  <p className="font-medium">
+                                    {formatDateTime(visit.completed_time)}
+                                  </p>
+                                </div>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setExpandedVisits((prev) => ({
+                                    ...prev,
+                                    [visit.id]: !prev[visit.id],
+                                  }))
+                                }
+                              >
+                                <Receipt className="h-4 w-4 mr-1" />
+                                View Invoice
+                                {expandedVisits[visit.id] ? (
+                                  <ChevronUp className="h-3 w-3 ml-1" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3 ml-1" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
+                          {expandedVisits[visit.id] && selectedPatient && (
+                            <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-4 duration-300">
+                              <PatientInvoiceView
+                                sessionId={visit.id}
+                                visitStatus={visit.status}
+                                patientName={selectedPatient.full_name}
+                                fileNumber={selectedPatient.file_number}
+                              />
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
@@ -1860,6 +1928,39 @@ export default function PatientDataPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Calling History Tab */}
+          <TabsContent value="calling" className="mt-6">
+            {selectedPatient && accessToken && (
+              <PatientCallingHistory
+                patientId={selectedPatient.id}
+                patientName={selectedPatient.full_name}
+                accessToken={accessToken}
+              />
+            )}
+          </TabsContent>
+
+          {/* ID Card Tab */}
+          <TabsContent value="idcard" className="mt-6">
+            {selectedPatient && (
+              <PatientIdCard
+                patient={{
+                  full_name: selectedPatient.full_name,
+                  file_number: selectedPatient.file_number,
+                  date_of_birth: selectedPatient.date_of_birth,
+                  gender: selectedPatient.gender,
+                  phone: selectedPatient.phone,
+                  address: selectedPatient.address,
+                  city: selectedPatient.city,
+                  district: selectedPatient.district,
+                  state: selectedPatient.state,
+                  pincode: selectedPatient.pincode,
+                  photo_url: selectedPatient.photo_url,
+                  registration_date: selectedPatient.registration_date,
+                }}
+              />
+            )}
           </TabsContent>
         </Tabs>
 

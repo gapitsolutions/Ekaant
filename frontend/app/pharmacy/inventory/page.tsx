@@ -58,6 +58,8 @@ import {
   Archive,
   FileSpreadsheet,
   TrendingDown,
+  Pencil,
+  Eye,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { FieldError } from "@/components/ui/field-error";
@@ -65,11 +67,13 @@ import { toastApiError, useApiErrors } from "@/lib/api-errors";
 import {
   getInventoryMedicines,
   addInventoryMedicine,
-  deleteInventoryMedicine,
+  updateInventoryMedicine,
   submitPurchaseInvoice,
   auditStockRemoval,
   listSuppliers,
   createSupplier,
+  getLowStockReport,
+  getExpiryReport,
   BUP_STRENGTHS,
   type Medicine,
   type MedicineCategory,
@@ -77,6 +81,8 @@ import {
   type RemovalReason,
   type Supplier,
   type SupplierCategory,
+  type LowStockReportItem,
+  type ExpiryReportRow,
 } from "@/lib/pharmacy-api";
 
 type TabValue = "list" | "invoice" | "audit";
@@ -91,8 +97,17 @@ export default function InventoryWorkstationPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [bupFilter, setBupFilter] = useState<BupStrength | "all">("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Medicine | null>(null);
+  const [editTarget, setEditTarget] = useState<Medicine | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  // Alert drill-down dialogs (reuse same pattern as pharmacy dashboard)
+  const [lowStockDialogOpen, setLowStockDialogOpen] = useState(false);
+  const [lowStockItems, setLowStockItems] = useState<LowStockReportItem[]>([]);
+  const [isLoadingLowStock, setIsLoadingLowStock] = useState(false);
+
+  const [nearExpiryDialogOpen, setNearExpiryDialogOpen] = useState(false);
+  const [nearExpiryRows, setNearExpiryRows] = useState<ExpiryReportRow[]>([]);
+  const [isLoadingNearExpiry, setIsLoadingNearExpiry] = useState(false);
 
   const loadSuppliers = useCallback(() => {
     return listSuppliers({ is_active: true, pageSize: 200 })
@@ -176,17 +191,33 @@ export default function InventoryWorkstationPage() {
     return results;
   }, [medicines]);
 
-  const handleDelete = async (reason: string, notes: string) => {
-    if (!deleteTarget) return;
-    try {
-      await deleteInventoryMedicine(deleteTarget.id, { reason, notes });
-      toast.success("Medicine removed from active inventory");
-      setDeleteTarget(null);
-      await loadMedicines();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete medicine",
-      );
+  const openLowStockDialog = async () => {
+    setLowStockDialogOpen(true);
+    if (lowStockItems.length === 0 && !isLoadingLowStock) {
+      setIsLoadingLowStock(true);
+      try {
+        const data = await getLowStockReport();
+        setLowStockItems(data.items || []);
+      } catch {
+        toast.error("Failed to load low stock data");
+      } finally {
+        setIsLoadingLowStock(false);
+      }
+    }
+  };
+
+  const openNearExpiryDialog = async () => {
+    setNearExpiryDialogOpen(true);
+    if (nearExpiryRows.length === 0 && !isLoadingNearExpiry) {
+      setIsLoadingNearExpiry(true);
+      try {
+        const data = await getExpiryReport();
+        setNearExpiryRows(data.near_expiry || []);
+      } catch {
+        toast.error("Failed to load near-expiry data");
+      } finally {
+        setIsLoadingNearExpiry(false);
+      }
     }
   };
 
@@ -326,7 +357,11 @@ export default function InventoryWorkstationPage() {
       tab === "list" ? (
         <div className="space-y-3">
           {lowStockMedicines.length > 0 ? (
-            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center justify-between gap-3.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => void openLowStockDialog()}
+              className="w-full bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center justify-between gap-3.5 shadow-sm cursor-pointer hover:bg-rose-100/60 transition-colors text-left"
+            >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="h-5 w-5 text-rose-600" />
@@ -342,10 +377,15 @@ export default function InventoryWorkstationPage() {
                   </p>
                 </div>
               </div>
-            </div>
+              <Eye className="h-4 w-4 text-rose-400" />
+            </button>
           ) : null}
           {nearExpiryBatches.length > 0 ? (
-            <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-center justify-between gap-3.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => void openNearExpiryDialog()}
+              className="w-full bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-center justify-between gap-3.5 shadow-sm cursor-pointer hover:bg-orange-100/60 transition-colors text-left"
+            >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center flex-shrink-0">
                   <CalendarClock className="h-5 w-5 text-orange-600" />
@@ -361,7 +401,8 @@ export default function InventoryWorkstationPage() {
                   </p>
                 </div>
               </div>
-            </div>
+              <Eye className="h-4 w-4 text-orange-400" />
+            </button>
           ) : null}
         </div>
       ) : null}
@@ -585,7 +626,7 @@ export default function InventoryWorkstationPage() {
                                           {isExpired && <AlertTriangle className="h-3 w-3 text-rose-500" />}
                                         </span>
                                       </div>
-                                      <span className="text-slate-600 font-semibold">{b.quantity}u</span>
+                                      <span className="text-slate-600 font-semibold">{b.quantity} Tabs</span>
                                     </div>
                                   );
                                 })}
@@ -612,7 +653,7 @@ export default function InventoryWorkstationPage() {
                           <TableCell className="text-center">
                             <div className="flex flex-col items-center justify-center">
                               <span className={`text-sm font-black ${isLow ? "text-rose-600" : "text-slate-800"}`}>
-                                {stock} u
+                                {stock} Tabs
                               </span>
                               {isLow ? (
                                 <span className="text-[9px] text-rose-500 font-bold uppercase mt-0.5 flex items-center gap-1">
@@ -630,6 +671,16 @@ export default function InventoryWorkstationPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-8 w-8 text-slate-400 hover:text-[#0d7377] hover:bg-teal-50"
+                                onClick={() => setEditTarget(m)}
+                                aria-label="Edit medicine"
+                                title="Edit Medicine"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
                                 onClick={() =>
                                   navigate(`/pharmacy/inventory/${m.id}`)
@@ -638,15 +689,6 @@ export default function InventoryWorkstationPage() {
                                 title="View Dispense History"
                               >
                                 <History className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                                onClick={() => setDeleteTarget(m)}
-                                aria-label="Delete medicine"
-                              >
-                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -682,35 +724,174 @@ export default function InventoryWorkstationPage() {
         </TabsContent>
       </Tabs>
 
-      <AddMedicineDialog
+      <MedicineFormDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
+        editTarget={null}
         onSuccess={() => {
           setAddDialogOpen(false);
           loadMedicines();
         }}
       />
 
-      <DeleteMedicineDialog
-        target={deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+      <MedicineFormDialog
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        editTarget={editTarget}
+        onSuccess={() => {
+          setEditTarget(null);
+          loadMedicines();
+        }}
       />
+
+      {/* Low Stock Dialog */}
+      <Dialog open={lowStockDialogOpen} onOpenChange={setLowStockDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-2xl p-0 overflow-hidden bg-white">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-amber-100" />
+                Low Stock Details
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="p-6 bg-slate-50 max-h-[60vh] overflow-y-auto">
+            {isLoadingLowStock ? (
+              <p className="py-12 text-center text-slate-400 italic">
+                Loading low-stock data…
+              </p>
+            ) : (
+              <Table>
+                <TableHeader className="bg-slate-50 border-b border-slate-100">
+                  <TableRow>
+                    <TableHead className="font-bold text-slate-500 text-xs">Medicine</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">Category</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">Current Stock</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">Reorder Level</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100 bg-white">
+                  {lowStockItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-6 text-slate-400">
+                        No low stock medicines.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    lowStockItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-semibold text-sm text-slate-700">
+                          <p>{item.name}</p>
+                          <p className="text-xs text-slate-400">{item.salt}</p>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">
+                            {item.category}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-bold text-amber-600">
+                          {item.current_stock} Tabs
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-slate-500">
+                          Min: {item.reorder_level}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Near Expiry Dialog */}
+      <Dialog open={nearExpiryDialogOpen} onOpenChange={setNearExpiryDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] rounded-2xl p-0 overflow-hidden bg-white">
+          <div className="bg-gradient-to-r from-orange-400 to-orange-500 p-6 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <CalendarClock className="h-6 w-6 text-orange-100" />
+                Near Expiry Medicines
+                <span className="ml-2 text-sm font-medium bg-white/20 px-2 py-0.5 rounded">
+                  {nearExpiryRows.length}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-orange-100 mt-2">
+              Batches expiring within the next 180 days.
+            </p>
+          </div>
+          <div className="p-6 bg-slate-50 max-h-[60vh] overflow-y-auto">
+            {isLoadingNearExpiry ? (
+              <p className="py-12 text-center text-slate-400 italic">
+                Loading near-expiry batches…
+              </p>
+            ) : (
+              <Table>
+                <TableHeader className="bg-slate-50 border-b border-slate-100">
+                  <TableRow>
+                    <TableHead className="font-bold text-slate-500 text-xs">Medicine</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">Batch No.</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs">Expiry Date</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">Days Left</TableHead>
+                    <TableHead className="font-bold text-slate-500 text-xs text-right">Stock</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100 bg-white">
+                  {nearExpiryRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-slate-400">
+                        No near-expiry batches.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    nearExpiryRows.map((row) => (
+                      <TableRow key={`${row.medicine_id}-${row.batch_number}`}>
+                        <TableCell className="font-semibold text-sm text-slate-700">
+                          {row.medicine_name}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-slate-600">
+                          {row.batch_number}
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold text-orange-600">
+                          {new Date(row.expiry_date).toLocaleDateString("en-IN")}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-bold text-orange-600">
+                          {row.days_until_expiry ?? "—"} d
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-bold text-slate-700">
+                          {row.quantity} Tabs
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-// ────────── Add Medicine Dialog ──────────
+// ────────── Medicine Form Dialog (Add + Edit) ──────────
 
-function AddMedicineDialog({
+function MedicineFormDialog({
   open,
   onOpenChange,
+  editTarget,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editTarget: Medicine | null;
   onSuccess: () => void;
 }) {
+  const isEdit = !!editTarget;
   const [category, setCategory] = useState<MedicineCategory>("Rx");
   const [bupCategory, setBupCategory] = useState<BupStrength>("2.0mg + 0.5mg");
   const [name, setName] = useState("");
@@ -721,6 +902,23 @@ function AddMedicineDialog({
   const [reorderLevel, setReorderLevel] = useState("50");
   const [tabletsPerStrip, setTabletsPerStrip] = useState("10");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (editTarget) {
+      setCategory(editTarget.category);
+      setBupCategory(editTarget.bup_category || "2.0mg + 0.5mg");
+      setName(editTarget.name);
+      setSalt(editTarget.salt);
+      setManufacturer(editTarget.manufacturer);
+      setMrp(editTarget.mrp);
+      setSellingPrice(editTarget.selling_price);
+      setReorderLevel(String(editTarget.reorder_level));
+      setTabletsPerStrip(String(editTarget.tablets_per_strip));
+    } else {
+      resetForm();
+    }
+  }, [editTarget]);
 
   const resetForm = () => {
     setCategory("Rx");
@@ -751,7 +949,7 @@ function AddMedicineDialog({
     }
     setIsSubmitting(true);
     try {
-      await addInventoryMedicine({
+      const payload = {
         name: name.trim(),
         salt: salt.trim(),
         category,
@@ -761,13 +959,23 @@ function AddMedicineDialog({
         tablets_per_strip: parseInt(tabletsPerStrip) || 10,
         mrp: mrpNum.toFixed(2),
         selling_price: spNum.toFixed(2),
-      });
-      toast.success("Medicine registered successfully");
+      };
+      if (isEdit && editTarget) {
+        await updateInventoryMedicine(editTarget.id, payload);
+        toast.success("Medicine updated successfully");
+      } else {
+        await addInventoryMedicine(payload);
+        toast.success("Medicine registered successfully");
+      }
       resetForm();
       onSuccess();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to register medicine",
+        error instanceof Error
+          ? error.message
+          : isEdit
+            ? "Failed to update medicine"
+            : "Failed to register medicine",
       );
     } finally {
       setIsSubmitting(false);
@@ -779,10 +987,13 @@ function AddMedicineDialog({
       <DialogContent className="sm:max-w-[550px] rounded-2xl p-6 bg-white border border-slate-100">
         <DialogHeader className="pb-3 border-b border-slate-50">
           <DialogTitle className="text-base font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <Pill className="h-5 w-5 text-[#0d7377]" /> Register New Medicine
+            <Pill className="h-5 w-5 text-[#0d7377]" />
+            {isEdit ? "Edit Medicine" : "Register New Medicine"}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400 mt-1">
-            Configure standard chemical salts, dosage constraints and reorder alert levels.
+            {isEdit
+              ? "Update medicine details. Changes apply to future dispenses."
+              : "Configure standard chemical salts, dosage constraints and reorder alert levels."}
           </DialogDescription>
         </DialogHeader>
 
@@ -936,120 +1147,10 @@ function AddMedicineDialog({
               <>
                 <Spinner className="h-4 w-4 mr-2" /> Saving…
               </>
+            ) : isEdit ? (
+              "Update Medicine"
             ) : (
               "Register Medicine"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ────────── Delete Medicine Dialog ──────────
-
-function DeleteMedicineDialog({
-  target,
-  onClose,
-  onConfirm,
-}: {
-  target: Medicine | null;
-  onClose: () => void;
-  onConfirm: (reason: string, notes: string) => Promise<void>;
-}) {
-  const [reason, setReason] = useState("destroyed");
-  const [notes, setNotes] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (target) {
-      setReason("destroyed");
-      setNotes("");
-    }
-  }, [target]);
-
-  const handleConfirm = async () => {
-    setIsSubmitting(true);
-    try {
-      await onConfirm(reason, notes);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open={!!target}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-[480px] rounded-2xl p-6 bg-white border border-slate-100">
-        <DialogHeader className="pb-3 border-b border-slate-50">
-          <DialogTitle className="text-base font-black text-rose-600 tracking-tight flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-rose-600" /> Audit Stock Deletion
-          </DialogTitle>
-          <DialogDescription className="text-xs text-slate-400 mt-1">
-            Submit audit reason for removing <strong className="text-slate-700">{target?.name}</strong>.
-            Historical batches and dispense records remain intact.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="bg-rose-50/70 border border-rose-100 p-3 rounded-xl text-xs font-semibold text-rose-700 leading-normal">
-            Controlled deletion is strictly audited. Ensure compliance documents are available.
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500">
-              Reason for removal
-            </Label>
-            <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-slate-200 text-xs">
-                <SelectItem value="destroyed">Destroyed</SelectItem>
-                <SelectItem value="returned">Returned to Supplier</SelectItem>
-                <SelectItem value="defect">Manufacturing Defect</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500">
-              Compliance Notes
-            </Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional explanation for audit log"
-              className="rounded-xl bg-slate-50 border-slate-200 text-xs min-h-[80px] resize-none font-semibold text-slate-700"
-              rows={3}
-            />
-          </div>
-        </div>
-
-        <DialogFooter className="pt-2 border-t border-slate-50">
-          <Button
-            variant="ghost"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-xl h-11 font-bold text-slate-400 hover:bg-slate-50 text-xs"
-          >
-            Cancel
-          </Button>
-          <Button
-            className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl h-11 px-6 shadow-md shadow-rose-900/10 text-xs"
-            onClick={handleConfirm}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Spinner className="h-4 w-4 mr-2" /> Removing…
-              </>
-            ) : (
-              "Confirm Removal"
             )}
           </Button>
         </DialogFooter>

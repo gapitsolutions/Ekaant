@@ -108,7 +108,8 @@ export default function DispenseWorkstationPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
   const [cashAmount, setCashAmount] = useState(0);
   const [onlineAmount, setOnlineAmount] = useState(0);
-  const [discount, setDiscount] = useState(0);
+  const [discount, setDiscount] = useState(0); // percentage (sent to backend)
+  const [discountRupees, setDiscountRupees] = useState(0); // amount in ₹ (primary UI input)
   const [notes, setNotes] = useState("");
 
   // Follow-up
@@ -300,14 +301,19 @@ export default function DispenseWorkstationPage() {
     () => lineItems.reduce((sum, li) => sum + li.total, 0),
     [lineItems],
   );
-  const discountAmount = useMemo(
-    () => Math.round(subtotal * (discount / 100)),
-    [subtotal, discount],
-  );
-  const grandTotal = useMemo(
-    () => Math.max(0, subtotal - discountAmount),
-    [subtotal, discountAmount],
-  );
+  // discountRupees is the primary input; clamp it to subtotal
+  const discountAmount = Math.min(discountRupees, subtotal);
+  const grandTotal = Math.max(0, subtotal - discountAmount);
+
+  // Auto-sync percentage from rupee amount (for backend submission)
+  useEffect(() => {
+    if (subtotal > 0) {
+      const pct = parseFloat(((discountRupees / subtotal) * 100).toFixed(2));
+      setDiscount(Math.min(pct, 100));
+    } else {
+      setDiscount(0);
+    }
+  }, [discountRupees, subtotal]);
 
   // Sync payment amounts with method/total
   useEffect(() => {
@@ -693,6 +699,7 @@ export default function DispenseWorkstationPage() {
                 onChange={(e) =>
                   setFormDays(Math.max(1, parseInt(e.target.value) || 0))
                 }
+                onWheel={(e) => e.currentTarget.blur()}
                 className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs text-center"
               />
             </div>
@@ -706,6 +713,7 @@ export default function DispenseWorkstationPage() {
                 onChange={(e) =>
                   setFormQty(Math.max(0, parseInt(e.target.value) || 0))
                 }
+                onWheel={(e) => e.currentTarget.blur()}
                 className="h-10 rounded-xl bg-teal-50/30 border-teal-200 font-bold text-[#0d7377] text-xs text-center focus:ring-1 focus:ring-[#0d7377]"
               />
             </div>
@@ -716,13 +724,10 @@ export default function DispenseWorkstationPage() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
                 <Input
                   type="number"
-                  min={0}
-                  step="0.01"
                   value={formPrice}
-                  onChange={(e) =>
-                    setFormPrice(Math.max(0, parseFloat(e.target.value) || 0))
-                  }
-                  className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs pl-6 pr-2 text-center"
+                  readOnly
+                  tabIndex={-1}
+                  className="h-10 rounded-xl bg-slate-100 border-slate-200 font-bold text-slate-700 text-xs pl-6 pr-2 text-center cursor-default"
                 />
               </div>
             </div>
@@ -840,7 +845,7 @@ export default function DispenseWorkstationPage() {
             <div className="space-y-1.5">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quick Days Preset</Label>
               <div className="flex flex-wrap gap-2">
-                {[7, 10, 15, 30, 45].map((d) => (
+                {[2, 3, 5, 7, 10, 14].map((d) => (
                   <button
                     key={d}
                     onClick={() => handleDaysPreset(d)}
@@ -850,7 +855,7 @@ export default function DispenseWorkstationPage() {
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800"
                     }`}
                   >
-                    {d} Days
+                    {d}
                   </button>
                 ))}
                 <button
@@ -877,7 +882,8 @@ export default function DispenseWorkstationPage() {
                       handleClearNextVisit();
                     }
                   }}
-                  placeholder="e.g. 7, 10, 30"
+                  onWheel={(e) => e.currentTarget.blur()}
+                  placeholder="e.g. 7, 10, 14"
                   className="h-11 rounded-xl border-slate-200 bg-slate-50 text-center font-bold text-slate-700 focus:ring-1 focus:ring-[#0d7377]"
                 />
               </div>
@@ -964,22 +970,32 @@ export default function DispenseWorkstationPage() {
               />
             </div>
 
-            {/* Discount */}
+            {/* Discount Amount (primary) + Percentage (auto-calc) */}
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount Percentage (%)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step="0.1"
-                value={discount}
-                onChange={(e) =>
-                  setDiscount(
-                    Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
-                  )
-                }
-                className="h-11 rounded-xl border-slate-200 bg-slate-50/50 text-center font-bold text-slate-700"
-              />
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount Amount (₹)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={subtotal}
+                  step="1"
+                  value={discountRupees || ""}
+                  onChange={(e) =>
+                    setDiscountRupees(
+                      Math.max(0, Math.min(subtotal, parseFloat(e.target.value) || 0)),
+                    )
+                  }
+                  onWheel={(e) => e.currentTarget.blur()}
+                  placeholder="0"
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50 pl-7 text-center font-bold text-slate-700"
+                />
+              </div>
+              {discount > 0 && (
+                <p className="text-[10px] font-bold text-slate-400 text-center">
+                  ≈ {discount.toFixed(1)}% discount
+                </p>
+              )}
               <FieldError message={apiErrors.get("payment.discount")} />
             </div>
           </div>
@@ -1023,6 +1039,7 @@ export default function DispenseWorkstationPage() {
                     onChange={(e) =>
                       handleSplitCashChange(parseFloat(e.target.value) || 0)
                     }
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="h-10 rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
                   />
                 </div>
@@ -1045,10 +1062,10 @@ export default function DispenseWorkstationPage() {
               <span>Formulation Subtotal</span>
               <span>₹{subtotal.toLocaleString("en-IN")}.00</span>
             </div>
-            {discount > 0 && (
+            {discountAmount > 0 && (
               <div className="flex justify-between text-sm font-bold text-emerald-600 bg-emerald-50/50 px-2.5 py-1 rounded-lg">
-                <span>Discount Allowed ({discount}%)</span>
-                <span>− ₹{discountAmount.toLocaleString("en-IN")}.00</span>
+                <span>Discount Allowed ({discount.toFixed(1)}%)</span>
+                <span>− ₹{discountAmount.toLocaleString("en-IN")}</span>
               </div>
             )}
             <div className="flex justify-between font-black text-lg text-slate-800 border-t border-slate-200 pt-3 mt-1 tracking-tight">

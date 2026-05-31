@@ -15,6 +15,11 @@ import {
 } from "@/lib/hms-api";
 import { useAuth } from "@/lib/auth-context";
 import {
+  CALL_RESULT_LABELS,
+  CALL_RESULT_COLORS,
+  CALL_RESULT_BADGE,
+} from "@/lib/call-result-utils";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -185,30 +190,6 @@ function getMonthDateRange(monthValue: string) {
   return { year, month, startDate, endDate };
 }
 
-// Labels for FollowUpCallResult values.
-const CALL_RESULT_LABELS: Record<string, string> = {
-  confirmed: "Confirmed",
-  busy_later: "Busy / Call Later",
-  wrong_number: "Wrong Number",
-  not_reachable: "Not Reachable",
-  other: "Other",
-};
-
-const CALL_RESULT_COLORS: Record<string, string> = {
-  confirmed: "bg-emerald-500",
-  busy_later: "bg-amber-500",
-  wrong_number: "bg-red-500",
-  not_reachable: "bg-slate-400",
-  other: "bg-blue-400",
-};
-
-const CALL_RESULT_BADGE: Record<string, string> = {
-  confirmed: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  busy_later: "bg-amber-50 text-amber-700 border-amber-100",
-  wrong_number: "bg-red-50 text-red-700 border-red-100",
-  not_reachable: "bg-slate-50 text-slate-600 border-slate-200",
-  other: "bg-blue-50 text-blue-700 border-blue-100",
-};
 
 export default function ReportsPage() {
   const { accessToken } = useAuth();

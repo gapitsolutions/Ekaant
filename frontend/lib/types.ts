@@ -199,6 +199,7 @@ export interface Visit {
   assigned_doctor_id?: string;
   pharmacist_id?: string;
   status: VisitStatus;
+  medicines_total?: number;
   created_at?: string;
 }
 

@@ -387,6 +387,50 @@ export async function getDispenseHistory(options?: {
   );
 }
 
+// ── Dispense Invoice Detail (per visit session) ──
+export interface DispenseInvoiceLineItem {
+  id: string;
+  medicine_name: string;
+  salt: string;
+  category: string;
+  batch_number: string;
+  dose: string;
+  days: number;
+  quantity: number;
+  unit_price: string;
+  total: string;
+}
+
+export interface DispenseInvoiceDetail {
+  id: string;
+  invoice_number: string;
+  session_id: string;
+  patient_id: string;
+  patient_name: string;
+  dispense_date: string;
+  dispense_time: string;
+  subtotal: string;
+  discount_percentage: string;
+  discount_amount: string;
+  net_payable: string;
+  payment_method: PaymentMethod | string;
+  cash_amount: string;
+  online_amount: string;
+  pharmacist: string;
+  status: DispenseStatus;
+  notes: string;
+  items: DispenseInvoiceLineItem[];
+}
+
+export async function getDispenseInvoiceBySession(
+  sessionId: string,
+): Promise<DispenseInvoiceDetail> {
+  return apiRequest<DispenseInvoiceDetail>(
+    `/api/v1/pharmacy/dispense/${sessionId}/`,
+    {},
+  );
+}
+
 // ── Reports ──
 export type ReportRange = "daily" | "monthly" | "custom";
 
