@@ -1,10 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,12 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -37,13 +41,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Activity,
   AlertTriangle,
   BarChart3,
   CalendarClock,
+  CalendarDays,
   Download,
   IndianRupee,
   Loader2,
-  Printer,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -65,32 +70,57 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("revenue");
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-black text-[#0d7377] tracking-tight flex items-center gap-2">
-          <BarChart3 className="h-7 w-7" />
-          Pharmacy Reports
-        </h1>
-        <p className="text-slate-500 mt-1 text-sm">
-          Analytics across revenue, consumption, and inventory health
-        </p>
-      </div>
-
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
       <Tabs value={tab} onValueChange={(v) => setTab(v as ReportTab)}>
-        <TabsList className="bg-slate-100 p-1.5 rounded-2xl h-14 shadow-sm border border-slate-200">
-          <TabsTrigger value="revenue" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
-            <IndianRupee className="h-4 w-4 mr-1" /> Revenue
-          </TabsTrigger>
-          <TabsTrigger value="consumption" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
-            <BarChart3 className="h-4 w-4 mr-1" /> Consumption
-          </TabsTrigger>
-          <TabsTrigger value="low-stock" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
-            <AlertTriangle className="h-4 w-4 mr-1" /> Low Stock
-          </TabsTrigger>
-          <TabsTrigger value="expiry" className="data-[state=active]:bg-[#0d7377] data-[state=active]:text-white rounded-xl font-bold">
-            <CalendarClock className="h-4 w-4 mr-1" /> Expiry
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                Pharmacy Reports
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Revenue analysis and medicine consumption tracking
+              </p>
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                className="border-slate-200 text-slate-700 font-medium rounded-md px-4 h-9 shadow-sm hover:bg-slate-50"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
+          </div>
+
+          <TabsList className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/80 rounded-lg h-auto sm:h-11 w-max border border-slate-200">
+            <TabsTrigger
+              value="revenue"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+            >
+              Revenue Report
+            </TabsTrigger>
+            <TabsTrigger
+              value="consumption"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+            >
+              Consumption Report
+            </TabsTrigger>
+            <TabsTrigger
+              value="low-stock"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+            >
+              Low Stock Report
+            </TabsTrigger>
+            <TabsTrigger
+              value="expiry"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+            >
+              Expiry Report
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="revenue" className="mt-6">
           <RevenueReportTab />
@@ -130,6 +160,9 @@ function defaultRangeState(): RangeFilterState {
   };
 }
 
+// Compact horizontal filter — label + control pairs in a row.
+// This layout is more space-efficient than the previous column grid and keeps
+// the period context visible inline without scrolling.
 function RangeFilter({
   state,
   onChange,
@@ -138,14 +171,16 @@ function RangeFilter({
   onChange: (next: RangeFilterState) => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr] items-end">
-      <div>
-        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Range</Label>
+    <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+          Range:
+        </Label>
         <Select
           value={state.range}
           onValueChange={(v) => onChange({ ...state, range: v as ReportRange })}
         >
-          <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl">
+          <SelectTrigger className="w-full sm:w-[140px] h-9 text-sm border-slate-200 rounded-lg bg-white">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="rounded-xl border-slate-200">
@@ -155,36 +190,37 @@ function RangeFilter({
           </SelectContent>
         </Select>
       </div>
+
       {state.range === "daily" ? (
-        <>
-          <div>
-            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Date</Label>
-            <Input
-              type="date"
-              value={state.date}
-              onChange={(e) => onChange({ ...state, date: e.target.value })}
-              className="bg-slate-50 border-slate-200 rounded-xl"
-            />
-          </div>
-          <div />
-        </>
+        <div className="flex items-center gap-2 animate-in slide-in-from-left-2 w-full sm:w-auto">
+          <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            Date:
+          </Label>
+          <Input
+            type="date"
+            value={state.date}
+            onChange={(e) => onChange({ ...state, date: e.target.value })}
+            className="h-9 w-full sm:w-[150px] text-sm rounded-lg border-slate-200 bg-white"
+          />
+        </div>
       ) : state.range === "monthly" ? (
-        <>
-          <div>
-            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Month</Label>
-            <Input
-              type="month"
-              value={state.month}
-              onChange={(e) => onChange({ ...state, month: e.target.value })}
-              className="bg-slate-50 border-slate-200 rounded-xl"
-            />
-          </div>
-          <div />
-        </>
+        <div className="flex items-center gap-2 animate-in slide-in-from-left-2 w-full sm:w-auto">
+          <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            Month:
+          </Label>
+          <Input
+            type="month"
+            value={state.month}
+            onChange={(e) => onChange({ ...state, month: e.target.value })}
+            className="h-9 w-full sm:w-[150px] text-sm rounded-lg border-slate-200 bg-white"
+          />
+        </div>
       ) : (
-        <>
-          <div>
-            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Start Date</Label>
+        <div className="flex items-center gap-3 animate-in slide-in-from-left-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              From:
+            </Label>
             <Input
               type="date"
               value={state.startDate}
@@ -192,20 +228,22 @@ function RangeFilter({
                 onChange({ ...state, startDate: e.target.value })
               }
               aria-label="Start date"
-              className="bg-slate-50 border-slate-200 rounded-xl"
+              className="h-9 w-full sm:w-[130px] text-sm rounded-lg border-slate-200 bg-white"
             />
           </div>
-          <div>
-            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">End Date</Label>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              To:
+            </Label>
             <Input
               type="date"
               value={state.endDate}
               onChange={(e) => onChange({ ...state, endDate: e.target.value })}
               aria-label="End date"
-              className="bg-slate-50 border-slate-200 rounded-xl"
+              className="h-9 w-full sm:w-[130px] text-sm rounded-lg border-slate-200 bg-white"
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -288,27 +326,47 @@ function RevenueReportTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       {/* Filter Area */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <h3 className="text-sm font-bold text-slate-800">Report Filters</h3>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportCSV} className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white border-0 rounded-xl">
-              <Download className="h-4 w-4 mr-2" /> CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.print()}
-              className="border-slate-200 rounded-xl hover:bg-slate-50"
-            >
-              <Printer className="h-4 w-4 mr-2" /> Print
-            </Button>
+      <Card className="border-slate-200 shadow-sm rounded-xl bg-white">
+        <CardContent className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-slate-800 text-sm whitespace-nowrap">
+              Report Filters
+            </h3>
+            {data?.period ? (
+              <div className="bg-teal-50 text-[#0d7377] px-3 py-1 rounded-full text-xs font-black tracking-wide border border-teal-100 shadow-sm whitespace-nowrap">
+                {data.period}
+              </div>
+            ) : null}
           </div>
-        </div>
-        <RangeFilter state={filter} onChange={setFilter} />
-      </div>
+
+          <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+            <RangeFilter state={filter} onChange={setFilter} />
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleExportCSV}
+                size="sm"
+                variant="outline"
+                disabled={!data}
+                className="border-slate-200 text-slate-700 bg-white hover:bg-slate-50 shadow-sm"
+              >
+                <Download className="h-4 w-4 mr-2 text-slate-400" />
+                Download CSV
+              </Button>
+              <Button
+                onClick={() => window.print()}
+                size="sm"
+                variant="outline"
+                className="border-slate-200 text-slate-700 bg-white hover:bg-slate-50 shadow-sm"
+              >
+                <Download className="h-4 w-4 mr-2 text-rose-400" />
+                Download PDF
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {errorMessage ? (
         <p className="text-sm text-destructive">{errorMessage}</p>
@@ -320,41 +378,130 @@ function RevenueReportTab() {
         </div>
       ) : data ? (
         <>
-          <p className="text-sm text-slate-500">
-            Period:{" "}
-            <span className="font-semibold text-slate-800">
-              {data.period}
-            </span>
-          </p>
-
-          <div className="grid gap-5 md:grid-cols-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <KpiCard
               label="Total Revenue"
               value={`₹${parseFloat(data.summary.total_revenue).toLocaleString("en-IN")}`}
               trend
-              accent="bg-emerald-500"
+              icon={<IndianRupee className="h-5 w-5 text-emerald-600" />}
+              iconBg="bg-emerald-100"
             />
             <KpiCard
               label="Cash Sales"
               value={`₹${parseFloat(data.summary.total_cash).toLocaleString("en-IN")}`}
-              accent="bg-amber-500"
+              icon={<IndianRupee className="h-5 w-5 text-amber-600" />}
+              iconBg="bg-amber-100"
             />
             <KpiCard
               label="Online Sales"
               value={`₹${parseFloat(data.summary.total_online).toLocaleString("en-IN")}`}
-              accent="bg-blue-500"
+              icon={<Activity className="h-5 w-5 text-blue-600" />}
+              iconBg="bg-blue-100"
             />
             <KpiCard
               label="Transactions"
               value={data.summary.total_transactions}
-              accent="bg-purple-500"
+              icon={<CalendarDays className="h-5 w-5 text-purple-600" />}
+              iconBg="bg-purple-100"
             />
           </div>
 
+          <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-50 p-6">
+              <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                Revenue Breakdown
+                <span className="text-[#0d7377] bg-teal-50 px-2 py-0.5 rounded text-xs">
+                  ({data.period})
+                </span>
+              </CardTitle>
+              <p className="text-xs text-slate-500 mt-1">
+                Daily breakdown for the selected period
+              </p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/80 border-b border-slate-100">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Sr. No.
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Date
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Day
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                      Cash
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                      Online
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-[#0d7377] text-right bg-teal-50/30">
+                      Total Revenue
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                      Txns
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-50">
+                  {data.breakdown.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center text-sm text-slate-500 py-8"
+                      >
+                        No transactions in this period
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data.breakdown.map((row, idx) => (
+                      <TableRow
+                        key={`${row.date}-${idx}`}
+                        className="hover:bg-slate-50/50 transition-colors"
+                      >
+                        <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">
+                          {idx + 1}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
+                          {new Date(row.date).toLocaleDateString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">
+                          {row.day_name}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-medium text-amber-600 text-sm">
+                          ₹{parseFloat(row.cash).toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-medium text-blue-600 text-sm">
+                          ₹{parseFloat(row.online).toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-black text-slate-900 text-sm bg-teal-50/30">
+                          ₹{parseFloat(row.revenue).toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right font-medium text-slate-600 text-sm">
+                          {row.transactions}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
           {chartData.length > 0 ? (
-            <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+            <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
               <CardHeader className="border-b border-slate-50 p-6">
-                <CardTitle className="text-base font-bold text-slate-800">Daily Revenue Trend</CardTitle>
+                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  Daily Revenue Trend
+                  <span className="text-[#0d7377] bg-teal-50 px-2 py-0.5 rounded text-xs">
+                    ({data.period})
+                  </span>
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-1">
+                  Visual trend of revenue generation
+                </p>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="h-72 w-full">
@@ -380,11 +527,30 @@ function RevenueReportTab() {
                           />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="label" fontSize={11} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                      <YAxis fontSize={11} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="#f1f5f9"
+                      />
+                      <XAxis
+                        dataKey="label"
+                        fontSize={11}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "#64748b" }}
+                      />
+                      <YAxis
+                        fontSize={11}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "#64748b" }}
+                      />
                       <Tooltip
-                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        contentStyle={{
+                          borderRadius: "12px",
+                          border: "1px solid #e2e8f0",
+                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                        }}
                         formatter={(value) =>
                           `₹${Number(value).toLocaleString("en-IN")}`
                         }
@@ -402,61 +568,6 @@ function RevenueReportTab() {
               </CardContent>
             </Card>
           ) : null}
-
-          <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
-            <CardHeader className="border-b border-slate-50 p-6">
-              <CardTitle className="text-base font-bold text-slate-800">Revenue Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Sr.</TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Date</TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Day</TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Cash</TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Online</TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-[#0d7377] text-right bg-teal-50/30">Revenue</TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Txns</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.breakdown.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="text-center text-sm text-slate-500 py-8"
-                      >
-                        No transactions in this period
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    data.breakdown.map((row, idx) => (
-                      <TableRow key={`${row.date}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
-                        <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">{idx + 1}</TableCell>
-                        <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
-                          {new Date(row.date).toLocaleDateString("en-IN")}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">{row.day_name}</TableCell>
-                        <TableCell className="px-6 py-3.5 text-right font-medium text-amber-600 text-sm">
-                          ₹{parseFloat(row.cash).toLocaleString("en-IN")}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 text-right font-medium text-blue-600 text-sm">
-                          ₹{parseFloat(row.online).toLocaleString("en-IN")}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 text-right font-black text-slate-900 text-sm bg-teal-50/30">
-                          ₹{parseFloat(row.revenue).toLocaleString("en-IN")}
-                        </TableCell>
-                        <TableCell className="px-6 py-3.5 text-right font-medium text-slate-600 text-sm">
-                          {row.transactions}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </>
       ) : null}
     </div>
@@ -467,26 +578,36 @@ function KpiCard({
   label,
   value,
   trend,
-  accent = "bg-primary",
+  icon,
+  iconBg = "bg-slate-100",
 }: {
   label: string;
   value: string | number;
   trend?: boolean;
-  accent?: string;
+  icon?: ReactNode;
+  iconBg?: string;
 }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border-slate-100 shadow-sm bg-white">
-      <div className={`h-1.5 w-full ${accent}`} />
-      <CardContent className="p-5">
-        <p className="text-4xl font-black text-slate-800">{value}</p>
-        <p className="text-sm font-black text-slate-400 uppercase tracking-widest mt-1">{label}</p>
-        {trend ? (
-          <p className="text-xs text-emerald-600 flex items-center gap-1 mt-2 font-medium">
-            <TrendingUp className="h-3 w-3" />
-            Live
-          </p>
+    <Card className="border-slate-200 shadow-sm rounded-xl bg-white p-6">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-xs font-medium text-slate-500 mb-2">{label}</p>
+          <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+        </div>
+        {icon ? (
+          <div
+            className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center flex-shrink-0`}
+          >
+            {icon}
+          </div>
         ) : null}
-      </CardContent>
+      </div>
+      {trend ? (
+        <p className="text-xs text-emerald-600 flex items-center gap-1 mt-3 font-semibold">
+          <TrendingUp className="h-3 w-3" />
+          Live
+        </p>
+      ) : null}
     </Card>
   );
 }
@@ -525,12 +646,14 @@ function ConsumptionReportTab() {
 
   const groupedBup = useMemo(() => {
     if (category !== "BUP" || !data) return null;
-    const groups: Record<string, ConsumptionReportResponse["medicine_breakdown"]> =
-      {
-        "0.4mg + 0.1mg": [],
-        "1.0mg + 0.25mg": [],
-        "2.0mg + 0.5mg": [],
-      };
+    const groups: Record<
+      string,
+      ConsumptionReportResponse["medicine_breakdown"]
+    > = {
+      "0.4mg + 0.1mg": [],
+      "1.0mg + 0.25mg": [],
+      "2.0mg + 0.5mg": [],
+    };
     data.medicine_breakdown.forEach((m) => {
       if (m.strength && groups[m.strength]) {
         groups[m.strength].push(m);
@@ -540,33 +663,45 @@ function ConsumptionReportTab() {
   }, [data, category]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       {/* Filter Area */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-800 mb-4">Report Filters</h3>
-        <RangeFilter state={filter} onChange={setFilter} />
-      </div>
+      <Card className="border-slate-200 shadow-sm rounded-xl bg-white">
+        <CardContent className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-slate-800 text-sm whitespace-nowrap">
+              Report Filters
+            </h3>
+            {data?.period ? (
+              <div className="bg-teal-50 text-[#0d7377] px-3 py-1 rounded-full text-xs font-black tracking-wide border border-teal-100 shadow-sm whitespace-nowrap">
+                {data.period}
+              </div>
+            ) : null}
+          </div>
+          <RangeFilter state={filter} onChange={setFilter} />
+        </CardContent>
+      </Card>
 
-      {/* Category Selector */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category:</Label>
+      <Card className="border-slate-200 shadow-sm rounded-xl bg-white">
+        <CardContent className="p-4 sm:p-5 flex flex-wrap items-center gap-3">
+          <Label className="text-sm font-semibold text-slate-600 mr-2">
+            Medicine Categories:
+          </Label>
           {(["All", "Rx", "NRx", "BUP"] as const).map((c) => (
-            <Button
+            <button
               key={c}
-              size="sm"
-              variant={category === c ? "default" : "outline"}
               onClick={() => setCategory(c)}
-              className={category === c
-                ? "bg-[#0d7377] hover:bg-[#0a5c5f] text-white border-0 rounded-xl font-bold"
-                : "border-slate-200 rounded-xl font-bold hover:border-[#0d7377] hover:text-[#0d7377]"
-              }
+              type="button"
+              className={`px-5 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm ${
+                category === c
+                  ? "bg-[#0d7377] text-white border-[#0d7377]"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-[#0d7377] hover:text-[#0d7377]"
+              }`}
             >
               {c}
-            </Button>
+            </button>
           ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {errorMessage ? (
         <p className="text-sm text-destructive">{errorMessage}</p>
@@ -578,10 +713,12 @@ function ConsumptionReportTab() {
         </div>
       ) : data ? (
         <>
-          <p className="text-sm text-slate-500">
-            Period:{" "}
-            <span className="font-semibold text-slate-800">{data.period}</span>
-          </p>
+          {/* Consumption trend chart — shows daily RX/NRx/BUP dispensing pattern.
+              Uses real trend_data returned by the backend; the AI version had this
+              chart but powered by Math.random() fabrications. */}
+          {data.trend_data.length > 1 ? (
+            <ConsumptionTrendChart rows={data.trend_data} category={category} />
+          ) : null}
 
           {category === "BUP" && groupedBup ? (
             Object.entries(groupedBup).map(([strength, rows]) => (
@@ -604,6 +741,120 @@ function ConsumptionReportTab() {
   );
 }
 
+// ────────── Consumption Trend Chart ──────────
+// Renders real trend_data from the backend — daily RX / NRx / BUP dispensing.
+// Only shown when there are ≥2 data points (a single day has no trend to draw).
+// When the user filters by a specific category, irrelevant bars are hidden so
+// the chart stays readable without cluttering with zero-value series.
+
+const TREND_COLORS = {
+  rx: "#0d7377",
+  nrx: "#f59e0b",
+  bup: "#6366f1",
+} as const;
+
+function ConsumptionTrendChart({
+  rows,
+  category,
+}: {
+  rows: { date: string; rx: number; nrx: number; bup: number; total: number }[];
+  category: "All" | "Rx" | "NRx" | "BUP";
+}) {
+  const chartData = rows.map((r) => ({
+    label: new Date(r.date).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+    }),
+    rx: r.rx,
+    nrx: r.nrx,
+    bup: r.bup,
+    total: r.total,
+  }));
+
+  const showRx = category === "All" || category === "Rx";
+  const showNrx = category === "All" || category === "NRx";
+  const showBup = category === "All" || category === "BUP";
+
+  return (
+    <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
+      <CardHeader className="border-b border-slate-50 p-6">
+        <CardTitle className="text-base font-bold text-slate-800">
+          Daily Dispensing Trend
+        </CardTitle>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Units dispensed per day, broken down by category
+        </p>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} barCategoryGap="30%">
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#f1f5f9"
+              />
+              <XAxis
+                dataKey="label"
+                fontSize={11}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#64748b" }}
+              />
+              <YAxis
+                fontSize={11}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "#64748b" }}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "12px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                }}
+                formatter={(value, name) => [value, String(name).toUpperCase()]}
+              />
+              <Legend
+                formatter={(value) => (
+                  <span className="text-xs font-semibold text-slate-600 uppercase">
+                    {value}
+                  </span>
+                )}
+              />
+              {showRx ? (
+                <Bar
+                  dataKey="rx"
+                  name="Rx"
+                  fill={TREND_COLORS.rx}
+                  radius={[4, 4, 0, 0]}
+                />
+              ) : null}
+              {showNrx ? (
+                <Bar
+                  dataKey="nrx"
+                  name="NRx"
+                  fill={TREND_COLORS.nrx}
+                  radius={[4, 4, 0, 0]}
+                />
+              ) : null}
+              {showBup ? (
+                <Bar
+                  dataKey="bup"
+                  name="BUP"
+                  fill={TREND_COLORS.bup}
+                  radius={[4, 4, 0, 0]}
+                />
+              ) : null}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MedicineBreakdownTable({
   rows,
 }: {
@@ -616,7 +867,9 @@ function MedicineBreakdownTable({
           <BarChart3 className="h-5 w-5 text-slate-400" />
         </div>
         <p className="text-sm font-bold text-slate-700">No consumption data</p>
-        <p className="text-xs text-slate-400 mt-1">No consumption recorded in this period</p>
+        <p className="text-xs text-slate-400 mt-1">
+          No consumption recorded in this period
+        </p>
       </div>
     );
   }
@@ -626,36 +879,60 @@ function MedicineBreakdownTable({
     0,
   );
   return (
-    <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+    <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
       <Table>
-        <TableHeader className="bg-slate-50/50">
+        <TableHeader className="bg-slate-50/80 border-b border-slate-100">
           <TableRow className="hover:bg-transparent">
-            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Sr.</TableHead>
-            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine</TableHead>
-            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Salt</TableHead>
-            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Consumed</TableHead>
-            <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-[#0d7377] text-right bg-teal-50/30">Selling Value</TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+              Sr.
+            </TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+              Medicine
+            </TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+              Salt
+            </TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+              Consumed
+            </TableHead>
+            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-[#0d7377] text-right bg-teal-50/30">
+              Selling Value
+            </TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody className="divide-y divide-slate-50">
           {rows.map((r, idx) => (
-            <TableRow key={`${r.name}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
-              <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">{idx + 1}</TableCell>
-              <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">{r.name}</TableCell>
+            <TableRow
+              key={`${r.name}-${idx}`}
+              className="hover:bg-slate-50/50 transition-colors"
+            >
+              <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">
+                {idx + 1}
+              </TableCell>
+              <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
+                {r.name}
+              </TableCell>
               <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">
                 {r.salt}
               </TableCell>
-              <TableCell className="px-6 py-3.5 text-right font-medium text-slate-700 text-sm">{r.quantity}</TableCell>
+              <TableCell className="px-6 py-3.5 text-right font-medium text-slate-700 text-sm">
+                {r.quantity}
+              </TableCell>
               <TableCell className="px-6 py-3.5 text-right font-black text-slate-900 text-sm bg-teal-50/30">
                 ₹{parseFloat(r.selling_value).toLocaleString("en-IN")}
               </TableCell>
             </TableRow>
           ))}
           <TableRow className="bg-teal-50/20 hover:bg-teal-50/30 border-t-2 border-teal-100">
-            <TableCell colSpan={3} className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm uppercase tracking-wider">
+            <TableCell
+              colSpan={3}
+              className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm uppercase tracking-wider"
+            >
               Totals
             </TableCell>
-            <TableCell className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm">{totalQty}</TableCell>
+            <TableCell className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm">
+              {totalQty}
+            </TableCell>
             <TableCell className="px-6 py-3.5 text-right font-black text-[#0d7377] text-sm bg-teal-50/40">
               ₹{totalValue.toLocaleString("en-IN")}
             </TableCell>
@@ -689,7 +966,7 @@ function LowStockReportTab() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       {errorMessage ? (
         <p className="text-sm text-destructive">{errorMessage}</p>
       ) : null}
@@ -698,45 +975,77 @@ function LowStockReportTab() {
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : items.length === 0 ? (
-        <Card className="rounded-2xl border-slate-100 shadow-sm bg-white">
+        <Card className="border-slate-200 shadow-sm rounded-xl bg-white">
           <CardContent className="p-0">
             <div className="flex flex-col items-center justify-center py-16">
               <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
                 <AlertTriangle className="h-6 w-6 text-emerald-500" />
               </div>
-              <p className="text-sm font-bold text-slate-700">All stock levels healthy</p>
-              <p className="text-xs text-slate-400 mt-1">All medicines are above their reorder level</p>
+              <p className="text-sm font-bold text-slate-700">
+                All stock levels healthy
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                All medicines are above their reorder level
+              </p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
+        <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
           <CardHeader className="border-b border-slate-50 p-6">
-            <CardTitle className="text-base font-bold text-slate-800">Low Stock Report</CardTitle>
-            <p className="text-xs text-slate-500 mt-1">Medicines that are at or below their reorder level</p>
+            <CardTitle className="text-base font-bold text-slate-800">
+              Low Stock Report
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Medicines that are at or below their reorder level
+            </p>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-slate-50/50">
+              <TableHeader className="bg-slate-50/80 border-b border-slate-100">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Sr.</TableHead>
-                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Medicine</TableHead>
-                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Salt</TableHead>
-                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Category</TableHead>
-                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Remaining</TableHead>
-                  <TableHead className="h-11 px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">Reorder Level</TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                    Sr.
+                  </TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                    Medicine
+                  </TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                    Salt
+                  </TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                    Category
+                  </TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                    Remaining
+                  </TableHead>
+                  <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                    Reorder Level
+                  </TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="divide-y divide-slate-50">
                 {items.map((it, idx) => (
-                  <TableRow key={it.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">{idx + 1}</TableCell>
-                    <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">{it.name}</TableCell>
+                  <TableRow
+                    key={it.id}
+                    className="hover:bg-slate-50/50 transition-colors"
+                  >
+                    <TableCell className="px-6 py-3.5 font-medium text-slate-400 text-sm">
+                      {idx + 1}
+                    </TableCell>
+                    <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
+                      {it.name}
+                    </TableCell>
                     <TableCell className="px-6 py-3.5 font-medium text-slate-500 text-sm">
                       {it.salt}
                     </TableCell>
                     <TableCell className="px-6 py-3.5">
-                      <Badge variant="outline" className="rounded-lg border-slate-200">{it.category}</Badge>
+                      <Badge
+                        variant="outline"
+                        className="rounded-lg border-slate-200"
+                      >
+                        {it.category}
+                      </Badge>
                     </TableCell>
                     <TableCell className="px-6 py-3.5 text-right">
                       <Badge
@@ -784,7 +1093,7 @@ function ExpiryReportTab() {
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       {errorMessage ? (
         <p className="text-sm text-destructive">{errorMessage}</p>
       ) : null}
@@ -795,46 +1104,64 @@ function ExpiryReportTab() {
         </div>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-rose-600" />
-            Expired Medicines
-            {data ? (
-              <Badge variant="secondary">{data.expired.length}</Badge>
-            ) : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!data || data.expired.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No expired batches in active inventory
+      <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-base font-bold text-red-600 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              Expired Medicines
+              {data ? (
+                <Badge variant="secondary">{data.expired.length}</Badge>
+              ) : null}
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Medicines that have already expired and need to be removed.
             </p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {!data || data.expired.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-500">
+              No expired batches in active inventory
+            </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Medicine</TableHead>
-                    <TableHead>Batch</TableHead>
-                    <TableHead>Expiry</TableHead>
-                    <TableHead>Days Overdue</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
+                <TableHeader className="bg-slate-50/80 border-b border-slate-100">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Medicine
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Batch No.
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Expiry Date
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Days Overdue
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                      Quantity
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-50">
                   {data.expired.map((r) => (
-                    <TableRow key={`${r.medicine_id}-${r.batch_number}`}>
-                      <TableCell className="font-medium">
+                    <TableRow
+                      key={`${r.medicine_id}-${r.batch_number}`}
+                      className="hover:bg-slate-50/50 transition-colors"
+                    >
+                      <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
                         {r.medicine_name}
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="px-6 py-3.5 font-mono text-slate-500 text-sm">
                         {r.batch_number}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-6 py-3.5 font-bold text-red-600 text-sm">
                         {new Date(r.expiry_date).toLocaleDateString("en-IN")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-6 py-3.5">
                         <Badge
                           variant="outline"
                           className="border-rose-500 text-rose-700 bg-rose-50"
@@ -842,7 +1169,9 @@ function ExpiryReportTab() {
                           {r.days_overdue ?? "—"} days
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{r.quantity}</TableCell>
+                      <TableCell className="px-6 py-3.5 text-right font-medium text-slate-700 text-sm">
+                        {r.quantity}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -852,46 +1181,64 @@ function ExpiryReportTab() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-amber-600" />
-            Near Expiry (within 180 days)
-            {data ? (
-              <Badge variant="secondary">{data.near_expiry.length}</Badge>
-            ) : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!data || data.near_expiry.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No batches nearing expiry
+      <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-base font-bold text-orange-500 flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-amber-600" />
+              Near Expiry (within 180 days)
+              {data ? (
+                <Badge variant="secondary">{data.near_expiry.length}</Badge>
+              ) : null}
+            </CardTitle>
+            <p className="text-xs text-slate-500 mt-1">
+              Medicines expiring within the next 180 days.
             </p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {!data || data.near_expiry.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-500">
+              No batches nearing expiry
+            </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Medicine</TableHead>
-                    <TableHead>Batch</TableHead>
-                    <TableHead>Expiry</TableHead>
-                    <TableHead>Days Remaining</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
+                <TableHeader className="bg-slate-50/80 border-b border-slate-100">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Medicine
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Batch No.
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Expiry Date
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500">
+                      Days Remaining
+                    </TableHead>
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
+                      Quantity
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-50">
                   {data.near_expiry.map((r) => (
-                    <TableRow key={`${r.medicine_id}-${r.batch_number}`}>
-                      <TableCell className="font-medium">
+                    <TableRow
+                      key={`${r.medicine_id}-${r.batch_number}`}
+                      className="hover:bg-slate-50/50 transition-colors"
+                    >
+                      <TableCell className="px-6 py-3.5 font-semibold text-slate-700 text-sm">
                         {r.medicine_name}
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="px-6 py-3.5 font-mono text-slate-500 text-sm">
                         {r.batch_number}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-6 py-3.5 font-bold text-orange-500 text-sm">
                         {new Date(r.expiry_date).toLocaleDateString("en-IN")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-6 py-3.5">
                         <Badge
                           variant="outline"
                           className="border-amber-500 text-amber-700 bg-amber-50"
@@ -899,7 +1246,9 @@ function ExpiryReportTab() {
                           {r.days_until_expiry ?? "—"} days
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{r.quantity}</TableCell>
+                      <TableCell className="px-6 py-3.5 text-right font-medium text-slate-700 text-sm">
+                        {r.quantity}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
