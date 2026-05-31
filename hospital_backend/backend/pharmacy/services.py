@@ -273,40 +273,69 @@ def _resolve_visit_session(session_id) -> VisitSession:
 
 
 def _build_payment_totals(line_items: list[dict], payment: dict) -> dict:
-    subtotal = sum(
-        (Decimal(item["qty"]) * Decimal(item["unit_price"]) for item in line_items),
-        Decimal("0"),
+    """Compute authoritative invoice totals on the server.
+
+    Money policy:
+    - ``discount`` arrives as a rupee AMOUNT (2 dp). The server is the sole
+      authority for ``net_payable``; the frontend's displayed total is never
+      trusted for persistence.
+    - For Cash / Online, the tendered amount is fully determined by
+      ``net_payable`` and is derived here (the client value is ignored). This
+      removes the entire class of "cash != net payable" rounding mismatches.
+    - For Split, the client must supply how the payment was divided; we only
+      validate that the two parts reconcile to ``net_payable`` within 1 paise
+      of floating-point dust, then snap them to exact 2 dp.
+    - ``discount_percentage`` is DERIVED from the amount purely for
+      storage/reporting; it never drives the math.
+    """
+    # Quantize each unit price first so the per-line totals persisted later
+    # (also computed with _q2 per line) reconcile exactly with the subtotal.
+    subtotal = _q2(
+        sum(
+            (Decimal(item["qty"]) * _q2(item["unit_price"]) for item in line_items),
+            Decimal("0"),
+        )
     )
-    discount_pct = Decimal(payment.get("discount", 0) or 0)
-    discount_amount = _q2(subtotal * discount_pct / Decimal("100"))
+
+    discount_amount = _q2(payment.get("discount", 0) or 0)
+    if discount_amount < Decimal("0"):
+        raise serializers.ValidationError("Discount cannot be negative.")
+    if discount_amount > subtotal:
+        raise serializers.ValidationError("Discount cannot exceed the subtotal.")
+
     net_payable = _q2(subtotal - discount_amount)
 
+    # Derived percentage (storage/reporting only). Bounded 0–100 by the
+    # discount<=subtotal check above, satisfying the model check constraint.
+    discount_pct = (
+        _q2(discount_amount / subtotal * Decimal("100"))
+        if subtotal > Decimal("0")
+        else Decimal("0")
+    )
+
     method = payment["payment_method"]
-    cash = Decimal(payment.get("cash_amount", 0) or 0)
-    online = Decimal(payment.get("online_amount", 0) or 0)
 
     if method == PaymentMethod.CASH:
-        if abs(cash - net_payable) > Decimal("1"):
-            raise serializers.ValidationError(
-                "Cash amount must equal net payable for Cash payments."
-            )
         cash = net_payable
         online = Decimal("0")
     elif method == PaymentMethod.ONLINE:
-        if abs(online - net_payable) > Decimal("1"):
-            raise serializers.ValidationError(
-                "Online amount must equal net payable for Online payments."
-            )
-        online = net_payable
         cash = Decimal("0")
+        online = net_payable
     elif method == PaymentMethod.SPLIT:
-        if abs((cash + online) - net_payable) > Decimal("1"):
+        cash = _q2(payment.get("cash_amount", 0) or 0)
+        online = _q2(payment.get("online_amount", 0) or 0)
+        if abs((cash + online) - net_payable) > Decimal("0.01"):
             raise serializers.ValidationError(
-                "Cash + Online must equal net payable (±1) for Split payments."
+                "Cash + Online must equal the net payable for Split payments."
             )
+        # Absorb sub-paise dust into the cash leg so the parts sum exactly.
+        cash = _q2(net_payable - online)
+    else:
+        cash = Decimal("0")
+        online = Decimal("0")
 
     return {
-        "subtotal": _q2(subtotal),
+        "subtotal": subtotal,
         "discount_percentage": discount_pct,
         "discount_amount": discount_amount,
         "net_payable": net_payable,

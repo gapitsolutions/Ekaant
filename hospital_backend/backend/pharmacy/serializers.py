@@ -382,8 +382,11 @@ class PaymentWriteSerializer(serializers.Serializer):
     online_amount = serializers.DecimalField(
         max_digits=10, decimal_places=2, min_value=0, default=0
     )
+    # ``discount`` is a rupee AMOUNT (not a percentage). Constrained to 2 dp
+    # (whole paise) so the frontend and backend agree to the cent. The
+    # discount percentage is derived server-side for storage/reporting.
     discount = serializers.DecimalField(
-        max_digits=5, decimal_places=2, min_value=0, max_value=100, default=0
+        max_digits=10, decimal_places=2, min_value=0, default=0
     )
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 

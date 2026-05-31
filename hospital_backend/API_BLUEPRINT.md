@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-05-31
+> **Last Updated:** 2026-06-01
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -1052,7 +1052,7 @@ Request body:
     "payment_method": "Cash",
     "cash_amount": "7980.00",
     "online_amount": "0",
-    "discount": "5.0",
+    "discount": "420.00",
     "notes": "Regular patient discount applied"
   },
   "next_followup_date": "2026-06-02"
@@ -1065,13 +1065,15 @@ Validation:
 - No existing `DispenseInvoice` for the session (unique constraint)
 - Each line item references an active medicine; batch is active, belongs to medicine, and not expired
 - Per-batch aggregate requested quantity (same batch may appear in multiple line items) ≤ batch's current quantity (re-checked after lock)
-- Payment validation:
-  - `subtotal = Σ(qty × unit_price)`
-  - `discount_amount = round(subtotal × discount / 100)`
+- `discount` is a **rupee amount** (2 dp), not a percentage. Must satisfy `0 ≤ discount ≤ subtotal`.
+- Payment computation (server is the sole authority for money totals):
+  - `subtotal = Σ(qty × round(unit_price, 2))`, then rounded to 2 dp
+  - `discount_amount = round(discount, 2)`
   - `net_payable = subtotal − discount_amount`
-  - `Cash`: `|cash_amount − net_payable| ≤ ₹1`
-  - `Online`: `|online_amount − net_payable| ≤ ₹1`
-  - `Split`: `|cash_amount + online_amount − net_payable| ≤ ₹1`
+  - `discount_percentage = round(discount_amount / subtotal × 100, 2)` — **derived, storage/reporting only**
+  - `Cash`: server derives `cash_amount = net_payable`, `online_amount = 0` (client values ignored)
+  - `Online`: server derives `online_amount = net_payable`, `cash_amount = 0` (client values ignored)
+  - `Split`: client `cash_amount + online_amount` must reconcile to `net_payable` within ₹0.01; cash leg is then snapped so the parts sum exactly
 - `next_followup_date` must be in the future if provided
 
 Side effects (in order, single transaction):
