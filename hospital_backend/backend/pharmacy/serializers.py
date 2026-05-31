@@ -440,6 +440,7 @@ class DispenseInvoiceListItemSerializer(serializers.Serializer):
     def from_invoice(cls, invoice: DispenseInvoice) -> dict:
         return {
             "id": str(invoice.id),
+            "session_id": str(invoice.visit_session_id) if invoice.visit_session_id else "",
             "invoice_number": invoice.invoice_number,
             "patient": invoice.patient.full_name if invoice.patient_id else "",
             "patient_id": str(invoice.patient_id),

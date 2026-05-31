@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-01
+> **Last Updated:** 2026-06-01 (IST)
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -1186,6 +1186,7 @@ Response item shape:
 ```json
 {
   "id": "uuid",
+  "session_id": "uuid",
   "invoice_number": "INV-20260523-0001",
   "patient": "Rahul Sharma",
   "patient_id": "uuid",
@@ -1200,6 +1201,10 @@ Response item shape:
 ```
 
 Plus `pagination: {page, pageSize, total}`.
+
+Notes:
+
+- `session_id` is included so clients can call `GET /api/v1/pharmacy/dispense/<session_id>/` for detailed invoice view or PDF generation flows.
 
 ### 7.16 `GET /api/v1/pharmacy/reports/revenue/`
 
@@ -1678,6 +1683,7 @@ Stock movement type reference:
 - `POST   /api/v1/pharmacy/inventory/audit-removal/`
 - `GET    /api/v1/pharmacy/queue/`
 - `POST   /api/v1/pharmacy/dispense/`
+- `GET    /api/v1/pharmacy/dispense/<session_id>/`
 - `POST   /api/v1/pharmacy/dispense/<session_id>/cancel/`
 - `GET    /api/v1/pharmacy/dispense-history/`
 - `GET    /api/v1/pharmacy/reports/revenue/`

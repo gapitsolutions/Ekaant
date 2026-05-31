@@ -347,6 +347,7 @@ export async function cancelDispense(
 // ── Dispense History (Invoice History) ──
 export interface DispenseHistoryItem {
   id: string;
+  session_id: string;
   invoice_number: string;
   patient: string;
   patient_id: string;
