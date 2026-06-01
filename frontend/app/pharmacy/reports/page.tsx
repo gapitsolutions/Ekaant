@@ -71,7 +71,7 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("revenue");
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
       <Tabs value={tab} onValueChange={(v) => setTab(v as ReportTab)}>
         <div className="flex flex-col gap-6">
           <PageHeader

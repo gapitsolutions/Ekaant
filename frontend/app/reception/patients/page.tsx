@@ -1110,7 +1110,7 @@ export default function PatientDataPage() {
   // If a patient is selected, show full profile
   if (selectedPatient) {
     return (
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6">
         {/* Back Button & Header */}
         <div className="space-y-3">
           <div className="flex items-center gap-4">
@@ -2705,7 +2705,7 @@ export default function PatientDataPage() {
 
   // Patient List View
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6">
       {/* Header */}
       <PageHeader
         title="Patient Data"

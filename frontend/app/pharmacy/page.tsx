@@ -398,7 +398,7 @@ export default function PharmacyDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50/50">
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 pb-20">
+      <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto px-6 py-8 space-y-8 pb-20">
         {/* ── Header ── */}
         <PageHeader
           title="Pharmacy Dashboard"

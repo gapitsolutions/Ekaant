@@ -18,6 +18,8 @@ import {
   Package,
   FileText,
   Building2,
+  Menu,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,7 +34,10 @@ interface NavItem {
 }
 
 const navigationByRole: Record<UserRole, NavItem[]> = {
-  admin: [{ title: "Dashboard", href: "/admin", icon: LayoutDashboard }],
+  admin: [
+    { title: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
+    { title: "Suppliers", href: "/admin/suppliers", icon: Building2 },
+  ],
   reception: [
     {
       title: "Dashboard",
@@ -79,11 +84,6 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
       icon: Package,
     },
     {
-      title: "Suppliers",
-      href: "/pharmacy/suppliers",
-      icon: Building2,
-    },
-    {
       title: "Invoice History",
       href: "/pharmacy/dispense-data",
       icon: FileText,
@@ -127,7 +127,13 @@ function NavLink({
   );
 }
 
-export function DashboardSidebar() {
+export function DashboardSidebar({
+  mobileOpen = false,
+  onClose,
+}: {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+} = {}) {
   const [isMounted, setIsMounted] = useState(false);
   const [currentPath, setCurrentPath] = useState("");
   const { user, logout } = useAuth();
@@ -170,7 +176,12 @@ export function DashboardSidebar() {
     .slice(0, 2);
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-50 h-screen w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 ease-in-out lg:translate-x-0",
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+      )}
+    >
       <div className="flex h-full flex-col">
         {/* Logo and Hospital Name */}
         <div className="flex h-20 items-center gap-3 border-b border-sidebar-border px-4">
@@ -191,6 +202,15 @@ export function DashboardSidebar() {
               {BRANDING.subtitle}
             </span>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="ml-auto h-9 w-9 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground lg:hidden"
+          >
+            <X className="h-5 w-5" />
+            <span className="sr-only">Close menu</span>
+          </Button>
         </div>
 
         {/* Navigation */}
@@ -247,11 +267,47 @@ export function DashboardSidebar() {
 }
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
-      <DashboardSidebar />
-      <main className="pl-64">
-        <div className="p-6">{children}</div>
+      {/* Mobile / tablet top bar (hidden on lg+ where the sidebar is fixed) */}
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          className="h-9 w-9"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <div className="relative h-8 w-8 overflow-hidden rounded-lg bg-primary/10 p-1">
+          <Image
+            src={BRANDING.logoPath}
+            alt={`${BRANDING.name} Logo`}
+            fill
+            className="object-contain"
+          />
+        </div>
+        <span className="truncate text-sm font-bold">{BRANDING.shortName}</span>
+      </header>
+
+      {/* Backdrop when the slide-over sidebar is open on small screens */}
+      {mobileOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      ) : null}
+
+      <DashboardSidebar
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+      />
+      <main className="lg:pl-64">
+        <div className="p-4 sm:p-6">{children}</div>
       </main>
     </div>
   );

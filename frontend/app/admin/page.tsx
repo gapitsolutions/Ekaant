@@ -33,7 +33,7 @@ export default function AdminDashboard() {
     getPatientsList(accessToken)
       .then((data) => {
         const mapped = data.items.map((item: any) => ({
-          id: item.id || item._id,
+          id: item.patient_id || item.id || item._id,
           file_number: item.file_number || '',
           patient_category: item.patient_category || 'deaddiction',
           full_name: item.full_name || '',
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-8">
       {/* Header */}
       <PageHeader
         icon={<LayoutDashboard className="h-7 w-7 text-primary" />}

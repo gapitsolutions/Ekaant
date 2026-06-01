@@ -224,7 +224,7 @@ export default function InventoryWorkstationPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
       <PageHeader
         icon={<Boxes className="h-7 w-7 text-primary" />}
         title={

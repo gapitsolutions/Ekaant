@@ -135,7 +135,7 @@ export default function PrescriptionQueuePage() {
   const showingCount = filteredItems.length;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       {/* ── Header ── */}
       <PageHeader
         icon={<ClipboardList className="h-8 w-8 text-primary" />}

@@ -302,7 +302,7 @@ export default function InvoiceHistoryPage() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
         <PageHeader
           icon={
             <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center flex-shrink-0">

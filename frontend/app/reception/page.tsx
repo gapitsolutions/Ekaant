@@ -280,7 +280,7 @@ export default function ReceptionDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-8">
       {/* Header */}
       <PageHeader
         title="Reception Dashboard"

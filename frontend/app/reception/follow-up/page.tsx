@@ -198,7 +198,7 @@ export default function FollowUpPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl 2xl:max-w-[1600px] mx-auto">
       <PageHeader
         title="Follow-Up Calling System"
         subtitle="Manage patient follow-ups scheduled by the pharmacy."

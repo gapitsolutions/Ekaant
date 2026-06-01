@@ -130,7 +130,7 @@ export default function MedicineDetailPage() {
   const isLowStock = medicine ? currentStock <= medicine.reorder_level : false;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6">
       <PageHeader
         className="border-b border-slate-100 pb-4"
         leading={
