@@ -738,7 +738,7 @@ export default function DispenseWorkstationPage() {
           <div className="flex items-center justify-end pt-2">
             <Button
               onClick={handleAddToList}
-              className="bg-primary hover:bg-[#0a5c5f] text-white font-bold px-6 h-10 rounded-xl shadow-sm flex items-center gap-2"
+              className="bg-primary hover:bg-primary-dark text-white font-bold px-6 h-10 rounded-xl shadow-sm flex items-center gap-2"
             >
               <Plus className="h-4 w-4" /> Add to List
             </Button>
@@ -908,7 +908,7 @@ export default function DispenseWorkstationPage() {
                     Next Follow-up: <span className="underline decoration-wavy decoration-primary/30 ml-0.5">{new Date(nextVisitDate).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</span>
                   </span>
                 </div>
-                <Badge className="bg-primary hover:bg-[#0a5c5f] text-white font-extrabold text-[9px] px-2 py-0.5 border-0 rounded-lg">
+                <Badge className="bg-primary hover:bg-primary-dark text-white font-extrabold text-[9px] px-2 py-0.5 border-0 rounded-lg">
                   {nextVisitDays ? `${nextVisitDays} Days` : "Custom"}
                 </Badge>
               </div>
@@ -1103,7 +1103,7 @@ export default function DispenseWorkstationPage() {
           <button
             onClick={handleSaveInvoice}
             disabled={isSaving || lineItems.length === 0}
-            className="w-full h-12 bg-gradient-to-r from-primary to-teal-700 hover:from-[#0a5c5f] hover:to-teal-800 disabled:opacity-60 text-white font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-900/10 hover:scale-[1.01] active:scale-95 mt-1"
+            className="w-full h-12 bg-gradient-to-r from-primary to-teal-700 hover:from-primary-dark hover:to-teal-800 disabled:opacity-60 text-white font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-900/10 hover:scale-[1.01] active:scale-95 mt-1"
           >
             {isSaving ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

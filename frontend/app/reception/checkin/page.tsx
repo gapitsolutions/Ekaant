@@ -420,7 +420,7 @@ export default function CheckinPage() {
         actions={
           <Button
             onClick={() => navigate("/reception/register")}
-            className="bg-gradient-to-r from-primary to-[#14919b] hover:from-[#0a5c5f] hover:to-primary"
+            className="bg-gradient-to-r from-primary to-primary-accent hover:from-primary-dark hover:to-primary"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Register New Patient
@@ -479,7 +479,7 @@ export default function CheckinPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Search Section */}
         <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-[#14919b]/5">
+          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-primary-accent/5">
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
               Search Patient
@@ -553,7 +553,7 @@ export default function CheckinPage() {
               </div>
               <Button
                 onClick={handleSearch}
-                className="bg-primary hover:bg-[#0a5c5f]"
+                className="bg-primary hover:bg-primary-dark"
               >
                 <Search className="h-4 w-4 mr-2" />
                 Search
@@ -579,7 +579,7 @@ export default function CheckinPage() {
                     >
                       <div className="flex items-start gap-3">
                         {/* Photo or Avatar */}
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-[#14919b]/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary-accent/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {patient.photo ? (
                             <img
                               src={patient.photo}
@@ -638,7 +638,7 @@ export default function CheckinPage() {
                 />
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-[#14919b]/10 flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-primary-accent/10 flex items-center justify-center mx-auto mb-4">
                     <Search className="h-8 w-8 text-primary/50" />
                   </div>
                   <p>Enter search term to find patient</p>
@@ -650,7 +650,7 @@ export default function CheckinPage() {
 
         {/* Confirmation & Verification Section */}
         <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-[#14919b]/5">
+          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-primary-accent/5">
             <CardTitle className="flex items-center gap-2">
               {isIdentityVerified ? (
                 <>
@@ -871,7 +871,7 @@ export default function CheckinPage() {
                         }
                         className={
                           verificationMethod === "fingerprint"
-                            ? "bg-primary hover:bg-[#0a5c5f]"
+                            ? "bg-primary hover:bg-primary-dark"
                             : ""
                         }
                         onClick={() =>
@@ -893,7 +893,7 @@ export default function CheckinPage() {
                         }
                         className={
                           verificationMethod === "photo"
-                            ? "bg-[#14919b] hover:bg-[#0f6f77]"
+                            ? "bg-primary-accent hover:bg-primary-accent-dark"
                             : ""
                         }
                         onClick={() => handleVerificationMethodChange("photo")}
@@ -939,7 +939,7 @@ export default function CheckinPage() {
                         className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all border-4 ${
                           isScanning
                             ? "bg-primary/20 border-primary animate-pulse"
-                            : "bg-gradient-to-br from-primary/10 to-[#14919b]/10 border-primary/30"
+                            : "bg-gradient-to-br from-primary/10 to-primary-accent/10 border-primary/30"
                         }`}
                       >
                         {isScanning ? (
@@ -960,7 +960,7 @@ export default function CheckinPage() {
                         size="lg"
                         onClick={handleFingerprintVerification}
                         disabled={isScanning || rdService?.available === false}
-                        className="bg-gradient-to-r from-primary to-[#14919b] hover:from-[#0a5c5f] hover:to-primary"
+                        className="bg-gradient-to-r from-primary to-primary-accent hover:from-primary-dark hover:to-primary"
                       >
                         {isScanning ? (
                           <>
@@ -1020,8 +1020,8 @@ export default function CheckinPage() {
                         </div>
                       ) : (
                         <div className="text-center py-6 space-y-3">
-                          <div className="w-20 h-20 mx-auto rounded-full bg-[#14919b]/10 flex items-center justify-center">
-                            <Camera className="h-10 w-10 text-[#14919b]" />
+                          <div className="w-20 h-20 mx-auto rounded-full bg-primary-accent/10 flex items-center justify-center">
+                            <Camera className="h-10 w-10 text-primary-accent" />
                           </div>
                           <p className="font-medium">
                             Capture patient photo for check-in verification
@@ -1032,7 +1032,7 @@ export default function CheckinPage() {
                           </p>
                           <Button
                             type="button"
-                            className="bg-[#14919b] hover:bg-[#0f6f77]"
+                            className="bg-primary-accent hover:bg-primary-accent-dark"
                             onClick={() => setIsPhotoCaptureOpen(true)}
                           >
                             <Camera className="h-4 w-4 mr-2" />
@@ -1091,7 +1091,7 @@ export default function CheckinPage() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 to-[#14919b]/10 flex items-center justify-center mb-4">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 to-primary-accent/10 flex items-center justify-center mb-4">
                   <User className="h-12 w-12 text-primary/30" />
                 </div>
                 <p className="font-medium text-muted-foreground">

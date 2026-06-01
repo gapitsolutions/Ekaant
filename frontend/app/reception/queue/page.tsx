@@ -466,7 +466,7 @@ export default function ReceptionQueuePage() {
               variant="outline"
               onClick={handleManualRefresh}
               disabled={isRefreshing || isLoading}
-              className="h-11 px-3 border-primary/20 text-primary hover:bg-primary/5 hover:text-[#0a5c5f] hover:border-primary/40 transition-all gap-2"
+              className="h-11 px-3 border-primary/20 text-primary hover:bg-primary/5 hover:text-primary-dark hover:border-primary/40 transition-all gap-2"
               title="Refresh data"
             >
               <RefreshCw

@@ -3,6 +3,8 @@ import {
   HOSPITAL_SHORT_NAME,
   HOSPITAL_SUBTITLE,
   HOSPITAL_LOGO_PATH,
+  HOSPITAL_PRIMARY_COLOR,
+  HOSPITAL_PRIMARY_ACCENT_COLOR,
 } from "./hospital-branding";
 
 /**
@@ -55,9 +57,10 @@ const HEADER_H = 82;
 const FOOTER_H = 8;
 const PAD_X = 28;
 
-// Colors (plain hex only).
-const TEAL = "#0d7377";
-const TEAL_LIGHT = "#14919b";
+// Colors (plain hex only — derived from BRANDING via hospital-branding.ts
+// so a brand change in ``branding.ts`` re-tints the exported card too).
+const TEAL = HOSPITAL_PRIMARY_COLOR;
+const TEAL_LIGHT = HOSPITAL_PRIMARY_ACCENT_COLOR;
 const TEAL_TINT = "#e7f1f1";
 const INK = "#1e293b";
 const INK_SOFT = "#334155";

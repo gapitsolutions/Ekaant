@@ -12,10 +12,15 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.03 200);
   
-  /* Primary: Teal - matching logo's main color (exact brand hex #0d7377,
-     the single source for the teal used across the UI). */
+  /* Primary brand colors. The hex defaults below match
+     ``lib/branding.ts`` so the UI renders correctly even before the
+     runtime override in ``app/layout.tsx`` mounts. To re-skin the app
+     edit ``branding.ts``; do NOT change these literals. */
   --primary: #0d7377;
   --primary-foreground: oklch(1 0 0);
+  --primary-dark: #0a5c5f;
+  --primary-accent: #14919b;
+  --primary-accent-dark: #0f6f77;
   
   /* Secondary: Dark teal/navy from logo */
   --secondary: oklch(0.95 0.02 185);
@@ -32,7 +37,7 @@
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.9 0.02 185);
   --input: oklch(0.92 0.02 185);
-  --ring: #0d7377;
+  --ring: var(--primary);
   
   /* Chart colors matching brand */
   --chart-1: oklch(0.5 0.14 185);
@@ -71,6 +76,12 @@
   --popover-foreground: oklch(0.95 0.01 180);
   --primary: oklch(0.6 0.14 180);
   --primary-foreground: oklch(0.15 0.02 200);
+  /* Dark-mode brand colors fall back to the same hex defaults as light
+     mode — the runtime override in ``layout.tsx`` sets these from
+     ``BRANDING.colors`` so they track the active brand. */
+  --primary-dark: #0a5c5f;
+  --primary-accent: #14919b;
+  --primary-accent-dark: #0f6f77;
   --secondary: oklch(0.25 0.03 200);
   --secondary-foreground: oklch(0.95 0.01 180);
   --muted: oklch(0.25 0.03 200);
@@ -115,6 +126,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-accent: var(--primary-accent);
+  --color-primary-accent-dark: var(--primary-accent-dark);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);

@@ -147,7 +147,7 @@ export function PatientIdCard({ patient }: PatientIdCardProps) {
             Print
           </Button>
           <Button
-            className="bg-primary hover:bg-[#0a5c5f] text-white"
+            className="bg-primary hover:bg-primary-dark text-white"
             onClick={handleDownload}
             disabled={actionsDisabled}
           >

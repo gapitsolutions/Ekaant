@@ -29,11 +29,11 @@ export function PatientCard({ patient, visit, onClick, showStage = true, waitTim
       className={`border-0 shadow-md bg-card/80 backdrop-blur overflow-hidden ${onClick ? 'cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5' : ''}`}
       onClick={onClick}
     >
-      <div className="h-1 bg-gradient-to-r from-primary to-[#14919b]"></div>
+      <div className="h-1 bg-gradient-to-r from-primary to-primary-accent"></div>
       <CardContent className="flex items-center gap-4 p-4">
         <Avatar className="h-12 w-12 ring-2 ring-primary/20">
           <AvatarImage src={patient.photo_url} alt={patient.full_name} />
-          <AvatarFallback className="bg-gradient-to-br from-primary/10 to-[#14919b]/10 text-primary font-semibold">
+          <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary-accent/10 text-primary font-semibold">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -108,7 +108,7 @@ export function PatientQueueItem({
     >
       <Avatar className="h-10 w-10 ring-2 ring-primary/10">
         <AvatarImage src={patient.photo_url} alt={patient.full_name} />
-        <AvatarFallback className="bg-gradient-to-br from-primary/10 to-[#14919b]/10 text-primary text-sm font-semibold">
+        <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary-accent/10 text-primary text-sm font-semibold">
           {initials}
         </AvatarFallback>
       </Avatar>

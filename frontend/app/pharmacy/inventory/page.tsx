@@ -246,7 +246,7 @@ export default function InventoryWorkstationPage() {
             </div>
             <Button
               onClick={() => setAddDialogOpen(true)}
-              className="bg-primary hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
+              className="bg-primary hover:bg-primary-dark text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
             >
               <Plus className="h-4 w-4" />
               Register Medicine
@@ -1255,7 +1255,7 @@ function MedicineFormDialog({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-primary hover:bg-[#0a5c5f] font-extrabold rounded-xl h-11 px-6 shadow-md shadow-teal-900/10 text-xs"
+            className="bg-primary hover:bg-primary-dark font-extrabold rounded-xl h-11 px-6 shadow-md shadow-teal-900/10 text-xs"
           >
             {isSubmitting ? (
               <>
@@ -1888,7 +1888,7 @@ function PurchaseInvoiceForm({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || items.length === 0}
-            className="w-full md:w-auto bg-primary hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-12 px-8 shadow-md shadow-teal-900/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform text-xs flex-shrink-0"
+            className="w-full md:w-auto bg-primary hover:bg-primary-dark text-white font-extrabold rounded-xl h-12 px-8 shadow-md shadow-teal-900/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform text-xs flex-shrink-0"
           >
             {isSubmitting ? (
               <>
@@ -1973,7 +1973,7 @@ function PurchaseInvoiceForm({
             </Button>
             <Button
               onClick={handleConfirmSelection}
-              className="rounded-xl bg-primary hover:bg-[#0a5c5f] text-xs font-bold text-white"
+              className="rounded-xl bg-primary hover:bg-primary-dark text-xs font-bold text-white"
             >
               Add {selectedIds.length} medicine(s)
             </Button>

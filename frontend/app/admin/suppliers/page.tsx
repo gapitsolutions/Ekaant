@@ -166,7 +166,7 @@ export default function SuppliersPage() {
         actions={
           <Button
             onClick={() => setCreateOpen(true)}
-            className="bg-primary hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
+            className="bg-primary hover:bg-primary-dark text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add supplier
@@ -647,7 +647,7 @@ function SupplierFormDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-[#0a5c5f] text-white rounded-xl">
+          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary-dark text-white rounded-xl">
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isEdit ? "Save changes" : "Add supplier"}
           </Button>

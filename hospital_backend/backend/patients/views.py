@@ -6,7 +6,8 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models.functions import Lower
+from django.db.models import CharField, Func, IntegerField, Value
+from django.db.models.functions import Cast, Coalesce, Lower
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
@@ -55,6 +56,41 @@ def _multi_values(request, key: str) -> list[str]:
     values = request.query_params.getlist(key)
     return [v.strip() for v in values if v and v.strip()]
 
+
+class _TrailingDigits(Func):
+    """Postgres ``SUBSTRING(file_number FROM '[0-9]+$')`` — trailing digit run or NULL."""
+
+    function = "SUBSTRING"
+    template = "%(function)s(%(expressions)s FROM '[0-9]+$')"
+    output_field = CharField()
+
+
+class _RegexpReplace(Func):
+    """Postgres ``REGEXP_REPLACE(value, pattern, replacement)``."""
+
+    function = "REGEXP_REPLACE"
+    output_field = CharField()
+
+
+def _order_by_file_number_natural(queryset):
+    """Order ``Patient`` rows by ``file_number`` with natural numeric sort.
+
+    File numbers look like ``A1``, ``A2``, ``A10``. A plain lexicographic
+    ``ORDER BY file_number`` gives ``A1, A10, A2``; we want ``A1, A2, A10``.
+    Split each value into its alphabetic prefix and its trailing integer,
+    then sort by ``(prefix, integer, raw)`` so shared natural keys still
+    have a deterministic tiebreaker.
+
+    Rows without trailing digits fall back to ``0`` so they sort before
+    numbered rows sharing the same prefix.
+    """
+    return queryset.annotate(
+        _fn_prefix=_RegexpReplace("file_number", Value(r"[0-9]+$"), Value("")),
+        _fn_number=Cast(
+            Coalesce(_TrailingDigits("file_number"), Value("0")),
+            IntegerField(),
+        ),
+    ).order_by("_fn_prefix", "_fn_number", "file_number")
 
 def _apply_reception_list_filters(request, queryset):
     """Apply optional list-page filters with multi-value semantics.
@@ -253,11 +289,12 @@ class ReceptionistPatientListView(APIView):
         except (TypeError, ValueError):
             page_size = 100
 
-        queryset = Patient.objects.all().order_by("file_number")
+        queryset = Patient.objects.all()
         if query:
-            queryset = patient_search_queryset(query).order_by("file_number")
+            queryset = patient_search_queryset(query)
 
         queryset = _apply_reception_list_filters(request, queryset)
+        queryset = _order_by_file_number_natural(queryset)
 
         paginated_queryset, pagination = paginate_queryset(queryset, page, page_size)
         items = PatientLookupSerializer(

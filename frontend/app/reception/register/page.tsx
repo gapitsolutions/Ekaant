@@ -125,6 +125,11 @@ export default function RegisterPatientPage() {
     setInstantFormData({ ...instantFormData, [e.target.name]: e.target.value });
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setInstantFormData((prev) => ({ ...prev, [e.target.name]: digits }));
+  };
+
   // Check Aadhaar uniqueness — placeholder, real check is server-side.
   const isAadhaarUnique = (_aadhaar: string): boolean => {
     return true;
@@ -212,6 +217,19 @@ export default function RegisterPatientPage() {
       !instantFormData.sex
     ) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    if (!/^\d{10}$/.test(instantFormData.phone)) {
+      toast.error("Mobile number must be exactly 10 digits.");
+      return;
+    }
+
+    if (
+      instantFormData.relative_phone &&
+      !/^\d{10}$/.test(instantFormData.relative_phone)
+    ) {
+      toast.error("Relative mobile number must be exactly 10 digits.");
       return;
     }
 
@@ -446,7 +464,7 @@ export default function RegisterPatientPage() {
         <TabsContent value="instant">
           <form onSubmit={handleInstantSubmit} className="space-y-6">
             {/* Patient Category Selection - Required First */}
-            <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-[#14919b]/5">
+            <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-primary-accent/5">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center gap-4">
                   <Label className="text-lg font-semibold text-center">
@@ -498,7 +516,7 @@ export default function RegisterPatientPage() {
                       }
                       className={`h-20 w-48 flex flex-col gap-2 ${
                         instantFormData.patient_category === "deaddiction"
-                          ? "bg-gradient-to-r from-primary to-[#14919b] hover:from-[#0a5c5f] hover:to-primary text-white"
+                          ? "bg-gradient-to-r from-primary to-primary-accent hover:from-primary-dark hover:to-primary text-white"
                           : "border-2 border-primary/30 hover:border-primary hover:bg-primary/5"
                       }`}
                       onClick={() =>
@@ -693,8 +711,11 @@ export default function RegisterPatientPage() {
                         name="phone"
                         type="tel"
                         value={instantFormData.phone}
-                        onChange={handleInstantChange}
-                        placeholder="Patient's mobile"
+                        onChange={handlePhoneChange}
+                        placeholder="10-digit mobile"
+                        inputMode="numeric"
+                        pattern="\d{10}"
+                        maxLength={10}
                         className="mt-1.5"
                         required
                       />
@@ -715,8 +736,11 @@ export default function RegisterPatientPage() {
                         name="relative_phone"
                         type="tel"
                         value={instantFormData.relative_phone}
-                        onChange={handleInstantChange}
-                        placeholder="Relative's mobile"
+                        onChange={handlePhoneChange}
+                        placeholder="10-digit mobile"
+                        inputMode="numeric"
+                        pattern="\d{10}"
+                        maxLength={10}
                         className="mt-1.5"
                         // required
                       />

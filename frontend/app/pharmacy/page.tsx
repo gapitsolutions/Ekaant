@@ -564,7 +564,7 @@ export default function PharmacyDashboard() {
                     <button
                       key={action.title}
                       onClick={action.onClick}
-                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-primary hover:bg-[#0a5c5f] text-white transition-colors text-left"
+                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-primary hover:bg-primary-dark text-white transition-colors text-left"
                     >
                       <div
                         className={`w-9 h-9 rounded-lg ${action.iconBg} flex items-center justify-center flex-shrink-0`}

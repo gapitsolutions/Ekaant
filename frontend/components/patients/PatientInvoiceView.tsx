@@ -266,7 +266,7 @@ export function PatientInvoiceView({
         <div className="pt-2 flex justify-end gap-2">
           <Button
             onClick={handlePrintInvoice}
-            className="bg-primary hover:bg-[#0a5c5f] text-white font-bold text-xs h-8 px-4 rounded-lg flex items-center gap-1.5 shadow-sm"
+            className="bg-primary hover:bg-primary-dark text-white font-bold text-xs h-8 px-4 rounded-lg flex items-center gap-1.5 shadow-sm"
           >
             <Printer className="h-3.5 w-3.5" />
             Print Invoice Receipt

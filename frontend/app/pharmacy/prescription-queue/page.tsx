@@ -315,7 +315,7 @@ export default function PrescriptionQueuePage() {
                           <div className="flex justify-end">
                             <Button
                               size="sm"
-                              className="bg-primary hover:bg-[#0a5c5f] text-white font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
+                              className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
                               onClick={() =>
                                 navigate(
                                   `/pharmacy/dispense/${item.session_id}`,

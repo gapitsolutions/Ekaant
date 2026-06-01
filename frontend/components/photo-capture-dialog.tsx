@@ -419,7 +419,7 @@ export function PhotoCaptureDialog({
               <Button
                 type="button"
                 onClick={handleConfirm}
-                className="bg-gradient-to-r from-primary to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-primary-accent"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Confirm Photo

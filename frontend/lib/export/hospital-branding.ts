@@ -12,4 +12,6 @@ export const HOSPITAL_SHORT_NAME = BRANDING.shortName;
 export const HOSPITAL_SUBTITLE = BRANDING.subtitle;
 export const HOSPITAL_LOGO_PATH = BRANDING.logoPath;
 export const HOSPITAL_PRIMARY_COLOR = BRANDING.colors.primary;
+export const HOSPITAL_PRIMARY_DARK_COLOR = BRANDING.colors.primaryDark;
+export const HOSPITAL_PRIMARY_ACCENT_COLOR = BRANDING.colors.primaryAccent;
 export const HOSPITAL_PRIMARY_GRADIENT = BRANDING.colors.primaryGradient;

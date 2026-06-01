@@ -591,12 +591,21 @@ export default function PatientDataPage() {
     /// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterState, filterDistrictOptions]);
 
-  // Sort current server-filtered page
+  // Sort current server-filtered page.
+  //
+  // ``numeric: true`` makes ``localeCompare`` treat embedded digit runs as
+  // numbers, so ``A1 < A2 < A10`` instead of the lexicographic
+  // ``A1 < A10 < A2``. The backend already orders the queryset this way;
+  // this keeps the client-side ordering consistent when the user toggles
+  // asc/desc on the loaded page.
   const filteredPatients = useMemo(() => {
     const result = [...patients];
 
     result.sort((a, b) => {
-      const comparison = a.file_number.localeCompare(b.file_number);
+      const comparison = a.file_number.localeCompare(b.file_number, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
       return sortOrder === "asc" ? comparison : -comparison;
     });
 
@@ -1177,7 +1186,7 @@ export default function PatientDataPage() {
               <Button
                 onClick={() => handleEditPatient(selectedPatient)}
                 disabled={isLoadingPatientDetail}
-                className="bg-gradient-to-r from-primary to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-primary-accent"
               >
                 {isLoadingPatientDetail ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1227,7 +1236,7 @@ export default function PatientDataPage() {
                 Cancel
               </Button>
               <Button
-                className="bg-gradient-to-r from-primary to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-primary-accent"
                 onClick={handleProceedFingerprintFlow}
               >
                 Continue
@@ -1277,7 +1286,7 @@ export default function PatientDataPage() {
                 Close
               </Button>
               <Button
-                className="bg-gradient-to-r from-primary to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-primary-accent"
                 onClick={handleCaptureAndUpdateFingerprint}
                 disabled={isUpdatingFingerprint}
               >
@@ -1352,7 +1361,7 @@ export default function PatientDataPage() {
 
         {/* Patient Profile Card */}
         <Card className="border-primary/20 overflow-hidden">
-          <div className="h-2 bg-gradient-to-r from-primary to-[#14919b]" />
+          <div className="h-2 bg-gradient-to-r from-primary to-primary-accent" />
           <CardContent className="pt-6">
             <div className="flex items-start gap-6">
               {/* Photo */}
@@ -1366,7 +1375,7 @@ export default function PatientDataPage() {
                     className="rounded-xl object-cover border-2 border-primary/30"
                   />
                 ) : (
-                  <div className="w-[120px] h-[120px] rounded-xl bg-gradient-to-br from-primary/10 to-[#14919b]/10 flex items-center justify-center border-2 border-primary/30">
+                  <div className="w-[120px] h-[120px] rounded-xl bg-gradient-to-br from-primary/10 to-primary-accent/10 flex items-center justify-center border-2 border-primary/30">
                     <User className="h-12 w-12 text-primary" />
                   </div>
                 )}
@@ -1999,7 +2008,7 @@ export default function PatientDataPage() {
                     value="personal"
                     className="space-y-4 px-6 pt-4 pb-6 mt-0"
                   >
-                    <div className="p-4 rounded-lg border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-[#14919b]/5">
+                    <div className="p-4 rounded-lg border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-primary-accent/5">
                       <h4 className="font-semibold mb-4 flex items-center gap-2">
                         <FileText className="h-4 w-4 text-primary" />
                         Registration Details
@@ -2687,7 +2696,7 @@ export default function PatientDataPage() {
               <Button
                 onClick={handleSavePatient}
                 disabled={isSavingPatient}
-                className="bg-gradient-to-r from-primary to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-primary-accent"
               >
                 {isSavingPatient ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -2964,7 +2973,7 @@ export default function PatientDataPage() {
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                             HDAMS:
                           </span>
-                          <span className="text-xs font-mono font-bold text-[#14919b]">
+                          <span className="text-xs font-mono font-bold text-primary-accent">
                             {patient.hdams_id || "N/A"}
                           </span>
                         </div>

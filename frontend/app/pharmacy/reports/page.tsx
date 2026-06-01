@@ -64,6 +64,7 @@ import {
   type ReportRange,
   type MedicineCategory,
 } from "@/lib/pharmacy-api";
+import { BRANDING } from "@/lib/branding";
 
 type ReportTab = "revenue" | "consumption" | "low-stock" | "expiry";
 
@@ -743,7 +744,7 @@ function ConsumptionReportTab() {
 // the chart stays readable without cluttering with zero-value series.
 
 const TREND_COLORS = {
-  rx: "#0d7377",
+  rx: BRANDING.colors.primary,
   nrx: "#f59e0b",
   bup: "#6366f1",
 } as const;

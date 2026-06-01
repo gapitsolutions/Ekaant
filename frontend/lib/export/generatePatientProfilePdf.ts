@@ -7,6 +7,7 @@ import {
   checkPageBreak,
   downloadPdf,
 } from "./pdf-helpers";
+import { HOSPITAL_PRIMARY_COLOR } from "./hospital-branding";
 import {
   EMPLOYMENT_STATUS_LABELS,
   EDUCATION_LABELS,
@@ -221,7 +222,7 @@ export async function generatePatientProfilePdf(
   // ── Footer ──
   y = checkPageBreak(doc, y, 15);
   y += 5;
-  doc.setDrawColor("#0d7377");
+  doc.setDrawColor(HOSPITAL_PRIMARY_COLOR);
   doc.setLineWidth(0.3);
   doc.line(14, y, pageWidth - 14, y);
   y += 5;
