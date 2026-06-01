@@ -1958,6 +1958,7 @@ export default function PatientDataPage() {
                   pincode: selectedPatient.pincode,
                   photo_url: selectedPatient.photo_url,
                   registration_date: selectedPatient.registration_date,
+                  blood_group: selectedPatient.blood_group,
                 }}
               />
             )}
