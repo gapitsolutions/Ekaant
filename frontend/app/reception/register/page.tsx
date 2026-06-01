@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,7 +47,6 @@ import {
   Fingerprint,
   Loader2,
   Save,
-  ArrowLeft,
   Zap,
   FileText,
   CheckCircle,
@@ -350,23 +350,10 @@ export default function RegisterPatientPage() {
     return (
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/reception")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Registration Complete
-            </h1>
-            <p className="text-muted-foreground">
-              Patient has been registered successfully
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Registration Complete"
+          subtitle="Patient has been registered successfully"
+        />
 
         <Card className="max-w-lg mx-auto border-0 shadow-xl">
           <CardContent className="pt-8 pb-8">
@@ -439,23 +426,10 @@ export default function RegisterPatientPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/reception")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Register New Patient
-          </h1>
-          <p className="text-muted-foreground">
-            Quick registration for new patients
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Register New Patient"
+        subtitle="Quick registration for new patients"
+      />
 
       <Tabs defaultValue="instant" className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-2 mx-auto">
@@ -472,7 +446,7 @@ export default function RegisterPatientPage() {
         <TabsContent value="instant">
           <form onSubmit={handleInstantSubmit} className="space-y-6">
             {/* Patient Category Selection - Required First */}
-            <Card className="border-0 shadow-lg bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
+            <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-[#14919b]/5">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center gap-4">
                   <Label className="text-lg font-semibold text-center">
@@ -524,8 +498,8 @@ export default function RegisterPatientPage() {
                       }
                       className={`h-20 w-48 flex flex-col gap-2 ${
                         instantFormData.patient_category === "deaddiction"
-                          ? "bg-gradient-to-r from-[#0d7377] to-[#14919b] hover:from-[#0a5c5f] hover:to-[#0d7377] text-white"
-                          : "border-2 border-[#0d7377]/30 hover:border-[#0d7377] hover:bg-[#0d7377]/5"
+                          ? "bg-gradient-to-r from-primary to-[#14919b] hover:from-[#0a5c5f] hover:to-primary text-white"
+                          : "border-2 border-primary/30 hover:border-primary hover:bg-primary/5"
                       }`}
                       onClick={() =>
                         setInstantFormData({

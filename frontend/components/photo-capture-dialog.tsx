@@ -291,7 +291,7 @@ export function PhotoCaptureDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5 text-[#0d7377]" />
+            <Camera className="h-5 w-5 text-primary" />
             {title}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -419,7 +419,7 @@ export function PhotoCaptureDialog({
               <Button
                 type="button"
                 onClick={handleConfirm}
-                className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-[#14919b]"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Confirm Photo

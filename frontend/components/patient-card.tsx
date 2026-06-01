@@ -29,11 +29,11 @@ export function PatientCard({ patient, visit, onClick, showStage = true, waitTim
       className={`border-0 shadow-md bg-card/80 backdrop-blur overflow-hidden ${onClick ? 'cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5' : ''}`}
       onClick={onClick}
     >
-      <div className="h-1 bg-gradient-to-r from-[#0d7377] to-[#14919b]"></div>
+      <div className="h-1 bg-gradient-to-r from-primary to-[#14919b]"></div>
       <CardContent className="flex items-center gap-4 p-4">
-        <Avatar className="h-12 w-12 ring-2 ring-[#0d7377]/20">
+        <Avatar className="h-12 w-12 ring-2 ring-primary/20">
           <AvatarImage src={patient.photo_url} alt={patient.full_name} />
-          <AvatarFallback className="bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 text-[#0d7377] font-semibold">
+          <AvatarFallback className="bg-gradient-to-br from-primary/10 to-[#14919b]/10 text-primary font-semibold">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -48,17 +48,17 @@ export function PatientCard({ patient, visit, onClick, showStage = true, waitTim
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5 text-[#0d7377]" />
+              <User className="h-3.5 w-3.5 text-primary" />
               {patient.file_number}
             </span>
             {age && (
               <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-[#0d7377]" />
+                <Calendar className="h-3.5 w-3.5 text-primary" />
                 {age} yrs, {patient.gender}
               </span>
             )}
             <span className="flex items-center gap-1">
-              <Phone className="h-3.5 w-3.5 text-[#0d7377]" />
+              <Phone className="h-3.5 w-3.5 text-primary" />
               {patient.phone}
             </span>
           </div>
@@ -74,7 +74,7 @@ export function PatientCard({ patient, visit, onClick, showStage = true, waitTim
         {waitTime && (
           <div className="text-right text-sm">
             <span className="text-muted-foreground">Waiting</span>
-            <p className="font-medium text-[#0d7377]">{waitTime}</p>
+            <p className="font-medium text-primary">{waitTime}</p>
           </div>
         )}
       </CardContent>
@@ -104,11 +104,11 @@ export function PatientQueueItem({
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 p-3 rounded-lg border border-[#0d7377]/10 bg-card hover:bg-[#0d7377]/5 hover:border-[#0d7377]/30 cursor-pointer transition-all"
+      className="flex items-center gap-3 p-3 rounded-lg border border-primary/10 bg-card hover:bg-primary/5 hover:border-primary/30 cursor-pointer transition-all"
     >
-      <Avatar className="h-10 w-10 ring-2 ring-[#0d7377]/10">
+      <Avatar className="h-10 w-10 ring-2 ring-primary/10">
         <AvatarImage src={patient.photo_url} alt={patient.full_name} />
-        <AvatarFallback className="bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 text-[#0d7377] text-sm font-semibold">
+        <AvatarFallback className="bg-gradient-to-br from-primary/10 to-[#14919b]/10 text-primary text-sm font-semibold">
           {initials}
         </AvatarFallback>
       </Avatar>
@@ -120,7 +120,7 @@ export function PatientQueueItem({
 
       <div className="text-right">
         <p className="text-xs text-muted-foreground">Wait time</p>
-        <p className="text-sm font-medium text-[#0d7377]">{waitTime}</p>
+        <p className="text-sm font-medium text-primary">{waitTime}</p>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -298,18 +299,16 @@ export default function ReceptionQueuePage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-[#0d7377]">Check-in History</h1>
-          <p className="text-muted-foreground">
-            Search, review, and manage completed and in-progress visit check-ins.
-          </p>
-        </div>
-        <div className="bg-[#e6f4f1] text-[#0d7377] font-bold px-4 py-2 rounded-lg border border-[#0d7377]/20 shadow-sm flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          {pagination.total} {pagination.total === 1 ? 'Check-in' : 'Check-ins'} Total
-        </div>
-      </div>
+      <PageHeader
+        title="Check-in History"
+        subtitle="Search, review, and manage completed and in-progress visit check-ins."
+        actions={
+          <div className="bg-[#e6f4f1] text-primary font-bold px-4 py-2 rounded-lg border border-primary/20 shadow-sm flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            {pagination.total} {pagination.total === 1 ? 'Check-in' : 'Check-ins'} Total
+          </div>
+        }
+      />
 
       {/* 1 total-records card + 1 card per verification method */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -455,7 +454,7 @@ export default function ReceptionQueuePage() {
                 setSearchQuery("");
                 setDebouncedSearchQuery("");
               }}
-              className="h-11 w-11 text-slate-400 hover:text-[#0d7377] hover:bg-[#0d7377]/5"
+              className="h-11 w-11 text-slate-400 hover:text-primary hover:bg-primary/5"
               title="Reset Filters"
             >
               <RotateCcw className="h-5 w-5" />
@@ -467,7 +466,7 @@ export default function ReceptionQueuePage() {
               variant="outline"
               onClick={handleManualRefresh}
               disabled={isRefreshing || isLoading}
-              className="h-11 px-3 border-[#0d7377]/20 text-[#0d7377] hover:bg-[#0d7377]/5 hover:text-[#0a5c5f] hover:border-[#0d7377]/40 transition-all gap-2"
+              className="h-11 px-3 border-primary/20 text-primary hover:bg-primary/5 hover:text-[#0a5c5f] hover:border-primary/40 transition-all gap-2"
               title="Refresh data"
             >
               <RefreshCw
@@ -524,7 +523,7 @@ export default function ReceptionQueuePage() {
                         {visit.visit_uid}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-[#f0f9f8] text-[#0d7377] border-[#0d7377]/20 font-bold font-mono">
+                        <Badge variant="outline" className="bg-[#f0f9f8] text-primary border-primary/20 font-bold font-mono">
                           {visit.patient.file_number}
                         </Badge>
                       </TableCell>
@@ -579,7 +578,7 @@ export default function ReceptionQueuePage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setSelectedVisit(visit)}
-                                className="h-8 w-8 text-slate-400 hover:text-[#0d7377] hover:bg-[#0d7377]/5 rounded-full"
+                                className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full"
                                 aria-label="View visit details"
                               >
                                 <Eye className="h-4 w-4" />

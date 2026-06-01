@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -458,7 +459,7 @@ export default function DispenseWorkstationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center space-y-3">
-          <div className="w-12 h-12 border-4 border-[#0d7377] border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-slate-500 font-bold tracking-tight">Loading Dispensing Workstation...</p>
         </div>
       </div>
@@ -470,8 +471,8 @@ export default function DispenseWorkstationPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <PageHeader
+        leading={
           <button
             onClick={() => navigate("/pharmacy/prescription-queue")}
             aria-label="Back to queue"
@@ -479,24 +480,21 @@ export default function DispenseWorkstationPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-              <Pill className="h-7 w-7 text-[#0d7377]" /> Dispense Medicines &amp; Bill
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Invoice number will be assigned on save.
-            </p>
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          className="border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold rounded-xl px-4 h-10 shadow-sm"
-          onClick={() => setCancelDialogOpen(true)}
-        >
-          <XCircle className="h-4 w-4 mr-2" />
-          Cancel Prescription
-        </Button>
-      </div>
+        }
+        icon={<Pill className="h-7 w-7 text-primary" />}
+        title="Dispense Medicines & Bill"
+        subtitle="Invoice number will be assigned on save."
+        actions={
+          <Button
+            variant="outline"
+            className="border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold rounded-xl px-4 h-10 shadow-sm"
+            onClick={() => setCancelDialogOpen(true)}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Cancel Prescription
+          </Button>
+        }
+      />
 
       {errorMessage ? (
         <p className="text-sm text-red-600 font-medium">{errorMessage}</p>
@@ -506,7 +504,7 @@ export default function DispenseWorkstationPage() {
       {queueItem ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[#0d7377] font-black text-lg flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-primary font-black text-lg flex-shrink-0">
               {initials}
             </div>
             <div>
@@ -559,7 +557,7 @@ export default function DispenseWorkstationPage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-            <Layers className="h-4 w-4 text-[#0d7377]" /> Formulation &amp; Dose Configuration
+            <Layers className="h-4 w-4 text-primary" /> Formulation &amp; Dose Configuration
           </h3>
         </div>
 
@@ -717,7 +715,7 @@ export default function DispenseWorkstationPage() {
                   setFormQty(Math.max(0, parseInt(e.target.value) || 0))
                 }
                 onWheel={(e) => e.currentTarget.blur()}
-                className="h-10 rounded-xl bg-teal-50/30 border-teal-200 font-bold text-[#0d7377] text-xs text-center focus:ring-1 focus:ring-[#0d7377]"
+                className="h-10 rounded-xl bg-teal-50/30 border-teal-200 font-bold text-primary text-xs text-center focus:ring-1 focus:ring-primary"
               />
             </div>
 
@@ -740,7 +738,7 @@ export default function DispenseWorkstationPage() {
           <div className="flex items-center justify-end pt-2">
             <Button
               onClick={handleAddToList}
-              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-bold px-6 h-10 rounded-xl shadow-sm flex items-center gap-2"
+              className="bg-primary hover:bg-[#0a5c5f] text-white font-bold px-6 h-10 rounded-xl shadow-sm flex items-center gap-2"
             >
               <Plus className="h-4 w-4" /> Add to List
             </Button>
@@ -753,12 +751,12 @@ export default function DispenseWorkstationPage() {
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
           <div>
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4 text-[#0d7377]" /> Active Dispensing List
+              <ShoppingCart className="h-4 w-4 text-primary" /> Active Dispensing List
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">Below items are verified and will be deducted from active inventory.</p>
           </div>
           {lineItems.length > 0 && (
-            <Badge className="bg-[#0d7377] text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full border-0">
+            <Badge className="bg-primary text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full border-0">
               {lineItems.length} Formulation(s)
             </Badge>
           )}
@@ -836,10 +834,10 @@ export default function DispenseWorkstationPage() {
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-50">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-[#0d7377]" />
+                <Calendar className="h-4 w-4 text-primary" />
                 <h3 className="font-bold text-slate-800 text-sm">Schedule Next Visit</h3>
               </div>
-              <Badge className="bg-teal-50 border border-teal-100 text-[#0d7377] font-semibold text-[9px] px-2 py-0.5 rounded">
+              <Badge className="bg-teal-50 border border-teal-100 text-primary font-semibold text-[9px] px-2 py-0.5 rounded">
                 Clinical scheduler
               </Badge>
             </div>
@@ -854,7 +852,7 @@ export default function DispenseWorkstationPage() {
                     onClick={() => handleDaysPreset(d)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition-all ${
                       nextVisitDays === d
-                        ? "bg-[#0d7377] text-white border-[#0d7377] shadow-sm"
+                        ? "bg-primary text-white border-primary shadow-sm"
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800"
                     }`}
                   >
@@ -887,7 +885,7 @@ export default function DispenseWorkstationPage() {
                   }}
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="e.g. 7, 10, 14"
-                  className="h-11 rounded-xl border-slate-200 bg-slate-50 text-center font-bold text-slate-700 focus:ring-1 focus:ring-[#0d7377]"
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50 text-center font-bold text-slate-700 focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div className="space-y-1.5">
@@ -896,7 +894,7 @@ export default function DispenseWorkstationPage() {
                   type="date"
                   value={nextVisitDate}
                   onChange={(e) => handleNextVisitDateChange(e.target.value)}
-                  className="w-full h-11 px-3 border border-slate-200 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0d7377]/10 focus:border-[#0d7377]"
+                  className="w-full h-11 px-3 border border-slate-200 bg-slate-50 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary"
                 />
                 <FieldError message={apiErrors.get("next_followup_date")} />
               </div>
@@ -904,13 +902,13 @@ export default function DispenseWorkstationPage() {
 
             {nextVisitDate && (
               <div className="bg-teal-50/70 border border-teal-100 rounded-xl p-3.5 flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2.5 text-[#0d7377]">
+                <div className="flex items-center gap-2.5 text-primary">
                   <ShieldCheck className="h-5 w-5 flex-shrink-0" />
                   <span className="text-xs font-black tracking-tight leading-snug">
-                    Next Follow-up: <span className="underline decoration-wavy decoration-[#0d7377]/30 ml-0.5">{new Date(nextVisitDate).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</span>
+                    Next Follow-up: <span className="underline decoration-wavy decoration-primary/30 ml-0.5">{new Date(nextVisitDate).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })}</span>
                   </span>
                 </div>
-                <Badge className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold text-[9px] px-2 py-0.5 border-0 rounded-lg">
+                <Badge className="bg-primary hover:bg-[#0a5c5f] text-white font-extrabold text-[9px] px-2 py-0.5 border-0 rounded-lg">
                   {nextVisitDays ? `${nextVisitDays} Days` : "Custom"}
                 </Badge>
               </div>
@@ -920,7 +918,7 @@ export default function DispenseWorkstationPage() {
           {/* Remarks / Notes */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
             <div className="flex items-center gap-2 pb-2.5 border-b border-slate-50">
-              <FileText className="h-4 w-4 text-[#0d7377]" />
+              <FileText className="h-4 w-4 text-primary" />
               <h3 className="font-bold text-slate-800 text-sm">Ledger Remarks &amp; Notes</h3>
             </div>
             <div className="space-y-2">
@@ -940,10 +938,10 @@ export default function DispenseWorkstationPage() {
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5 relative overflow-hidden">
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-50">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-[#0d7377]" />
+              <CreditCard className="h-4 w-4 text-primary" />
               <h3 className="font-bold text-slate-800 text-sm">Settlement &amp; Pricing</h3>
             </div>
-            <Badge className="bg-teal-50 border border-teal-100 text-[#0d7377] font-semibold text-[9px] px-2 py-0.5 rounded">
+            <Badge className="bg-teal-50 border border-teal-100 text-primary font-semibold text-[9px] px-2 py-0.5 rounded">
               Deductions verified
             </Badge>
           </div>
@@ -1008,9 +1006,9 @@ export default function DispenseWorkstationPage() {
             <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-4 space-y-3">
               <div className="flex justify-between items-center pb-2 border-b border-slate-200">
                 <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Activity className="h-3.5 w-3.5 text-[#0d7377]" /> Split Payment Portions
+                  <Activity className="h-3.5 w-3.5 text-primary" /> Split Payment Portions
                 </span>
-                <Badge className="bg-[#0d7377]/10 text-[#0d7377] font-black text-[10px] py-0.5 px-2 rounded-lg border-0 h-5 flex items-center">
+                <Badge className="bg-primary/10 text-primary font-black text-[10px] py-0.5 px-2 rounded-lg border-0 h-5 flex items-center">
                   Total: ₹{grandTotal}
                 </Badge>
               </div>
@@ -1073,7 +1071,7 @@ export default function DispenseWorkstationPage() {
             )}
             <div className="flex justify-between font-black text-lg text-slate-800 border-t border-slate-200 pt-3 mt-1 tracking-tight">
               <span>Net Payable</span>
-              <span className="text-[#0d7377]">₹{grandTotal.toLocaleString("en-IN")}.00</span>
+              <span className="text-primary">₹{grandTotal.toLocaleString("en-IN")}.00</span>
             </div>
           </div>
 
@@ -1105,7 +1103,7 @@ export default function DispenseWorkstationPage() {
           <button
             onClick={handleSaveInvoice}
             disabled={isSaving || lineItems.length === 0}
-            className="w-full h-12 bg-gradient-to-r from-[#0d7377] to-teal-700 hover:from-[#0a5c5f] hover:to-teal-800 disabled:opacity-60 text-white font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-900/10 hover:scale-[1.01] active:scale-95 mt-1"
+            className="w-full h-12 bg-gradient-to-r from-primary to-teal-700 hover:from-[#0a5c5f] hover:to-teal-800 disabled:opacity-60 text-white font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-900/10 hover:scale-[1.01] active:scale-95 mt-1"
           >
             {isSaving ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PatientFlowTracker } from "@/components/patient-flow-tracker";
 import { AnalyticsCards } from "@/components/analytics-cards";
+import { BRANDING } from "@/lib/branding";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Users,
   UserCheck,
@@ -88,9 +90,9 @@ export default function AdminDashboard() {
       value: patients.length,
       description: "Registered patients",
       icon: Users,
-      accent: "bg-[#0d7377]",
+      accent: "bg-primary",
       iconBg: "bg-teal-50",
-      iconColor: "text-[#0d7377]",
+      iconColor: "text-primary",
     },
     {
       title: "Today's Visits",
@@ -124,21 +126,17 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <LayoutDashboard className="h-7 w-7 text-[#0d7377]" />
-            Admin Dashboard
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            Overview of Aggarwal Psychiatric &amp; De-Addiction Centre operations
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-          <Clock className="h-4 w-4" />
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </div>
-      </div>
+      <PageHeader
+        icon={<LayoutDashboard className="h-7 w-7 text-primary" />}
+        title="Admin Dashboard"
+        subtitle={`Overview of ${BRANDING.name} operations`}
+        actions={
+          <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
+            <Clock className="h-4 w-4" />
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        }
+      />
 
       {/* Stats Grid */}
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -242,7 +240,7 @@ export default function AdminDashboard() {
         <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-slate-50/30">
             <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-              <Users className="h-4 w-4 text-[#0d7377]" />
+              <Users className="h-4 w-4 text-primary" />
               Staff Overview
             </CardTitle>
             <CardDescription className="text-slate-400 text-xs">Team distribution by role</CardDescription>
@@ -251,7 +249,7 @@ export default function AdminDashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-[#0d7377]" />
+                  <div className="h-3 w-3 rounded-full bg-primary" />
                   <span className="text-sm font-medium text-slate-700">Reception</span>
                 </div>
                 <span className="font-bold text-slate-800">{staffByRole.reception}</span>
@@ -285,7 +283,7 @@ export default function AdminDashboard() {
         <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-slate-50/30">
             <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-              <Users className="h-4 w-4 text-[#0d7377]" />
+              <Users className="h-4 w-4 text-primary" />
               Recent Patients
             </CardTitle>
             <CardDescription className="text-slate-400 text-xs">Newly registered patients</CardDescription>
@@ -299,7 +297,7 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-teal-50 flex items-center justify-center">
-                      <span className="text-sm font-bold text-[#0d7377]">
+                      <span className="text-sm font-bold text-primary">
                         {patient.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </span>
                     </div>
@@ -310,7 +308,7 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="font-mono text-[10px] text-[#0d7377] border-teal-200 bg-teal-50">{patient.file_number}</Badge>
+                  <Badge variant="outline" className="font-mono text-[10px] text-primary border-teal-200 bg-teal-50">{patient.file_number}</Badge>
                 </div>
               ))}
               {patients.length === 0 && (
@@ -329,7 +327,7 @@ export default function AdminDashboard() {
         <Card className="border-slate-100 shadow-sm rounded-2xl overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-slate-50/30">
             <CardTitle className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-              <Activity className="h-4 w-4 text-[#0d7377]" />
+              <Activity className="h-4 w-4 text-primary" />
               Today&apos;s Patient Flow
             </CardTitle>
             <CardDescription className="text-slate-400 text-xs">Current status of visits</CardDescription>
@@ -338,7 +336,7 @@ export default function AdminDashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50/50">
                 <span className="text-sm font-medium text-slate-700">At Reception</span>
-                <Badge variant="secondary" className="bg-teal-50 text-[#0d7377] border border-teal-200 font-bold text-xs">
+                <Badge variant="secondary" className="bg-teal-50 text-primary border border-teal-200 font-bold text-xs">
                   {todayVisits.filter((v) => v.current_stage === "reception").length}
                 </Badge>
               </div>

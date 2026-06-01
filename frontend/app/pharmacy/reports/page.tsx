@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,16 +74,10 @@ export default function ReportsPage() {
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
       <Tabs value={tab} onValueChange={(v) => setTab(v as ReportTab)}>
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                Pharmacy Reports
-              </h1>
-              <p className="text-sm text-slate-500 mt-1">
-                Revenue analysis and medicine consumption tracking
-              </p>
-            </div>
-            <div>
+          <PageHeader
+            title="Pharmacy Reports"
+            subtitle="Revenue analysis and medicine consumption tracking"
+            actions={
               <Button
                 variant="outline"
                 onClick={() => window.print()}
@@ -91,31 +86,31 @@ export default function ReportsPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Export Report
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           <TabsList className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/80 rounded-lg h-auto sm:h-11 w-max border border-slate-200">
             <TabsTrigger
               value="revenue"
-              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
             >
               Revenue Report
             </TabsTrigger>
             <TabsTrigger
               value="consumption"
-              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
             >
               Consumption Report
             </TabsTrigger>
             <TabsTrigger
               value="low-stock"
-              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
             >
               Low Stock Report
             </TabsTrigger>
             <TabsTrigger
               value="expiry"
-              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-[#0d7377] data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
+              className="px-6 py-1.5 rounded-md text-sm font-bold transition-all h-full data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm text-slate-500 hover:text-slate-700"
             >
               Expiry Report
             </TabsTrigger>
@@ -335,7 +330,7 @@ function RevenueReportTab() {
               Report Filters
             </h3>
             {data?.period ? (
-              <div className="bg-teal-50 text-[#0d7377] px-3 py-1 rounded-full text-xs font-black tracking-wide border border-teal-100 shadow-sm whitespace-nowrap">
+              <div className="bg-teal-50 text-primary px-3 py-1 rounded-full text-xs font-black tracking-wide border border-teal-100 shadow-sm whitespace-nowrap">
                 {data.period}
               </div>
             ) : null}
@@ -410,7 +405,7 @@ function RevenueReportTab() {
             <CardHeader className="border-b border-slate-50 p-6">
               <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
                 Revenue Breakdown
-                <span className="text-[#0d7377] bg-teal-50 px-2 py-0.5 rounded text-xs">
+                <span className="text-primary bg-teal-50 px-2 py-0.5 rounded text-xs">
                   ({data.period})
                 </span>
               </CardTitle>
@@ -437,7 +432,7 @@ function RevenueReportTab() {
                     <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
                       Online
                     </TableHead>
-                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-[#0d7377] text-right bg-teal-50/30">
+                    <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-primary text-right bg-teal-50/30">
                       Total Revenue
                     </TableHead>
                     <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
@@ -495,7 +490,7 @@ function RevenueReportTab() {
               <CardHeader className="border-b border-slate-50 p-6">
                 <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
                   Daily Revenue Trend
-                  <span className="text-[#0d7377] bg-teal-50 px-2 py-0.5 rounded text-xs">
+                  <span className="text-primary bg-teal-50 px-2 py-0.5 rounded text-xs">
                     ({data.period})
                   </span>
                 </CardTitle>
@@ -672,7 +667,7 @@ function ConsumptionReportTab() {
               Report Filters
             </h3>
             {data?.period ? (
-              <div className="bg-teal-50 text-[#0d7377] px-3 py-1 rounded-full text-xs font-black tracking-wide border border-teal-100 shadow-sm whitespace-nowrap">
+              <div className="bg-teal-50 text-primary px-3 py-1 rounded-full text-xs font-black tracking-wide border border-teal-100 shadow-sm whitespace-nowrap">
                 {data.period}
               </div>
             ) : null}
@@ -693,8 +688,8 @@ function ConsumptionReportTab() {
               type="button"
               className={`px-5 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm ${
                 category === c
-                  ? "bg-[#0d7377] text-white border-[#0d7377]"
-                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-[#0d7377] hover:text-[#0d7377]"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-primary hover:text-primary"
               }`}
             >
               {c}
@@ -895,7 +890,7 @@ function MedicineBreakdownTable({
             <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-slate-500 text-right">
               Consumed
             </TableHead>
-            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-[#0d7377] text-right bg-teal-50/30">
+            <TableHead className="h-11 px-6 font-bold uppercase text-xs tracking-wider text-primary text-right bg-teal-50/30">
               Selling Value
             </TableHead>
           </TableRow>
@@ -926,14 +921,14 @@ function MedicineBreakdownTable({
           <TableRow className="bg-teal-50/20 hover:bg-teal-50/30 border-t-2 border-teal-100">
             <TableCell
               colSpan={3}
-              className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm uppercase tracking-wider"
+              className="px-6 py-3.5 text-right font-bold text-primary text-sm uppercase tracking-wider"
             >
               Totals
             </TableCell>
-            <TableCell className="px-6 py-3.5 text-right font-bold text-[#0d7377] text-sm">
+            <TableCell className="px-6 py-3.5 text-right font-bold text-primary text-sm">
               {totalQty}
             </TableCell>
-            <TableCell className="px-6 py-3.5 text-right font-black text-[#0d7377] text-sm bg-teal-50/40">
+            <TableCell className="px-6 py-3.5 text-right font-black text-primary text-sm bg-teal-50/40">
               ₹{totalValue.toLocaleString("en-IN")}
             </TableCell>
           </TableRow>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -130,25 +131,22 @@ export default function MedicineDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => navigate("/pharmacy/inventory")}
-          aria-label="Back to inventory"
-          className="h-10 w-10 rounded-xl border-slate-200 text-slate-500 hover:text-slate-800"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-            Product Dispense History
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
-            Track which patient received how much quantity from which batch.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        className="border-b border-slate-100 pb-4"
+        leading={
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate("/pharmacy/inventory")}
+            aria-label="Back to inventory"
+            className="h-10 w-10 rounded-xl border-slate-200 text-slate-500 hover:text-slate-800"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+        title="Product Dispense History"
+        subtitle="Track which patient received how much quantity from which batch."
+      />
 
       {medicine ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -182,13 +180,13 @@ export default function MedicineDetailPage() {
               <div className="w-px bg-slate-100" />
               <div className="text-right">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Dispensed</p>
-                <p className="font-extrabold text-[#0d7377] text-lg">{totalQuantity} units</p>
+                <p className="font-extrabold text-primary text-lg">{totalQuantity} units</p>
               </div>
             </div>
           </div>
 
           <div className={`bg-white border rounded-2xl shadow-sm p-6 flex flex-col justify-center items-center text-center ${isLowStock ? "border-rose-200" : "border-slate-200"}`}>
-            <Activity className={`h-6 w-6 mb-2 ${isLowStock ? "text-rose-500" : "text-[#0d7377]"}`} />
+            <Activity className={`h-6 w-6 mb-2 ${isLowStock ? "text-rose-500" : "text-primary"}`} />
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Current Stock</p>
             <p className={`font-black text-2xl tracking-tight ${isLowStock ? "text-rose-600" : "text-slate-800"}`}>
               {currentStock}
@@ -211,7 +209,7 @@ export default function MedicineDetailPage() {
         <CardHeader className="py-4 px-6 border-b border-slate-100 bg-white">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <CardTitle className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#0d7377]" />
+              <Calendar className="h-4 w-4 text-primary" />
               Dispense Logs
             </CardTitle>
             <div className="flex flex-wrap items-center gap-3">
@@ -220,8 +218,8 @@ export default function MedicineDetailPage() {
                 onValueChange={(v) => setFilterMode(v as FilterMode)}
               >
                 <TabsList className="bg-slate-100 p-1 rounded-lg">
-                  <TabsTrigger value="month" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-[#0d7377] font-medium text-sm">By Month</TabsTrigger>
-                  <TabsTrigger value="day" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-[#0d7377] font-medium text-sm">By Day</TabsTrigger>
+                  <TabsTrigger value="month" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-primary font-medium text-sm">By Month</TabsTrigger>
+                  <TabsTrigger value="day" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-primary font-medium text-sm">By Day</TabsTrigger>
                 </TabsList>
               </Tabs>
               <div className="relative">
@@ -312,7 +310,7 @@ export default function MedicineDetailPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-black text-[#0d7377]">{it.quantity}</span>
+                        <span className="font-black text-primary">{it.quantity}</span>
                       </TableCell>
                       <TableCell className="px-6 text-right font-extrabold text-slate-700 text-sm">
                         ₹{parseFloat(it.total_price).toLocaleString("en-IN")}

@@ -8,7 +8,7 @@ const variantStyles: Record<StatusVariant, string> = {
   warning: 'bg-amber-100 text-amber-800',
   danger: 'bg-red-100 text-red-800',
   info: 'bg-sky-100 text-sky-800',
-  primary: 'bg-[#0d7377]/10 text-[#0d7377]',
+  primary: 'bg-primary/10 text-primary',
 };
 
 interface StatusBadgeProps {

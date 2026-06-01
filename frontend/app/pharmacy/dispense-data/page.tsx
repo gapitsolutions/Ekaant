@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -282,7 +284,7 @@ export default function InvoiceHistoryPage() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 rounded-lg text-[#0d7377] hover:text-[#0d7377] hover:bg-teal-50 font-semibold"
+          className="h-8 rounded-lg text-primary hover:text-primary hover:bg-teal-50 font-semibold"
           onClick={() => void handleViewInvoice(item)}
           disabled={!hasSession || isViewing || isDownloading}
           title={!hasSession ? "Session reference unavailable" : undefined}
@@ -301,34 +303,32 @@ export default function InvoiceHistoryPage() {
   return (
     <>
       <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center flex-shrink-0">
-                <FileText className="h-5 w-5 text-[#0d7377]" />
-              </div>
-              Invoice History
-            </h1>
-            <p className="text-sm text-slate-500 mt-1 font-medium">
-              Historical record of dispensed and cancelled invoices
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge className="bg-teal-50 hover:bg-teal-50 text-[#0d7377] font-bold px-3 py-1.5 rounded-lg border border-teal-200 shadow-sm flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Audit Compliant
-            </Badge>
-            <Button
-              variant="outline"
-              onClick={handleExportCSV}
-              disabled={items.length === 0}
-              className="border-slate-200 text-slate-700 font-semibold rounded-lg px-4 h-10 shadow-sm hover:bg-slate-50"
-            >
-              <Download className="h-4 w-4 mr-2 text-slate-500" />
-              Export CSV
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          icon={
+            <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+          }
+          title="Invoice History"
+          subtitle="Historical record of dispensed and cancelled invoices"
+          actions={
+            <>
+              <Badge className="bg-teal-50 hover:bg-teal-50 text-primary font-bold px-3 py-1.5 rounded-lg border border-teal-200 shadow-sm flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Audit Compliant
+              </Badge>
+              <Button
+                variant="outline"
+                onClick={handleExportCSV}
+                disabled={items.length === 0}
+                className="border-slate-200 text-slate-700 font-semibold rounded-lg px-4 h-10 shadow-sm hover:bg-slate-50"
+              >
+                <Download className="h-4 w-4 mr-2 text-slate-500" />
+                Export CSV
+              </Button>
+            </>
+          }
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
@@ -357,7 +357,7 @@ export default function InvoiceHistoryPage() {
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
                   Total Revenue (page)
                 </p>
-                <h3 className="text-2xl font-black text-[#0d7377] tracking-tight mt-0.5">
+                <h3 className="text-2xl font-black text-primary tracking-tight mt-0.5">
                   {"\u20B9"}
                   {totalRevenue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                 </h3>
@@ -395,7 +395,7 @@ export default function InvoiceHistoryPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by patient, file no., invoice"
-                  className="pl-9 h-10 bg-slate-50 border-slate-200 rounded-xl text-sm font-medium focus:ring-[#0d7377]/10 focus:border-[#0d7377]"
+                  className="pl-9 h-10 bg-slate-50 border-slate-200 rounded-xl text-sm font-medium focus:ring-primary/10 focus:border-primary"
                 />
               </div>
               <Select
@@ -496,15 +496,16 @@ export default function InvoiceHistoryPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
               </div>
             ) : items.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-7 w-7 text-slate-400" />
-                </div>
-                <p className="font-bold text-slate-700 text-sm">No invoices found</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  No invoices match your filters.
-                </p>
-              </div>
+              <EmptyState
+                className="py-16"
+                icon={
+                  <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+                    <FileText className="h-7 w-7 text-slate-400" />
+                  </div>
+                }
+                title="No invoices found"
+                description="No invoices match your filters."
+              />
             ) : (
               <>
                 <div className="hidden md:block overflow-x-auto">
@@ -537,7 +538,7 @@ export default function InvoiceHistoryPage() {
                             </p>
                             <p className="text-xs font-medium text-slate-500 mt-1">
                               FILE:{" "}
-                              <span className="font-mono font-bold text-[#0d7377]">
+                              <span className="font-mono font-bold text-primary">
                                 {it.file_number || "-"}
                               </span>
                             </p>
@@ -588,7 +589,7 @@ export default function InvoiceHistoryPage() {
                         <p className="font-bold text-slate-800 text-base">{it.patient}</p>
                         <p className="text-xs font-medium text-slate-500 mt-1">
                           FILE:{" "}
-                          <span className="font-mono font-bold text-[#0d7377]">
+                          <span className="font-mono font-bold text-primary">
                             {it.file_number || "-"}
                           </span>
                         </p>

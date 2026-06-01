@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -1085,7 +1086,7 @@ export default function PatientDataPage() {
   }) => (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-5 w-5 text-[#0d7377]" />
+        <Icon className="h-5 w-5 text-primary" />
         <h3 className="font-semibold text-lg">{title}</h3>
       </div>
       <div className="grid grid-cols-2 gap-4 pl-7">{children}</div>
@@ -1122,7 +1123,7 @@ export default function PatientDataPage() {
               </h1>
               <p className="text-muted-foreground">
                 File No:{" "}
-                <span className="font-mono text-[#0d7377]">
+                <span className="font-mono text-primary">
                   {selectedPatient.file_number}
                 </span>
                 {selectedPatient.hdams_id && (
@@ -1176,7 +1177,7 @@ export default function PatientDataPage() {
               <Button
                 onClick={() => handleEditPatient(selectedPatient)}
                 disabled={isLoadingPatientDetail}
-                className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-[#14919b]"
               >
                 {isLoadingPatientDetail ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1209,7 +1210,7 @@ export default function PatientDataPage() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Fingerprint className="h-5 w-5 text-[#0d7377]" />
+                <Fingerprint className="h-5 w-5 text-primary" />
                 Confirm Fingerprint Update
               </DialogTitle>
               <DialogDescription>
@@ -1226,7 +1227,7 @@ export default function PatientDataPage() {
                 Cancel
               </Button>
               <Button
-                className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-[#14919b]"
                 onClick={handleProceedFingerprintFlow}
               >
                 Continue
@@ -1242,7 +1243,7 @@ export default function PatientDataPage() {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Fingerprint className="h-5 w-5 text-[#0d7377]" />
+                <Fingerprint className="h-5 w-5 text-primary" />
                 Fingerprint Update Console
               </DialogTitle>
               <DialogDescription>
@@ -1251,7 +1252,7 @@ export default function PatientDataPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="rounded-lg border border-[#0d7377]/20 bg-[#0d7377]/5 p-4">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm text-muted-foreground mb-1">Status</p>
               <p className="font-medium">{fingerprintFlowMessage}</p>
             </div>
@@ -1276,7 +1277,7 @@ export default function PatientDataPage() {
                 Close
               </Button>
               <Button
-                className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-[#14919b]"
                 onClick={handleCaptureAndUpdateFingerprint}
                 disabled={isUpdatingFingerprint}
               >
@@ -1350,8 +1351,8 @@ export default function PatientDataPage() {
         </Dialog>
 
         {/* Patient Profile Card */}
-        <Card className="border-[#0d7377]/20 overflow-hidden">
-          <div className="h-2 bg-gradient-to-r from-[#0d7377] to-[#14919b]" />
+        <Card className="border-primary/20 overflow-hidden">
+          <div className="h-2 bg-gradient-to-r from-primary to-[#14919b]" />
           <CardContent className="pt-6">
             <div className="flex items-start gap-6">
               {/* Photo */}
@@ -1362,11 +1363,11 @@ export default function PatientDataPage() {
                     alt={selectedPatient.full_name}
                     width={120}
                     height={120}
-                    className="rounded-xl object-cover border-2 border-[#0d7377]/30"
+                    className="rounded-xl object-cover border-2 border-primary/30"
                   />
                 ) : (
-                  <div className="w-[120px] h-[120px] rounded-xl bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 flex items-center justify-center border-2 border-[#0d7377]/30">
-                    <User className="h-12 w-12 text-[#0d7377]" />
+                  <div className="w-[120px] h-[120px] rounded-xl bg-gradient-to-br from-primary/10 to-[#14919b]/10 flex items-center justify-center border-2 border-primary/30">
+                    <User className="h-12 w-12 text-primary" />
                   </div>
                 )}
                 {selectedPatient.fingerprint_template && (
@@ -1490,7 +1491,7 @@ export default function PatientDataPage() {
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Total Visits</p>
-                  <p className="font-medium text-[#0d7377]">
+                  <p className="font-medium text-primary">
                     {patientVisits.length}
                   </p>
                 </div>
@@ -1817,7 +1818,7 @@ export default function PatientDataPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-[#0d7377]" />
+                  <Activity className="h-5 w-5 text-primary" />
                   Visit History
                 </CardTitle>
                 <CardDescription>
@@ -1843,13 +1844,13 @@ export default function PatientDataPage() {
                         className={`border-l-4 ${
                           visit.status === "completed"
                             ? "border-l-green-500 bg-green-50/50"
-                            : "border-l-[#0d7377] bg-[#0d7377]/5"
+                            : "border-l-primary bg-primary/5"
                         }`}
                       >
                         <CardContent className="py-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center font-semibold text-[#0d7377]">
+                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-primary">
                                 {patientVisits.length - index}
                               </div>
                               <div>
@@ -1970,7 +1971,7 @@ export default function PatientDataPage() {
           <DialogContent className="w-[95vw] max-w-6xl h-[92vh] overflow-hidden flex flex-col p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
               <DialogTitle className="flex items-center gap-2">
-                <Edit className="h-5 w-5 text-[#0d7377]" />
+                <Edit className="h-5 w-5 text-primary" />
                 Edit Patient Data
               </DialogTitle>
               <DialogDescription>
@@ -1998,9 +1999,9 @@ export default function PatientDataPage() {
                     value="personal"
                     className="space-y-4 px-6 pt-4 pb-6 mt-0"
                   >
-                    <div className="p-4 rounded-lg border-2 border-[#0d7377]/30 bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
+                    <div className="p-4 rounded-lg border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-[#14919b]/5">
                       <h4 className="font-semibold mb-4 flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-[#0d7377]" />
+                        <FileText className="h-4 w-4 text-primary" />
                         Registration Details
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2686,7 +2687,7 @@ export default function PatientDataPage() {
               <Button
                 onClick={handleSavePatient}
                 disabled={isSavingPatient}
-                className="bg-gradient-to-r from-[#0d7377] to-[#14919b]"
+                className="bg-gradient-to-r from-primary to-[#14919b]"
               >
                 {isSavingPatient ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -2706,18 +2707,15 @@ export default function PatientDataPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-[#0d7377]">Patient Data</h1>
-          <p className="text-muted-foreground">
-            Click on any patient to view their complete profile and visit
-            history
-          </p>
-        </div>
-        <div className="bg-[#e6f4f1] text-[#0d7377] font-bold px-4 py-2 rounded-lg border border-[#0d7377]/20">
-          {totalPatientsCount} Patients
-        </div>
-      </div>
+      <PageHeader
+        title="Patient Data"
+        subtitle="Click on any patient to view their complete profile and visit history"
+        actions={
+          <div className="bg-[#e6f4f1] text-primary font-bold px-4 py-2 rounded-lg border border-primary/20">
+            {totalPatientsCount} Patients
+          </div>
+        }
+      />
 
       {/* Search and Filter */}
       <Card className="border-none shadow-sm bg-white">
@@ -2735,7 +2733,7 @@ export default function PatientDataPage() {
             <Button
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className={`gap-2 h-11 border-slate-200 ${showFilters ? "bg-[#0d7377]/10 border-[#0d7377] text-[#0d7377]" : ""}`}
+              className={`gap-2 h-11 border-slate-200 ${showFilters ? "bg-primary/10 border-primary text-primary" : ""}`}
             >
               <Filter className="h-4 w-4" />
               Filters
@@ -2789,7 +2787,7 @@ export default function PatientDataPage() {
                   variant="ghost"
                   size="sm"
                   onClick={resetFilters}
-                  className="h-8 text-xs text-muted-foreground hover:text-[#0d7377] gap-1"
+                  className="h-8 text-xs text-muted-foreground hover:text-primary gap-1"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Reset
@@ -2910,7 +2908,7 @@ export default function PatientDataPage() {
           filteredPatients.map((patient) => (
             <Card
               key={patient.id}
-              className="cursor-pointer hover:border-[#0d7377]/30 hover:shadow-lg transition-all group bg-white border-slate-100"
+              className="cursor-pointer hover:border-primary/30 hover:shadow-lg transition-all group bg-white border-slate-100"
               onClick={() => handleSelectPatient(patient)}
             >
               <CardContent className="p-0">
@@ -2929,7 +2927,7 @@ export default function PatientDataPage() {
                       </div>
                     ) : (
                       <div className="w-24 h-24 rounded-lg bg-white flex items-center justify-center border-2 border-white shadow-sm">
-                        <User className="h-10 w-10 text-[#0d7377]/30" />
+                        <User className="h-10 w-10 text-primary/30" />
                       </div>
                     )}
                   </div>
@@ -2945,7 +2943,7 @@ export default function PatientDataPage() {
                         <Badge
                           className={
                             patient.status === "active"
-                              ? "bg-[#e6f4f1] text-[#0d7377] border-[#0d7377]/20 hover:bg-[#e6f4f1]"
+                              ? "bg-[#e6f4f1] text-primary border-primary/20 hover:bg-[#e6f4f1]"
                               : "bg-slate-100 text-slate-600 border-slate-200"
                           }
                         >
@@ -2958,7 +2956,7 @@ export default function PatientDataPage() {
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                             File No:
                           </span>
-                          <span className="text-xs font-mono font-bold text-[#0d7377]">
+                          <span className="text-xs font-mono font-bold text-primary">
                             {patient.file_number}
                           </span>
                         </div>
@@ -2977,7 +2975,7 @@ export default function PatientDataPage() {
                     <div className="grid grid-cols-2 gap-y-3 gap-x-12 mt-4">
                       <div className="flex items-center gap-3 text-slate-600">
                         <div className="w-8 flex justify-center">
-                          <Phone className="h-4 w-4 text-[#0d7377]" />
+                          <Phone className="h-4 w-4 text-primary" />
                         </div>
                         <span className="text-sm font-bold text-slate-700">
                           {patient.phone || "N/A"}
@@ -3014,8 +3012,8 @@ export default function PatientDataPage() {
                   </div>
 
                   {/* Action Section */}
-                  <div className="w-16 border-l border-slate-50 flex items-center justify-center group-hover:bg-[#0d7377]/5 transition-colors">
-                    <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-[#0d7377]" />
+                  <div className="w-16 border-l border-slate-50 flex items-center justify-center group-hover:bg-primary/5 transition-colors">
+                    <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -3025,7 +3023,7 @@ export default function PatientDataPage() {
       </div>
 
       {/* Pagination Controls */}
-      <Card className="border-[#0d7377]/20">
+      <Card className="border-primary/20">
         <CardContent className="py-4">
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">

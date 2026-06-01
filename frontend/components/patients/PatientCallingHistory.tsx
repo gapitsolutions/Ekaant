@@ -215,7 +215,7 @@ export function PatientCallingHistory({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Phone className="h-5 w-5 text-[#0d7377]" />
+            <Phone className="h-5 w-5 text-primary" />
             Call History
           </CardTitle>
           <CardDescription>
@@ -269,7 +269,7 @@ export function PatientCallingHistory({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-[#0d7377]/10 flex items-center justify-center text-xs font-bold text-[#0d7377]">
+                        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                           {item.staff_name?.charAt(0)?.toUpperCase() || "?"}
                         </div>
                         <span className="text-sm">{item.staff_name}</span>

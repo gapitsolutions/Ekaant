@@ -422,15 +422,15 @@ export async function renderIdCardCanvas(
 
   // Logo: the original asset (no background processing) inside a clean white
   // rounded container — a deliberate brand element on the teal header.
-  const tileSize = 52;
+  const tileSize = 60;
   const tileX = PAD_X;
   const tileY = (HEADER_H - tileSize) / 2;
-  const tilePad = 7;
+  const tilePad = 4;
   const tileRadius = 10;
 
   // White rounded container with a soft shadow for a premium look.
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.20)";
+  ctx.shadowColor = "rgba(0,0,0,0.12)";
   ctx.shadowBlur = 9;
   ctx.shadowOffsetY = 2;
   roundRectPath(ctx, tileX, tileY, tileSize, tileSize, tileRadius);

@@ -214,7 +214,7 @@ export function MultiSelect({
                     className={cn(
                       'flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors',
                       checked
-                        ? 'border-[#0d7377] bg-[#0d7377] text-white'
+                        ? 'border-primary bg-primary text-white'
                         : 'border-input bg-white',
                     )}
                   >
@@ -237,7 +237,7 @@ export function MultiSelect({
               variant="ghost"
               size="sm"
               onClick={() => onChange([])}
-              className="h-7 text-xs text-muted-foreground hover:text-[#0d7377]"
+              className="h-7 text-xs text-muted-foreground hover:text-primary"
             >
               Clear
             </Button>

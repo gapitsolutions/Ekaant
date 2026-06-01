@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -197,14 +199,10 @@ export default function FollowUpPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Follow-Up Calling System</h1>
-          <p className="text-slate-500 mt-1">
-            Manage patient follow-ups scheduled by the pharmacy.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Follow-Up Calling System"
+        subtitle="Manage patient follow-ups scheduled by the pharmacy."
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-[#e0f2f1] to-teal-50 border-teal-200 shadow-sm relative overflow-hidden">
@@ -295,15 +293,16 @@ export default function FollowUpPage() {
               <p className="text-sm text-slate-500">Loading follow-ups...</p>
             </div>
           ) : items.length === 0 ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-5 border border-slate-100">
-                <CheckCircle className="h-10 w-10 text-slate-300" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-700">No {tab} follow-ups found</h3>
-              <p className="text-slate-500 mt-2 max-w-sm">
-                There are no patients matching your criteria. Great job keeping the queue clear!
-              </p>
-            </div>
+            <EmptyState
+              className="py-20"
+              icon={
+                <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                  <CheckCircle className="h-10 w-10 text-slate-300" />
+                </div>
+              }
+              title={`No ${tab} follow-ups found`}
+              description="There are no patients matching your criteria. Great job keeping the queue clear!"
+            />
           ) : (
             <div className="divide-y divide-slate-100">
               {items.map((item) => {

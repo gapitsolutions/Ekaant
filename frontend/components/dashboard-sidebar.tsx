@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { BRANDING } from "@/lib/branding";
 
 interface NavItem {
   title: string;
@@ -175,8 +176,8 @@ export function DashboardSidebar() {
         <div className="flex h-20 items-center gap-3 border-b border-sidebar-border px-4">
           <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-white/10 p-1">
             <Image
-              src="/logo.png"
-              alt="Aggarwal Hospital Logo"
+              src={BRANDING.logoPath}
+              alt={`${BRANDING.name} Logo`}
               fill
               className="object-contain"
               priority
@@ -184,10 +185,10 @@ export function DashboardSidebar() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold leading-tight text-sidebar-foreground truncate">
-              Aggarwal Psychiatric
+              {BRANDING.shortName}
             </span>
             <span className="text-xs text-sidebar-foreground/70 leading-tight">
-              & De-Addiction Centre
+              {BRANDING.subtitle}
             </span>
           </div>
         </div>

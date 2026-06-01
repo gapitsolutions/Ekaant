@@ -9,6 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -157,25 +159,20 @@ export default function SuppliersPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-[#0d7377]" />
-            Suppliers
-          </h1>
-          <p className="text-slate-500 mt-1 font-medium italic">
-            Pharmaceutical wholesalers and distributors. Soft-deactivate
-            removes from selection without affecting historical invoices.
-          </p>
-        </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add supplier
-        </Button>
-      </header>
+      <PageHeader
+        icon={<Building2 className="h-7 w-7 text-primary" />}
+        title="Suppliers"
+        subtitle="Pharmaceutical wholesalers and distributors. Soft-deactivate removes from selection without affecting historical invoices."
+        actions={
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="bg-primary hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add supplier
+          </Button>
+        }
+      />
 
       <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
         <CardHeader className="bg-slate-50/30 border-b border-slate-100 py-6 px-6">
@@ -236,20 +233,19 @@ export default function SuppliersPage() {
 
           {isLoading ? (
             <div className="flex items-center justify-center py-24">
-              <Spinner className="h-6 w-6 text-[#0d7377]" />
+              <Spinner className="h-6 w-6 text-primary" />
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <Building2 className="h-7 w-7 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">
-                No suppliers found
-              </h3>
-              <p className="text-sm text-slate-500 mt-1 max-w-[280px] mx-auto">
-                No suppliers match the current filters.
-              </p>
-            </div>
+            <EmptyState
+              className="py-24"
+              icon={
+                <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center">
+                  <Building2 className="h-7 w-7 text-slate-300" />
+                </div>
+              }
+              title="No suppliers found"
+              description="No suppliers match the current filters."
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -651,7 +647,7 @@ function SupplierFormDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white rounded-xl">
+          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-[#0a5c5f] text-white rounded-xl">
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isEdit ? "Save changes" : "Add supplier"}
           </Button>

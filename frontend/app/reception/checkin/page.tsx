@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   PhotoCaptureDialog,
   type CapturedPhoto,
@@ -101,8 +103,8 @@ const getBannerStyle = (status: VisitStatus) => {
       };
     case "on_time":
       return {
-        bg: "bg-[#0d7377]/10 border-[#0d7377]/10",
-        text: "text-[#0d7377]",
+        bg: "bg-primary/10 border-primary/10",
+        text: "text-primary",
         label: "ON TIME VISIT",
         badge: null,
       };
@@ -412,31 +414,27 @@ export default function CheckinPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-[#0d7377] to-[#14919b] bg-clip-text text-transparent">
-            Patient Check-in
-          </h1>
-          <p className="text-muted-foreground">
-            Search patient, verify identity, and complete check-in
-          </p>
-        </div>
-        <Button
-          onClick={() => navigate("/reception/register")}
-          className="bg-gradient-to-r from-[#0d7377] to-[#14919b] hover:from-[#0a5c5f] hover:to-[#0d7377]"
-        >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Register New Patient
-        </Button>
-      </div>
+      <PageHeader
+        title="Patient Check-in"
+        subtitle="Search patient, verify identity, and complete check-in"
+        actions={
+          <Button
+            onClick={() => navigate("/reception/register")}
+            className="bg-gradient-to-r from-primary to-[#14919b] hover:from-[#0a5c5f] hover:to-primary"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Register New Patient
+          </Button>
+        }
+      />
 
       {/* Step Indicator */}
       <div className="flex items-center justify-center gap-2">
         <div
           className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
             verificationStep === "search"
-              ? "bg-[#0d7377] text-white"
-              : "bg-[#0d7377]/10 text-[#0d7377]"
+              ? "bg-primary text-white"
+              : "bg-primary/10 text-primary"
           }`}
         >
           <Search className="h-4 w-4" />
@@ -446,9 +444,9 @@ export default function CheckinPage() {
         <div
           className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
             verificationStep === "confirm" || verificationStep === "verify"
-              ? "bg-[#0d7377] text-white"
+              ? "bg-primary text-white"
               : verificationStep === "verified"
-                ? "bg-[#0d7377]/10 text-[#0d7377]"
+                ? "bg-primary/10 text-primary"
                 : "bg-muted text-muted-foreground"
           }`}
         >
@@ -461,7 +459,7 @@ export default function CheckinPage() {
             verificationStep === "verified"
               ? "bg-emerald-500 text-white"
               : verificationStep === "verify"
-                ? "bg-[#0d7377] text-white"
+                ? "bg-primary text-white"
                 : "bg-muted text-muted-foreground"
           }`}
         >
@@ -481,9 +479,9 @@ export default function CheckinPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Search Section */}
         <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-          <CardHeader className="border-b bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
+          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-[#14919b]/5">
             <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5 text-[#0d7377]" />
+              <Search className="h-5 w-5 text-primary" />
               Search Patient
             </CardTitle>
             <CardDescription>
@@ -550,12 +548,12 @@ export default function CheckinPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="focus-visible:ring-[#0d7377]"
+                  className="focus-visible:ring-primary"
                 />
               </div>
               <Button
                 onClick={handleSearch}
-                className="bg-[#0d7377] hover:bg-[#0a5c5f]"
+                className="bg-primary hover:bg-[#0a5c5f]"
               >
                 <Search className="h-4 w-4 mr-2" />
                 Search
@@ -575,13 +573,13 @@ export default function CheckinPage() {
                       onClick={() => handleSelectPatient(patient)}
                       className={`p-4 rounded-lg border cursor-pointer transition-all ${
                         selectedPatient?.id === patient.id
-                          ? "border-[#0d7377] bg-[#0d7377]/5 shadow-md ring-2 ring-[#0d7377]/20"
-                          : "hover:bg-[#0d7377]/5 hover:border-[#0d7377]/50"
+                          ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+                          : "hover:bg-primary/5 hover:border-primary/50"
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         {/* Photo or Avatar */}
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0d7377]/20 to-[#14919b]/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-[#14919b]/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {patient.photo ? (
                             <img
                               src={patient.photo}
@@ -589,7 +587,7 @@ export default function CheckinPage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <User className="h-6 w-6 text-[#0d7377]" />
+                            <User className="h-6 w-6 text-primary" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -612,34 +610,36 @@ export default function CheckinPage() {
                           </div>
                         </div>
                         {selectedPatient?.id === patient.id && (
-                          <CheckCircle className="h-5 w-5 text-[#0d7377]" />
+                          <CheckCircle className="h-5 w-5 text-primary" />
                         )}
                       </div>
                     </div>
                   ))}
                 </>
               ) : searchQuery && searchResults.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                    <Search className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
-                  <p className="font-medium">No patients found</p>
-                  <p className="text-sm mt-1">
-                    Try a different search term or register a new patient
-                  </p>
-                  <Button
-                    variant="link"
-                    className="mt-3 text-[#0d7377]"
-                    onClick={() => navigate("/reception/register")}
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Register New Patient
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={
+                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
+                      <Search className="h-8 w-8 text-muted-foreground/50" />
+                    </div>
+                  }
+                  title="No patients found"
+                  description="Try a different search term or register a new patient"
+                  action={
+                    <Button
+                      variant="link"
+                      className="text-primary"
+                      onClick={() => navigate("/reception/register")}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Register New Patient
+                    </Button>
+                  }
+                />
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 flex items-center justify-center mx-auto mb-4">
-                    <Search className="h-8 w-8 text-[#0d7377]/50" />
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-[#14919b]/10 flex items-center justify-center mx-auto mb-4">
+                    <Search className="h-8 w-8 text-primary/50" />
                   </div>
                   <p>Enter search term to find patient</p>
                 </div>
@@ -650,7 +650,7 @@ export default function CheckinPage() {
 
         {/* Confirmation & Verification Section */}
         <Card className="shadow-lg border-0 bg-card/80 backdrop-blur">
-          <CardHeader className="border-b bg-gradient-to-r from-[#0d7377]/5 to-[#14919b]/5">
+          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-[#14919b]/5">
             <CardTitle className="flex items-center gap-2">
               {isIdentityVerified ? (
                 <>
@@ -659,7 +659,7 @@ export default function CheckinPage() {
                 </>
               ) : (
                 <>
-                  <Fingerprint className="h-5 w-5 text-[#0d7377]" />
+                  <Fingerprint className="h-5 w-5 text-primary" />
                   Check-in Confirmation
                 </>
               )}
@@ -682,7 +682,7 @@ export default function CheckinPage() {
                   className={`rounded-2xl border overflow-hidden transition-all bg-[#f8fafc] ${
                     biometricVerified
                       ? "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                      : "border-[#0d7377]/20 shadow-sm"
+                      : "border-primary/20 shadow-sm"
                   }`}
                 >
                   {/* Latest Follow-Up Date Banner */}
@@ -749,7 +749,7 @@ export default function CheckinPage() {
                           <Camera className="h-12 w-12 text-slate-300" />
                         )}
                         {selectedPatient.fingerprint_template && (
-                          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#0d7377] flex items-center justify-center ring-2 ring-white">
+                          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center ring-2 ring-white">
                             <Fingerprint className="h-3 w-3 text-white" />
                           </div>
                         )}
@@ -767,7 +767,7 @@ export default function CheckinPage() {
                         )}
                       </h3>
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2 mb-3">
-                        <Badge className="bg-[#0d7377] hover:bg-[#0d7377] text-white font-mono px-3 py-1 rounded-md text-xs border-0">
+                        <Badge className="bg-primary hover:bg-primary text-white font-mono px-3 py-1 rounded-md text-xs border-0">
                           {selectedPatient.file_number}
                         </Badge>
                         {biometricVerified && (
@@ -788,8 +788,8 @@ export default function CheckinPage() {
                   <div className="p-6 space-y-3 bg-[#f8fafc]/50">
                     {/* Age / DOB */}
                     <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
-                        <Calendar className="h-5 w-5 text-[#0d7377]" />
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
@@ -810,8 +810,8 @@ export default function CheckinPage() {
 
                     {/* Mobile Number */}
                     <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
-                        <Phone className="h-5 w-5 text-[#0d7377]" />
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Phone className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
@@ -825,8 +825,8 @@ export default function CheckinPage() {
 
                     {/* Aadhaar Number */}
                     <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
-                        <CreditCard className="h-5 w-5 text-[#0d7377]" />
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <CreditCard className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
@@ -840,8 +840,8 @@ export default function CheckinPage() {
 
                     {/* Address */}
                     <div className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-slate-100 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
-                        <MapPin className="h-5 w-5 text-[#0d7377]" />
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <MapPin className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
@@ -871,7 +871,7 @@ export default function CheckinPage() {
                         }
                         className={
                           verificationMethod === "fingerprint"
-                            ? "bg-[#0d7377] hover:bg-[#0a5c5f]"
+                            ? "bg-primary hover:bg-[#0a5c5f]"
                             : ""
                         }
                         onClick={() =>
@@ -938,14 +938,14 @@ export default function CheckinPage() {
                       <div
                         className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all border-4 ${
                           isScanning
-                            ? "bg-[#0d7377]/20 border-[#0d7377] animate-pulse"
-                            : "bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 border-[#0d7377]/30"
+                            ? "bg-primary/20 border-primary animate-pulse"
+                            : "bg-gradient-to-br from-primary/10 to-[#14919b]/10 border-primary/30"
                         }`}
                       >
                         {isScanning ? (
-                          <Loader2 className="h-10 w-10 text-[#0d7377] animate-spin" />
+                          <Loader2 className="h-10 w-10 text-primary animate-spin" />
                         ) : (
-                          <Fingerprint className="h-10 w-10 text-[#0d7377]" />
+                          <Fingerprint className="h-10 w-10 text-primary" />
                         )}
                       </div>
                       <div>
@@ -960,7 +960,7 @@ export default function CheckinPage() {
                         size="lg"
                         onClick={handleFingerprintVerification}
                         disabled={isScanning || rdService?.available === false}
-                        className="bg-gradient-to-r from-[#0d7377] to-[#14919b] hover:from-[#0a5c5f] hover:to-[#0d7377]"
+                        className="bg-gradient-to-r from-primary to-[#14919b] hover:from-[#0a5c5f] hover:to-primary"
                       >
                         {isScanning ? (
                           <>
@@ -1091,8 +1091,8 @@ export default function CheckinPage() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#0d7377]/10 to-[#14919b]/10 flex items-center justify-center mb-4">
-                  <User className="h-12 w-12 text-[#0d7377]/30" />
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 to-[#14919b]/10 flex items-center justify-center mb-4">
+                  <User className="h-12 w-12 text-primary/30" />
                 </div>
                 <p className="font-medium text-muted-foreground">
                   No Patient Selected

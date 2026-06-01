@@ -128,8 +128,8 @@ export function PatientInvoiceView({
       {/* Receipt Top Header */}
       <div className="bg-slate-50/80 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[#0d7377]/10 flex items-center justify-center">
-            <Receipt className="h-4 w-4 text-[#0d7377]" />
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Receipt className="h-4 w-4 text-primary" />
           </div>
           <div>
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -244,11 +244,11 @@ export function PatientInvoiceView({
             </div>
           )}
 
-          <div className="flex justify-between items-center bg-[#0d7377]/5 p-3 rounded-xl border border-[#0d7377]/10 mt-3 shadow-inner">
+          <div className="flex justify-between items-center bg-primary/5 p-3 rounded-xl border border-primary/10 mt-3 shadow-inner">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
               Total Visit Invoice
             </span>
-            <span className="text-lg font-black text-[#0d7377] font-mono">
+            <span className="text-lg font-black text-primary font-mono">
               {"₹"}
               {netPayable.toFixed(2)}
             </span>
@@ -266,7 +266,7 @@ export function PatientInvoiceView({
         <div className="pt-2 flex justify-end gap-2">
           <Button
             onClick={handlePrintInvoice}
-            className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-bold text-xs h-8 px-4 rounded-lg flex items-center gap-1.5 shadow-sm"
+            className="bg-primary hover:bg-[#0a5c5f] text-white font-bold text-xs h-8 px-4 rounded-lg flex items-center gap-1.5 shadow-sm"
           >
             <Printer className="h-3.5 w-3.5" />
             Print Invoice Receipt
@@ -284,7 +284,7 @@ function MedicineRow({ item }: { item: DispenseInvoiceLineItem }) {
   return (
     <div className="flex justify-between items-center hover:bg-slate-50/50 p-1.5 rounded transition-colors">
       <div className="flex items-center gap-1.5 min-w-0">
-        <Pill className="h-3.5 w-3.5 text-[#0d7377] shrink-0" />
+        <Pill className="h-3.5 w-3.5 text-primary shrink-0" />
         <span className="font-semibold text-slate-600 truncate">
           {item.medicine_name}
         </span>

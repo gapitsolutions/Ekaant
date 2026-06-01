@@ -16,6 +16,7 @@ import {
 } from "@/lib/pharmacy-api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Dialog,
   DialogContent,
@@ -399,20 +400,16 @@ export default function PharmacyDashboard() {
     <div className="min-h-screen bg-slate-50/50">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 pb-20">
         {/* ── Header ── */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
-              Pharmacy Dashboard
-            </h1>
-            <p className="text-slate-500 mt-1 text-sm">
-              Manage prescriptions and inventory
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-            <Clock className="h-4 w-4" />
-            <span>{today}</span>
-          </div>
-        </div>
+        <PageHeader
+          title="Pharmacy Dashboard"
+          subtitle="Manage prescriptions and inventory"
+          actions={
+            <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
+              <Clock className="h-4 w-4" />
+              <span>{today}</span>
+            </div>
+          }
+        />
 
         {errorMessage ? (
           <p className="text-sm text-destructive">{errorMessage}</p>
@@ -483,7 +480,7 @@ export default function PharmacyDashboard() {
               </div>
               <button
                 onClick={() => navigate("/pharmacy/prescription-queue")}
-                className="flex items-center gap-1 text-sm font-medium text-[#0d7377] hover:underline"
+                className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
               >
                 View All <ChevronRight className="h-4 w-4" />
               </button>
@@ -524,7 +521,7 @@ export default function PharmacyDashboard() {
                           {getInitials(item.patient_name)}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-800 text-sm group-hover:text-[#0d7377] transition-colors">
+                          <p className="font-semibold text-slate-800 text-sm group-hover:text-primary transition-colors">
                             {item.patient_name}
                           </p>
                           <p className="text-xs text-slate-400">
@@ -540,7 +537,7 @@ export default function PharmacyDashboard() {
                             Debt ₹{outstanding.toLocaleString("en-IN")}
                           </span>
                         ) : null}
-                        <span className="hidden sm:flex items-center gap-1 text-xs font-medium text-slate-400 group-hover:text-[#0d7377] transition-colors">
+                        <span className="hidden sm:flex items-center gap-1 text-xs font-medium text-slate-400 group-hover:text-primary transition-colors">
                           Open Invoice <ChevronRight className="h-3.5 w-3.5" />
                         </span>
                       </div>
@@ -567,7 +564,7 @@ export default function PharmacyDashboard() {
                     <button
                       key={action.title}
                       onClick={action.onClick}
-                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-[#0d7377] hover:bg-[#0a5c5f] text-white transition-colors text-left"
+                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-primary hover:bg-[#0a5c5f] text-white transition-colors text-left"
                     >
                       <div
                         className={`w-9 h-9 rounded-lg ${action.iconBg} flex items-center justify-center flex-shrink-0`}
@@ -755,7 +752,7 @@ export default function PharmacyDashboard() {
                             setIsPendingDispenseDialogOpen(false);
                             navigate(`/pharmacy/dispense/${item.session_id}`);
                           }}
-                          className="text-xs bg-[#0d7377]/10 text-[#0d7377] hover:bg-[#0d7377]/20 border-0 font-bold"
+                          className="text-xs bg-primary/10 text-primary hover:bg-primary/20 border-0 font-bold"
                         >
                           Open <ArrowRight className="h-3 w-3 ml-1" />
                         </Button>
@@ -831,7 +828,7 @@ export default function PharmacyDashboard() {
                 <TableBody className="divide-y divide-slate-100 bg-white">
                   {dispensedTodayItems.map((inv) => (
                     <TableRow key={inv.id}>
-                      <TableCell className="font-mono text-sm font-bold text-[#0d7377]">
+                      <TableCell className="font-mono text-sm font-bold text-primary">
                         {inv.invoice_number}
                       </TableCell>
                       <TableCell className="text-sm">

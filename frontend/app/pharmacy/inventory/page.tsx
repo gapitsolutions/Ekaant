@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -224,35 +225,35 @@ export default function InventoryWorkstationPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-24">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
-              <Boxes className="h-7 w-7 text-[#0d7377]" /> Inventory Workstation
-            </h1>
-            <Badge className="bg-teal-50 border border-teal-100 text-[#0d7377] font-bold text-[10px] uppercase px-2 py-0.5 rounded-lg flex items-center gap-1">
+      <PageHeader
+        icon={<Boxes className="h-7 w-7 text-primary" />}
+        title={
+          <span className="flex items-center gap-2">
+            Inventory Workstation
+            <Badge className="bg-teal-50 border border-teal-100 text-primary font-bold text-[10px] uppercase px-2 py-0.5 rounded-lg flex items-center gap-1">
               <Sparkles className="h-3 w-3" /> Audit Compliant
             </Badge>
-          </div>
-          <p className="text-xs text-slate-500 font-medium">
-            {medicines.length} active formulation
-            {medicines.length === 1 ? "" : "s"} registered
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-white text-slate-600 font-extrabold px-3.5 py-2 rounded-xl border border-slate-100 shadow-sm flex items-center gap-2 text-xs">
-            <Calendar className="h-4 w-4 text-[#0d7377]" />
-            <span>{medicines.length} Predefined Formulations</span>
-          </div>
-          <Button
-            onClick={() => setAddDialogOpen(true)}
-            className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
-          >
-            <Plus className="h-4 w-4" />
-            Register Medicine
-          </Button>
-        </div>
-      </div>
+          </span>
+        }
+        subtitle={`${medicines.length} active formulation${
+          medicines.length === 1 ? "" : "s"
+        } registered`}
+        actions={
+          <>
+            <div className="bg-white text-slate-600 font-extrabold px-3.5 py-2 rounded-xl border border-slate-100 shadow-sm flex items-center gap-2 text-xs">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span>{medicines.length} Predefined Formulations</span>
+            </div>
+            <Button
+              onClick={() => setAddDialogOpen(true)}
+              className="bg-primary hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
+            >
+              <Plus className="h-4 w-4" />
+              Register Medicine
+            </Button>
+          </>
+        }
+      />
 
       {/* Stat Filter Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -264,9 +265,9 @@ export default function InventoryWorkstationPage() {
               count: counts.all,
               labelColor: "text-slate-500",
               activeBg: "bg-teal-50/30",
-              activeBorder: "border-[#0d7377]",
-              activeRing: "ring-[#0d7377]/20",
-              badgeClass: "bg-[#0d7377] text-white",
+              activeBorder: "border-primary",
+              activeRing: "ring-primary/20",
+              badgeClass: "bg-primary text-white",
               icon: Layers,
               subtitle: "Predefined stock",
             },
@@ -420,7 +421,7 @@ export default function InventoryWorkstationPage() {
             onClick={() => setTab("list")}
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
               tab === "list"
-                ? "bg-[#0d7377] text-white shadow-md shadow-teal-900/10"
+                ? "bg-primary text-white shadow-md shadow-teal-900/10"
                 : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
             }`}
           >
@@ -431,7 +432,7 @@ export default function InventoryWorkstationPage() {
             onClick={() => setTab("invoice")}
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
               tab === "invoice"
-                ? "bg-[#0d7377] text-white shadow-md shadow-teal-900/10"
+                ? "bg-primary text-white shadow-md shadow-teal-900/10"
                 : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
             }`}
           >
@@ -469,7 +470,7 @@ export default function InventoryWorkstationPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search registered composition, salt or name..."
-                    className="pl-9 h-10 bg-white border-slate-200 rounded-lg focus:ring-[#0d7377]/10 focus:border-[#0d7377] font-medium text-slate-700 text-sm w-full md:max-w-md"
+                    className="pl-9 h-10 bg-white border-slate-200 rounded-lg focus:ring-primary/10 focus:border-primary font-medium text-slate-700 text-sm w-full md:max-w-md"
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
@@ -497,7 +498,7 @@ export default function InventoryWorkstationPage() {
                         setBupFilter(v as BupStrength | "all")
                       }
                     >
-                      <SelectTrigger className="w-40 h-10 rounded-lg border-slate-200 bg-white font-medium text-sm text-[#0d7377]">
+                      <SelectTrigger className="w-40 h-10 rounded-lg border-slate-200 bg-white font-medium text-sm text-primary">
                         <SelectValue placeholder="Strength" />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg border-slate-200 text-sm">
@@ -747,7 +748,7 @@ export default function InventoryWorkstationPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-slate-400 hover:text-[#0d7377] hover:bg-teal-50"
+                                className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-teal-50"
                                 onClick={() => setEditTarget(m)}
                                 aria-label="Edit medicine"
                                 title="Edit Medicine"
@@ -1092,7 +1093,7 @@ function MedicineFormDialog({
       <DialogContent className="sm:max-w-[550px] rounded-2xl p-6 bg-white border border-slate-100">
         <DialogHeader className="pb-3 border-b border-slate-50">
           <DialogTitle className="text-base font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <Pill className="h-5 w-5 text-[#0d7377]" />
+            <Pill className="h-5 w-5 text-primary" />
             {isEdit ? "Edit Medicine" : "Register New Medicine"}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400 mt-1">
@@ -1123,14 +1124,14 @@ function MedicineFormDialog({
           </div>
           {category === "BUP" ? (
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-[#0d7377]">
+              <Label className="text-xs font-bold text-primary">
                 BUP Strength Subcategory
               </Label>
               <Select
                 value={bupCategory}
                 onValueChange={(v) => setBupCategory(v as BupStrength)}
               >
-                <SelectTrigger className="h-11 rounded-xl bg-teal-50/50 border-teal-200 text-[#0d7377] font-black text-xs">
+                <SelectTrigger className="h-11 rounded-xl bg-teal-50/50 border-teal-200 text-primary font-black text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-teal-100 text-xs">
@@ -1203,7 +1204,7 @@ function MedicineFormDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-[#0d7377]">
+            <Label className="text-xs font-bold text-primary">
               Dispense Selling Price (₹)
             </Label>
             <Input
@@ -1212,7 +1213,7 @@ function MedicineFormDialog({
               step="0.01"
               value={sellingPrice}
               onChange={(e) => setSellingPrice(e.target.value)}
-              className="h-11 rounded-xl bg-teal-50/30 border-teal-200 font-black text-[#0d7377] text-center text-xs"
+              className="h-11 rounded-xl bg-teal-50/30 border-teal-200 font-black text-primary text-center text-xs"
             />
           </div>
 
@@ -1254,7 +1255,7 @@ function MedicineFormDialog({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-[#0d7377] hover:bg-[#0a5c5f] font-extrabold rounded-xl h-11 px-6 shadow-md shadow-teal-900/10 text-xs"
+            className="bg-primary hover:bg-[#0a5c5f] font-extrabold rounded-xl h-11 px-6 shadow-md shadow-teal-900/10 text-xs"
           >
             {isSubmitting ? (
               <>
@@ -1509,7 +1510,7 @@ function PurchaseInvoiceForm({
     <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
       <CardHeader className="p-6 border-b border-slate-100 bg-slate-50/20">
         <CardTitle className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
-          <FileSpreadsheet className="h-5 w-5 text-[#0d7377]" /> Enter Purchase
+          <FileSpreadsheet className="h-5 w-5 text-primary" /> Enter Purchase
           Invoice (Bulk Stock Entry)
         </CardTitle>
       </CardHeader>
@@ -1638,7 +1639,7 @@ function PurchaseInvoiceForm({
                 onClick={() =>
                   document.getElementById("purchase-invoice-document")?.click()
                 }
-                className="h-10 rounded-xl border-[#0d7377]/30 bg-teal-50/50 hover:bg-teal-50 text-xs font-black text-[#0d7377] flex items-center gap-2"
+                className="h-10 rounded-xl border-primary/30 bg-teal-50/50 hover:bg-teal-50 text-xs font-black text-primary flex items-center gap-2"
               >
                 <Upload className="h-4 w-4" />
                 {invoiceDocument ? "Replace Document" : "Upload Document"}
@@ -1668,7 +1669,7 @@ function PurchaseInvoiceForm({
               />
             ) : invoiceDocument ? (
               <div className="px-4 text-center">
-                <FileSpreadsheet className="h-8 w-8 text-[#0d7377] mx-auto mb-2" />
+                <FileSpreadsheet className="h-8 w-8 text-primary mx-auto mb-2" />
                 <p className="text-xs font-bold text-slate-700 truncate max-w-[220px]">
                   {invoiceDocument.filename}
                 </p>
@@ -1701,7 +1702,7 @@ function PurchaseInvoiceForm({
             variant="outline"
             size="sm"
             onClick={() => setSelectDialogOpen(true)}
-            className="h-9 px-3 rounded-xl border-[#0d7377]/30 bg-teal-50/50 hover:bg-teal-50 text-xs font-black text-[#0d7377] flex items-center gap-1.5"
+            className="h-9 px-3 rounded-xl border-primary/30 bg-teal-50/50 hover:bg-teal-50 text-xs font-black text-primary flex items-center gap-1.5"
           >
             <Plus className="h-4 w-4" />
             Select Medicines
@@ -1806,7 +1807,7 @@ function PurchaseInvoiceForm({
                             purchasePrice: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className="h-8 w-24 rounded-lg bg-slate-50 border-slate-200 font-black text-[#0d7377] text-xs text-center"
+                        className="h-8 w-24 rounded-lg bg-slate-50 border-slate-200 font-black text-primary text-xs text-center"
                       />
                     </TableCell>
                     <TableCell>
@@ -1872,10 +1873,10 @@ function PurchaseInvoiceForm({
               </strong>
             </div>
             <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 shadow-sm">
-              <span className="text-[8px] font-black text-[#0d7377] uppercase tracking-wider block">
+              <span className="text-[8px] font-black text-primary uppercase tracking-wider block">
                 Grand Total
               </span>
-              <strong className="text-sm font-black text-[#0d7377] block mt-0.5">
+              <strong className="text-sm font-black text-primary block mt-0.5">
                 ₹
                 {summary.grandTotal.toLocaleString("en-IN", {
                   maximumFractionDigits: 2,
@@ -1887,7 +1888,7 @@ function PurchaseInvoiceForm({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || items.length === 0}
-            className="w-full md:w-auto bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-12 px-8 shadow-md shadow-teal-900/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform text-xs flex-shrink-0"
+            className="w-full md:w-auto bg-primary hover:bg-[#0a5c5f] text-white font-extrabold rounded-xl h-12 px-8 shadow-md shadow-teal-900/10 flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform text-xs flex-shrink-0"
           >
             {isSubmitting ? (
               <>
@@ -1936,7 +1937,7 @@ function PurchaseInvoiceForm({
                             );
                           }
                         }}
-                        className="mt-0.5 rounded-md border-slate-300 data-[state=checked]:bg-[#0d7377] data-[state=checked]:border-[#0d7377]"
+                        className="mt-0.5 rounded-md border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-black text-slate-800 truncate">
@@ -1972,7 +1973,7 @@ function PurchaseInvoiceForm({
             </Button>
             <Button
               onClick={handleConfirmSelection}
-              className="rounded-xl bg-[#0d7377] hover:bg-[#0a5c5f] text-xs font-bold text-white"
+              className="rounded-xl bg-primary hover:bg-[#0a5c5f] text-xs font-bold text-white"
             >
               Add {selectedIds.length} medicine(s)
             </Button>

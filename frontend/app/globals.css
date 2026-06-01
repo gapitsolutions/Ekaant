@@ -12,8 +12,9 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.03 200);
   
-  /* Primary: Teal - matching logo's main color */
-  --primary: oklch(0.5 0.14 185);
+  /* Primary: Teal - matching logo's main color (exact brand hex #0d7377,
+     the single source for the teal used across the UI). */
+  --primary: #0d7377;
   --primary-foreground: oklch(1 0 0);
   
   /* Secondary: Dark teal/navy from logo */
@@ -31,7 +32,7 @@
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.9 0.02 185);
   --input: oklch(0.92 0.02 185);
-  --ring: oklch(0.5 0.14 185);
+  --ring: #0d7377;
   
   /* Chart colors matching brand */
   --chart-1: oklch(0.5 0.14 185);

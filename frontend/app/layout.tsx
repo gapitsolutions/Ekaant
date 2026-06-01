@@ -2,20 +2,21 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/lib/auth-context'
 import { Toaster } from '@/components/ui/sonner'
+import { BRANDING } from '@/lib/branding'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Aggarwal Psychiatric & De-Addiction Centre',
-  description: 'Comprehensive patient management system for Aggarwal Psychiatric and De-Addiction Centre',
+  title: BRANDING.name,
+  description: `${BRANDING.tagline} for ${BRANDING.name}`,
   generator: 'v0.app',
   icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
+    icon: BRANDING.faviconPath,
+    apple: BRANDING.faviconPath,
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0d7377',
+  themeColor: BRANDING.colors.primary,
 }
 
 export default function RootLayout({

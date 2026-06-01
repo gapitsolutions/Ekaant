@@ -6,6 +6,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth-context";
 import {
   getDashboardStats,
@@ -281,25 +282,21 @@ export default function ReceptionDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            Reception Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome back! Manage patient check-ins and registrations
-          </p>
-        </div>
-        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
-          <Clock className="h-4 w-4" />
-          {new Date().toLocaleDateString("en-IN", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </div>
-      </div>
+      <PageHeader
+        title="Reception Dashboard"
+        subtitle="Welcome back! Manage patient check-ins and registrations"
+        actions={
+          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+            <Clock className="h-4 w-4" />
+            {new Date().toLocaleDateString("en-IN", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
+        }
+      />
 
       {/* Stats Overview */}
       <div className="grid gap-6 md:grid-cols-3">
@@ -402,7 +399,7 @@ export default function ReceptionDashboard() {
                           <div className="flex items-center gap-2">
                             <p className="font-semibold text-foreground text-sm">{q.patient_name}</p>
                             {q.file_number && (
-                              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#0d7377] bg-[#e0f2f1] px-1.5 py-0.5 rounded">
+                              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-primary bg-[#e0f2f1] px-1.5 py-0.5 rounded">
                                 <FileText className="h-3 w-3" />
                                 {q.file_number}
                               </span>

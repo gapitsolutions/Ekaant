@@ -1,10 +1,15 @@
 /**
- * Shared hospital branding constants used across all exports (PDFs, ID cards, invoices).
- * Sourced from the same values used in the sidebar / layout.
+ * Hospital branding constants for exports (PDFs, ID cards, invoices).
+ *
+ * These now re-export from the single source of truth in `lib/branding.ts`.
+ * The named exports below are kept for backward compatibility so existing
+ * imports continue to work unchanged.
  */
-export const HOSPITAL_NAME = "Aggarwal Psychiatric & De-Addiction Centre";
-export const HOSPITAL_SHORT_NAME = "Aggarwal Psychiatric";
-export const HOSPITAL_SUBTITLE = "& De-Addiction Centre";
-export const HOSPITAL_LOGO_PATH = "/logo.png";
-export const HOSPITAL_PRIMARY_COLOR = "#0d7377";
-export const HOSPITAL_PRIMARY_GRADIENT = ["#0d7377", "#14919b"] as const;
+import { BRANDING } from "@/lib/branding";
+
+export const HOSPITAL_NAME = BRANDING.name;
+export const HOSPITAL_SHORT_NAME = BRANDING.shortName;
+export const HOSPITAL_SUBTITLE = BRANDING.subtitle;
+export const HOSPITAL_LOGO_PATH = BRANDING.logoPath;
+export const HOSPITAL_PRIMARY_COLOR = BRANDING.colors.primary;
+export const HOSPITAL_PRIMARY_GRADIENT = BRANDING.colors.primaryGradient;

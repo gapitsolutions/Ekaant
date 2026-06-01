@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -14,7 +16,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowLeft,
   ArrowRight,
   Clock,
   ClipboardList,
@@ -136,45 +137,31 @@ export default function PrescriptionQueuePage() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/pharmacy")}
-            aria-label="Back to dashboard"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-              <ClipboardList className="h-8 w-8 text-[#0d7377]" />
-              Prescription Queue
-            </h1>
-            <p className="text-slate-500 mt-1 font-medium italic">
-              Patients currently waiting at the pharmacy stage
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="bg-[#e6f4f1] text-[#0d7377] font-bold px-4 py-2 rounded-lg border border-[#0d7377]/20 shadow-sm flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            {totalWaiting} {totalWaiting === 1 ? "Patient" : "Patients"} Waiting
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 rounded-xl border-slate-200"
-            onClick={() => void loadQueue()}
-            disabled={isLoading}
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={<ClipboardList className="h-8 w-8 text-primary" />}
+        title="Prescription Queue"
+        subtitle="Patients currently waiting at the pharmacy stage"
+        actions={
+          <>
+            <div className="bg-[#e6f4f1] text-primary font-bold px-4 py-2 rounded-lg border border-primary/20 shadow-sm flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              {totalWaiting} {totalWaiting === 1 ? "Patient" : "Patients"} Waiting
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-slate-200"
+              onClick={() => void loadQueue()}
+              disabled={isLoading}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       <Card className="rounded-2xl border-slate-100 shadow-sm bg-white overflow-hidden">
         <CardHeader className="bg-slate-50/30 border-b border-slate-100 py-5 px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -189,7 +176,7 @@ export default function PrescriptionQueuePage() {
               placeholder="Search name, file no, or phone…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-slate-200 rounded-xl focus-visible:ring-[#0d7377]"
+              className="pl-10 bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
             />
           </div>
         </CardHeader>
@@ -212,40 +199,40 @@ export default function PrescriptionQueuePage() {
 
           {isLoading && items.length === 0 ? (
             <div className="flex items-center justify-center py-24">
-              <Loader2 className="h-6 w-6 animate-spin text-[#0d7377]" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : totalWaiting === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <Users className="h-7 w-7 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">
-                No patients in the queue
-              </h3>
-              <p className="text-sm text-slate-500 mt-1 max-w-[280px] mx-auto">
-                Checked-in patients pending dispense will appear here
-              </p>
-            </div>
+            <EmptyState
+              className="py-24"
+              icon={
+                <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center">
+                  <Users className="h-7 w-7 text-slate-300" />
+                </div>
+              }
+              title="No patients in the queue"
+              description="Checked-in patients pending dispense will appear here"
+            />
           ) : filteredItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <Search className="h-7 w-7 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">
-                No matching patients
-              </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                No patient matches &ldquo;{searchQuery}&rdquo;.
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-3 text-[#0d7377]"
-                onClick={() => setSearchQuery("")}
-              >
-                Clear search
-              </Button>
-            </div>
+            <EmptyState
+              className="py-20"
+              icon={
+                <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center">
+                  <Search className="h-7 w-7 text-slate-300" />
+                </div>
+              }
+              title="No matching patients"
+              description={`No patient matches “${searchQuery}”.`}
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Clear search
+                </Button>
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -285,8 +272,8 @@ export default function PrescriptionQueuePage() {
                       >
                         <TableCell className="font-medium py-4 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-[#0d7377]/10 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-bold text-[#0d7377]">
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-primary">
                                 {initials}
                               </span>
                             </div>
@@ -303,7 +290,7 @@ export default function PrescriptionQueuePage() {
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4">
-                          <span className="font-mono font-bold text-[#0d7377]">
+                          <span className="font-mono font-bold text-primary">
                             {item.patient?.file_number || "—"}
                           </span>
                         </TableCell>
@@ -328,7 +315,7 @@ export default function PrescriptionQueuePage() {
                           <div className="flex justify-end">
                             <Button
                               size="sm"
-                              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
+                              className="bg-primary hover:bg-[#0a5c5f] text-white font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
                               onClick={() =>
                                 navigate(
                                   `/pharmacy/dispense/${item.session_id}`,

@@ -26,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -454,27 +455,21 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-[#0d7377] tracking-tight flex items-center gap-3">
-            <BarChart3 className="h-8 w-8" />
-            Hospital Analytics &amp; Reports
-          </h1>
-          <p className="text-slate-500 mt-1 font-medium">
-            Generate day-wise, monthly, and custom reports for hospital operations.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<BarChart3 className="h-8 w-8 text-primary" />}
+        title="Hospital Analytics & Reports"
+        subtitle="Generate day-wise, monthly, and custom reports for hospital operations."
+      />
 
       <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
         {/* ── Both tab rows on one line ── */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
           <TabsList className="bg-slate-100 p-1.5 rounded-2xl h-14 shadow-sm border border-slate-200">
-            <TabsTrigger value="checkin" className="rounded-xl px-8 h-full data-[state=active]:bg-[#0d7377] data-[state=active]:text-white font-bold transition-all">
+            <TabsTrigger value="checkin" className="rounded-xl px-8 h-full data-[state=active]:bg-primary data-[state=active]:text-white font-bold transition-all">
               <ClipboardList className="h-4 w-4 mr-2" />
               Check-in Reports
             </TabsTrigger>
-            <TabsTrigger value="calling" className="rounded-xl px-8 h-full data-[state=active]:bg-[#0d7377] data-[state=active]:text-white font-bold transition-all">
+            <TabsTrigger value="calling" className="rounded-xl px-8 h-full data-[state=active]:bg-primary data-[state=active]:text-white font-bold transition-all">
               <Phone className="h-4 w-4 mr-2" />
               Calling Reports
             </TabsTrigger>
@@ -482,9 +477,9 @@ export default function ReportsPage() {
 
           <Tabs value={activeTab} onValueChange={(tab) => { setActiveTab(tab); setRecordsSearchQuery(""); setCallingSearchQuery(""); }} className="w-full md:w-auto">
             <TabsList className="bg-white p-1 rounded-xl h-11 border border-slate-200 shadow-sm">
-              <TabsTrigger value="daily" className="rounded-lg data-[state=active]:bg-[#0d7377]/10 data-[state=active]:text-[#0d7377] font-bold">Daily</TabsTrigger>
-              <TabsTrigger value="monthly" className="rounded-lg data-[state=active]:bg-[#0d7377]/10 data-[state=active]:text-[#0d7377] font-bold">Monthly</TabsTrigger>
-              <TabsTrigger value="custom" className="rounded-lg data-[state=active]:bg-[#0d7377]/10 data-[state=active]:text-[#0d7377] font-bold">Custom Range</TabsTrigger>
+              <TabsTrigger value="daily" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary font-bold">Daily</TabsTrigger>
+              <TabsTrigger value="monthly" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary font-bold">Monthly</TabsTrigger>
+              <TabsTrigger value="custom" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary font-bold">Custom Range</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -495,8 +490,8 @@ export default function ReportsPage() {
             <div className="space-y-2">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Date</Label>
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-                <Calendar className="h-4 w-4 text-[#0d7377]" />
-                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold text-[#0d7377] p-0 h-auto" />
+                <Calendar className="h-4 w-4 text-primary" />
+                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold text-primary p-0 h-auto" />
               </div>
             </div>
           )}
@@ -504,8 +499,8 @@ export default function ReportsPage() {
             <div className="space-y-2">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Month</Label>
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-                <CalendarDays className="h-4 w-4 text-[#0d7377]" />
-                <Input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold text-[#0d7377] p-0 h-auto" />
+                <CalendarDays className="h-4 w-4 text-primary" />
+                <Input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0 font-bold text-primary p-0 h-auto" />
               </div>
             </div>
           )}
@@ -513,18 +508,18 @@ export default function ReportsPage() {
             <div className="flex items-center gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">From</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border-slate-200 focus-visible:ring-[#0d7377]" />
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-xl border-slate-200 focus-visible:ring-primary" />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">To</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border-slate-200 focus-visible:ring-[#0d7377]" />
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-xl border-slate-200 focus-visible:ring-primary" />
               </div>
             </div>
           )}
           {mainTab === "checkin" && activeTab === "custom" && (
             <Button
               onClick={fetchCustomRange}
-              className="bg-[#0d7377] hover:bg-[#0d7377]/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
+              className="bg-primary hover:bg-primary/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
             >
               <Filter className="h-4 w-4 mr-2" />
               Fetch Records
@@ -548,7 +543,7 @@ export default function ReportsPage() {
                     || (activeTab === "custom" && (!customData || customData.items.length === 0))
                   : !callingData || callingData.items.length === 0
               }
-              className="bg-[#0d7377] hover:bg-[#0d7377]/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
+              className="bg-primary hover:bg-primary/90 text-white rounded-xl px-8 h-12 shadow-lg shadow-teal-900/20"
             >
               <Download className="h-4 w-4 mr-2" />
               Export CSV Report
@@ -563,7 +558,7 @@ export default function ReportsPage() {
           {activeTab === "daily" && (
             <div className="grid gap-6 md:grid-cols-3">
               <Card className="border-none shadow-sm bg-white overflow-hidden">
-                <div className="h-1.5 bg-[#0d7377] w-full" />
+                <div className="h-1.5 bg-primary w-full" />
                 <CardContent className="p-6">
                   <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
                   <p className="text-4xl font-black text-slate-800">{dailyData?.total_checkins || 0}</p>
@@ -590,7 +585,7 @@ export default function ReportsPage() {
             <>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="border-none shadow-sm bg-white overflow-hidden">
-                  <div className="h-1.5 bg-[#0d7377] w-full" />
+                  <div className="h-1.5 bg-primary w-full" />
                   <CardContent className="p-6">
                     <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
                     <p className="text-4xl font-black text-slate-800">{monthlyData?.total_checkins || 0}</p>
@@ -635,7 +630,7 @@ export default function ReportsPage() {
                       `category-breakdown-${selectedMonth}`,
                     )
                   }
-                  className="border-[#0d7377]/30 text-[#0d7377] hover:bg-[#0d7377]/10 font-bold rounded-xl h-10 px-6"
+                  className="border-primary/30 text-primary hover:bg-primary/10 font-bold rounded-xl h-10 px-6"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download Breakdown
@@ -659,7 +654,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead className="px-6 font-bold uppercase text-[10px] tracking-wider text-slate-500">Date</TableHead>
                       <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Total Visits</TableHead>
-                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-[#0d7377] text-center">De-Addiction</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-primary text-center">De-Addiction</TableHead>
                       <TableHead className="font-bold uppercase text-[10px] tracking-wider text-blue-600 text-center">Psychiatric</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -716,7 +711,7 @@ export default function ReportsPage() {
               ) : customData ? (
                 <div className="grid gap-6 md:grid-cols-4">
                   <Card className="border-none shadow-sm bg-white overflow-hidden">
-                    <div className="h-1.5 bg-[#0d7377] w-full" />
+                    <div className="h-1.5 bg-primary w-full" />
                     <CardContent className="p-6">
                       <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Total Visits</p>
                       <p className="text-4xl font-black text-slate-800">{customData.total_checkins}</p>
@@ -764,7 +759,7 @@ export default function ReportsPage() {
               <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
                 <CardHeader className="border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <CardTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5 text-[#0d7377]" />
+                    <ClipboardList className="h-5 w-5 text-primary" />
                     Visit Records — {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                   </CardTitle>
                   <div className="relative w-full md:w-72">
@@ -773,7 +768,7 @@ export default function ReportsPage() {
                       placeholder="Search name, file no, or phone..."
                       value={recordsSearchQuery}
                       onChange={(e) => setRecordsSearchQuery(e.target.value)}
-                      className="pl-10 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-[#0d7377]"
+                      className="pl-10 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
                     />
                   </div>
                 </CardHeader>
@@ -804,7 +799,7 @@ export default function ReportsPage() {
                       <TableBody>
                         {records.map((item) => (
                           <TableRow key={item.id} className="hover:bg-slate-50/50">
-                            <TableCell className="px-6 font-mono font-bold text-[#0d7377]">{item.patient.file_number}</TableCell>
+                            <TableCell className="px-6 font-mono font-bold text-primary">{item.patient.file_number}</TableCell>
                             <TableCell className="font-bold text-slate-800">{item.patient.full_name}</TableCell>
                             <TableCell className="text-slate-500">{item.patient.phone || "-"}</TableCell>
                             <TableCell className="capitalize text-slate-500">{item.patient.patient_category}</TableCell>
@@ -904,7 +899,7 @@ export default function ReportsPage() {
                 <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
                   <CardHeader className="border-b border-slate-50">
                     <CardTitle className="text-lg font-bold flex items-center gap-2">
-                      <Users className="h-5 w-5 text-[#0d7377]" />
+                      <Users className="h-5 w-5 text-primary" />
                       Staff Performance
                     </CardTitle>
                   </CardHeader>
@@ -988,7 +983,7 @@ export default function ReportsPage() {
                       <TableBody>
                         {filteredCallingItems.map((item) => (
                           <TableRow key={item.id} className="hover:bg-slate-50/50">
-                            <TableCell className="px-6 font-mono font-bold text-[#0d7377]">{item.file_number}</TableCell>
+                            <TableCell className="px-6 font-mono font-bold text-primary">{item.file_number}</TableCell>
                             <TableCell className="font-bold text-slate-800">{item.patient_name}</TableCell>
                             <TableCell className="text-slate-500 font-medium">
                               {new Date(item.called_at).toLocaleDateString("en-IN")}

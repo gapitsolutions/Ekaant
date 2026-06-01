@@ -126,7 +126,7 @@ export function PatientIdCard({ patient }: PatientIdCardProps) {
       <CardHeader className="pb-4 flex flex-row items-center justify-between border-b">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-[#0d7377]" />
+            <CreditCard className="h-5 w-5 text-primary" />
             Patient ID Card
           </CardTitle>
           <CardDescription className="mt-1.5">
@@ -147,7 +147,7 @@ export function PatientIdCard({ patient }: PatientIdCardProps) {
             Print
           </Button>
           <Button
-            className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
+            className="bg-primary hover:bg-[#0a5c5f] text-white"
             onClick={handleDownload}
             disabled={actionsDisabled}
           >
@@ -168,7 +168,7 @@ export function PatientIdCard({ patient }: PatientIdCardProps) {
         >
           {isRendering ? (
             <div className="h-full w-full flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-white text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin text-[#0d7377]" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span className="text-sm">Generating ID card…</span>
             </div>
           ) : renderFailed ? (

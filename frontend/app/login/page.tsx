@@ -17,6 +17,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/ui/field-error";
 import type { ApiFieldErrors } from "@/lib/api-client";
+import { BRANDING } from "@/lib/branding";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -53,8 +54,8 @@ export default function LoginPage() {
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-white shadow-lg p-2">
             <Image
-              src="/logo.png"
-              alt="Aggarwal Hospital Logo"
+              src={BRANDING.logoPath}
+              alt={`${BRANDING.name} Logo`}
               fill
               className="object-contain"
               priority
@@ -62,10 +63,10 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              Aggarwal Psychiatric
+              {BRANDING.shortName}
             </h1>
             <p className="text-lg text-primary font-medium">
-              & De-Addiction Centre
+              {BRANDING.subtitle}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               Patient Management System
