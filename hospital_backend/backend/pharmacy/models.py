@@ -257,6 +257,7 @@ class PurchaseInvoice(models.Model):
         on_delete=models.PROTECT,
         related_name="purchase_invoices",
     )
+    order_date = models.DateField(blank=True, null=True)
     invoice_date = models.DateField()
     delivery_date = models.DateField(blank=True, null=True)
     invoice_photo = models.FileField(
@@ -281,6 +282,7 @@ class PurchaseInvoice(models.Model):
         verbose_name_plural = "Purchase Invoices"
         indexes = [
             Index(fields=["supplier"]),
+            Index(fields=["order_date"]),
             Index(fields=["invoice_date"]),
             Index(fields=["-created_at"]),
         ]

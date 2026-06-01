@@ -4,13 +4,16 @@ Each view is thin — validation lives in serializers, transactional writes
 in services. Read endpoints query directly because they don't mutate state.
 """
 
+import mimetypes
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers as drf_serializers
 from rest_framework import status
@@ -31,6 +34,7 @@ from .models import (
     MedicineBatch,
     MedicineCategory,
     PaymentMethod,
+    PurchaseInvoice,
     Supplier,
 )
 from .serializers import (
@@ -49,6 +53,16 @@ from .serializers import (
 
 
 NEAR_EXPIRY_DAYS = 180
+
+
+def _purchase_invoice_document_url(invoice: PurchaseInvoice, request) -> str | None:
+    if not invoice.invoice_photo:
+        return None
+    path = reverse(
+        "pharmacy-purchase-invoice-document",
+        kwargs={"invoice_id": invoice.pk},
+    )
+    return request.build_absolute_uri(path) if request else path
 
 
 # ────────────────────────────────────────────────────────────
@@ -358,13 +372,41 @@ class PurchaseInvoiceCreateView(APIView):
             {
                 "id": str(invoice.id),
                 "invoice_number": invoice.invoice_number,
+                "order_date": invoice.order_date,
+                "invoice_date": invoice.invoice_date,
+                "delivery_date": invoice.delivery_date,
                 "supplier": SupplierEmbeddedSerializer.from_supplier(
                     invoice.supplier
                 ),
                 "items_loaded": invoice.items_count,
                 "total_amount": invoice.total_amount,
+                "invoice_document_url": _purchase_invoice_document_url(
+                    invoice, request
+                ),
             },
             status_code=status.HTTP_201_CREATED,
+        )
+
+
+class PurchaseInvoiceDocumentView(APIView):
+    permission_classes = [IsPharmacistOrAdmin]
+
+    def get(self, request, invoice_id):
+        invoice = get_object_or_404(PurchaseInvoice, pk=invoice_id)
+        if not invoice.invoice_photo:
+            raise drf_serializers.ValidationError(
+                "No invoice document is attached to this purchase invoice."
+            )
+
+        content_type = (
+            mimetypes.guess_type(invoice.invoice_photo.name)[0]
+            or "application/octet-stream"
+        )
+        return FileResponse(
+            invoice.invoice_photo.open("rb"),
+            content_type=content_type,
+            as_attachment=content_type == "application/pdf",
+            filename=invoice.invoice_photo.name.rsplit("/", 1)[-1],
         )
 
 

@@ -19,6 +19,7 @@ interface PatientInvoiceViewProps {
   visitStatus: string;
   patientName: string;
   fileNumber: string;
+  prefetchedInvoice?: DispenseInvoiceDetail | null;
 }
 
 function formatDate(date: string | undefined): string {
@@ -41,13 +42,22 @@ export function PatientInvoiceView({
   visitStatus,
   patientName,
   fileNumber,
+  prefetchedInvoice = null,
 }: PatientInvoiceViewProps) {
-  const [invoice, setInvoice] = useState<DispenseInvoiceDetail | null>(null);
+  const [invoice, setInvoice] = useState<DispenseInvoiceDetail | null>(
+    prefetchedInvoice,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setInvoice(prefetchedInvoice);
+    setError(null);
+  }, [prefetchedInvoice, sessionId]);
+
   // Lazy fetch — only when this component mounts (i.e., invoice expanded)
   useEffect(() => {
+    if (prefetchedInvoice) return;
     if (visitStatus === "cancelled") return;
 
     setIsLoading(true);
@@ -56,7 +66,7 @@ export function PatientInvoiceView({
       .then((data) => setInvoice(data))
       .catch(() => setError("no_invoice"))
       .finally(() => setIsLoading(false));
-  }, [sessionId, visitStatus]);
+  }, [sessionId, visitStatus, prefetchedInvoice]);
 
   // Cancelled visit
   if (visitStatus === "cancelled") {

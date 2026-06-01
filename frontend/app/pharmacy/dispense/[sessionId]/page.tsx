@@ -108,8 +108,8 @@ export default function DispenseWorkstationPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
   const [cashAmount, setCashAmount] = useState(0);
   const [onlineAmount, setOnlineAmount] = useState(0);
-  const [discount, setDiscount] = useState(0); // percentage (sent to backend)
-  const [discountRupees, setDiscountRupees] = useState(0); // amount in ₹ (primary UI input)
+  const [discount, setDiscount] = useState(0); // percentage — DISPLAY ONLY (not sent)
+  const [discountRupees, setDiscountRupees] = useState(0); // amount in ₹ (primary input, sent to backend)
   const [notes, setNotes] = useState("");
 
   // Follow-up
@@ -391,7 +391,10 @@ export default function DispenseWorkstationPage() {
           payment_method: paymentMethod,
           cash_amount: cashAmount,
           online_amount: onlineAmount,
-          discount,
+          // Send the discount as a rupee AMOUNT (2 dp). The backend is the
+          // authority for net payable and derives cash/online for Cash/Online,
+          // so no percentage round-trip is involved.
+          discount: Math.round(discountAmount * 100) / 100,
           notes,
         },
         next_followup_date: nextVisitDate || null,

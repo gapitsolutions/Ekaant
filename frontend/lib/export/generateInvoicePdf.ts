@@ -3,6 +3,7 @@ import {
   loadLogoBase64,
   addPdfHeader,
   openPdfForPrint,
+  downloadPdf,
 } from "./pdf-helpers";
 import { HOSPITAL_PRIMARY_COLOR } from "./hospital-branding";
 import type { DispenseInvoiceDetail } from "@/lib/pharmacy-api";
@@ -25,6 +26,7 @@ interface InvoicePdfOptions {
   invoice: DispenseInvoiceDetail;
   patientName: string;
   fileNumber: string;
+  mode?: "print" | "download";
 }
 
 function fmtDate(d: string | undefined): string {
@@ -45,7 +47,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 export async function generateInvoicePdf(
   options: InvoicePdfOptions,
 ): Promise<void> {
-  const { invoice, patientName, fileNumber } = options;
+  const { invoice, patientName, fileNumber, mode = "print" } = options;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const logo = await loadLogoBase64();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -224,5 +226,10 @@ export async function generateInvoicePdf(
     y,
   );
 
-  openPdfForPrint(doc, `invoice-${invoice.invoice_number}.pdf`);
+  const filename = `invoice-${invoice.invoice_number}.pdf`;
+  if (mode === "download") {
+    downloadPdf(doc, filename);
+    return;
+  }
+  openPdfForPrint(doc, filename);
 }

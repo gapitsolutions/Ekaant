@@ -141,8 +141,12 @@ export interface PurchaseInvoiceItemPayload {
 export interface PurchaseInvoicePayload {
   invoice_number: string;
   supplier_id: string;
+  order_date: string;
   invoice_date: string;
   delivery_date?: string | null;
+  invoice_document_base64?: string;
+  invoice_document_mime_type?: string;
+  invoice_document_filename?: string;
   notes?: string;
   items: PurchaseInvoiceItemPayload[];
 }
@@ -156,9 +160,13 @@ export interface PurchaseInvoiceSupplierSnapshot {
 export interface PurchaseInvoiceResponse {
   id: string;
   invoice_number: string;
+  order_date: string;
+  invoice_date: string;
+  delivery_date: string | null;
   supplier: PurchaseInvoiceSupplierSnapshot | null;
   items_loaded: number;
   total_amount: string;
+  invoice_document_url: string | null;
 }
 
 export async function submitPurchaseInvoice(
@@ -347,6 +355,7 @@ export async function cancelDispense(
 // ── Dispense History (Invoice History) ──
 export interface DispenseHistoryItem {
   id: string;
+  session_id: string;
   invoice_number: string;
   patient: string;
   patient_id: string;

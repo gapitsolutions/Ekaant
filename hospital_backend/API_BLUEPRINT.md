@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-05-31
+> **Last Updated:** 2026-06-01 (IST)
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -864,8 +864,12 @@ Request body:
 {
   "invoice_number": "SUP-2026-0042",
   "supplier_id": "supplier-uuid",
+  "order_date": "2026-05-18",
   "invoice_date": "2026-05-20",
   "delivery_date": "2026-05-22",
+  "invoice_document_base64": "<optional-base64-payload>",
+  "invoice_document_mime_type": "application/pdf",
+  "invoice_document_filename": "supplier-bill.pdf",
   "notes": "",
   "items": [
     {
@@ -886,9 +890,13 @@ Validation:
 
 - `invoice_number` globally unique
 - `supplier_id` references an existing, active Supplier (see §7.20)
+- `order_date` is required for new submissions and cannot be in the future
 - `invoice_date` not in the future
+- `order_date <= invoice_date`
 - `delivery_date ≥ invoice_date` if provided
 - ≥ 1 item; each item references an active medicine; `expiry_date` in the future; `quantity > 0`; `0 ≤ gst_percentage ≤ 100`
+- `delivery_date >= order_date` if provided
+- Optional invoice document fields must be provided as a pair (`invoice_document_base64`, `invoice_document_mime_type`); allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; maximum decoded file size: 5 MB
 - No duplicate `(medicine_id, batch_number)` within items
 
 Side effects per item:
@@ -908,18 +916,37 @@ Response (201):
   "data": {
     "id": "uuid",
     "invoice_number": "SUP-2026-0042",
+    "order_date": "2026-05-18",
+    "invoice_date": "2026-05-20",
+    "delivery_date": "2026-05-22",
     "supplier": {
       "id": "supplier-uuid",
       "company_name": "Abbott Healthcare Ltd",
       "mobile_number": "9876543210"
     },
     "items_loaded": 1,
-    "total_amount": "179200.00"
+    "total_amount": "179200.00",
+    "invoice_document_url": "https://example.com/api/v1/pharmacy/inventory/invoices/<invoice_id>/document/"
   }
 }
 ```
 
 Errors: 400 validation, 404 supplier or medicine not found, 409 duplicate invoice number.
+
+### 7.9.1 `GET /api/v1/pharmacy/inventory/invoices/<invoice_id>/document/`
+
+View: `PurchaseInvoiceDocumentView.get`
+Permission: `IsPharmacistOrAdmin`
+
+**Use case:** Open or download the original supplier invoice document attached during purchase invoice creation.
+
+Behavior:
+
+- Looks up `PurchaseInvoice.invoice_photo` by invoice id.
+- Returns an authenticated `FileResponse`.
+- PDFs are returned as attachments for download; image documents are opened inline when the browser supports them.
+
+Errors: 400 no document attached, 404 invoice not found.
 
 ### 7.10 `POST /api/v1/pharmacy/inventory/audit-removal/`
 
@@ -1052,7 +1079,7 @@ Request body:
     "payment_method": "Cash",
     "cash_amount": "7980.00",
     "online_amount": "0",
-    "discount": "5.0",
+    "discount": "420.00",
     "notes": "Regular patient discount applied"
   },
   "next_followup_date": "2026-06-02"
@@ -1065,13 +1092,15 @@ Validation:
 - No existing `DispenseInvoice` for the session (unique constraint)
 - Each line item references an active medicine; batch is active, belongs to medicine, and not expired
 - Per-batch aggregate requested quantity (same batch may appear in multiple line items) ≤ batch's current quantity (re-checked after lock)
-- Payment validation:
-  - `subtotal = Σ(qty × unit_price)`
-  - `discount_amount = round(subtotal × discount / 100)`
+- `discount` is a **rupee amount** (2 dp), not a percentage. Must satisfy `0 ≤ discount ≤ subtotal`.
+- Payment computation (server is the sole authority for money totals):
+  - `subtotal = Σ(qty × round(unit_price, 2))`, then rounded to 2 dp
+  - `discount_amount = round(discount, 2)`
   - `net_payable = subtotal − discount_amount`
-  - `Cash`: `|cash_amount − net_payable| ≤ ₹1`
-  - `Online`: `|online_amount − net_payable| ≤ ₹1`
-  - `Split`: `|cash_amount + online_amount − net_payable| ≤ ₹1`
+  - `discount_percentage = round(discount_amount / subtotal × 100, 2)` — **derived, storage/reporting only**
+  - `Cash`: server derives `cash_amount = net_payable`, `online_amount = 0` (client values ignored)
+  - `Online`: server derives `online_amount = net_payable`, `cash_amount = 0` (client values ignored)
+  - `Split`: client `cash_amount + online_amount` must reconcile to `net_payable` within ₹0.01; cash leg is then snapped so the parts sum exactly
 - `next_followup_date` must be in the future if provided
 
 Side effects (in order, single transaction):
@@ -1233,6 +1262,7 @@ Response item shape:
 ```json
 {
   "id": "uuid",
+  "session_id": "uuid",
   "invoice_number": "INV-20260523-0001",
   "patient": "Rahul Sharma",
   "patient_id": "uuid",
@@ -1247,6 +1277,10 @@ Response item shape:
 ```
 
 Plus `pagination: {page, pageSize, total}`.
+
+Notes:
+
+- `session_id` is included so clients can call `GET /api/v1/pharmacy/dispense/<session_id>/` for detailed invoice view or PDF generation flows.
 
 ### 7.16 `GET /api/v1/pharmacy/reports/revenue/`
 
@@ -1722,6 +1756,7 @@ Stock movement type reference:
 - `GET    /api/v1/pharmacy/inventory/medicines/<id>/dispense-history/`
 - `GET    /api/v1/pharmacy/inventory/stats/`
 - `POST   /api/v1/pharmacy/inventory/invoices/`
+- `GET    /api/v1/pharmacy/inventory/invoices/<invoice_id>/document/`
 - `POST   /api/v1/pharmacy/inventory/audit-removal/`
 - `GET    /api/v1/pharmacy/queue/`
 - `POST   /api/v1/pharmacy/dispense/`
