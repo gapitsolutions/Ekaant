@@ -1121,7 +1121,56 @@ Errors:
 - 404: session, medicine, or batch not found
 - 409: dispense already exists for session OR insufficient stock after lock acquisition
 
-### 7.14 `POST /api/v1/pharmacy/dispense/<session_id>/cancel/`
+### 7.14 `GET /api/v1/pharmacy/dispense/<session_id>/`
+
+View: `DispenseInvoiceDetailView.get`
+Permission: `IsReceptionAdminOrPharmacist`
+
+**Use case:** Fetch the full dispense invoice (with line items) for a specific visit session. Used by the patient profile's "View Invoice" expansion to display medicines dispensed, quantities, prices, and totals.
+
+**Path parameter:** `session_id` — UUID of the `VisitSession`.
+
+**Response (200):**
+```json
+{
+  "id": "<uuid>",
+  "invoice_number": "INV-20260531-0001",
+  "session_id": "<uuid>",
+  "patient_id": "<uuid>",
+  "patient_name": "Rahul Sharma",
+  "dispense_date": "2026-05-31",
+  "dispense_time": "2026-05-31T10:30:00+05:30",
+  "subtotal": "224.00",
+  "discount_percentage": "0.00",
+  "discount_amount": "0.00",
+  "net_payable": "224.00",
+  "payment_method": "Cash",
+  "cash_amount": "224.00",
+  "online_amount": "0.00",
+  "pharmacist": "Dr. Pharmacist",
+  "status": "success",
+  "notes": "",
+  "items": [
+    {
+      "id": "<uuid>",
+      "medicine_name": "Diazepam 5mg",
+      "salt": "Diazepam",
+      "category": "Rx",
+      "batch_number": "B001",
+      "dose": "5mg",
+      "days": 7,
+      "quantity": 7,
+      "unit_price": "8.00",
+      "total": "56.00"
+    }
+  ]
+}
+```
+
+**Errors:**
+- 404: no dispense invoice found for the given session
+
+### 7.15 `POST /api/v1/pharmacy/dispense/<session_id>/cancel/`
 
 View: `DispenseCancelView.post`
 Serializer: `DispenseCancelSerializer`
@@ -1676,6 +1725,7 @@ Stock movement type reference:
 - `POST   /api/v1/pharmacy/inventory/audit-removal/`
 - `GET    /api/v1/pharmacy/queue/`
 - `POST   /api/v1/pharmacy/dispense/`
+- `GET    /api/v1/pharmacy/dispense/<session_id>/`
 - `POST   /api/v1/pharmacy/dispense/<session_id>/cancel/`
 - `GET    /api/v1/pharmacy/dispense-history/`
 - `GET    /api/v1/pharmacy/reports/revenue/`
