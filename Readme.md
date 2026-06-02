@@ -457,6 +457,64 @@ What sync command does:
 - requeues unsuccessful completed calls when `next_call_date` is due
 - marks tickets successful when patient has checked in
 
+## 10.5 Auto-restart services after VM reboot
+
+You can wire `scripts/restart_services.sh` to start the stack automatically after a VM reboot. Choose one option below.
+
+### Option A: systemd (recommended)
+
+1. Create a unit file (update the `User`, `Group`, and paths if your repo lives elsewhere):
+
+```bash
+sudo tee /etc/systemd/system/hospital-restart.service > /dev/null <<'UNIT'
+[Unit]
+Description=Hospital backend restart after reboot
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/hospital/app/hospital_backend
+ExecStart=/srv/hospital/app/hospital_backend/scripts/restart_services.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+```
+
+2. Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable hospital-restart.service
+sudo systemctl start hospital-restart.service
+```
+
+3. Check status/logs:
+
+```bash
+sudo systemctl status hospital-restart.service
+journalctl -u hospital-restart.service --no-pager
+```
+
+### Option B: cron @reboot
+
+Add a reboot entry to the user crontab (adjust the path if needed):
+
+```bash
+(crontab -l 2>/dev/null; echo "@reboot cd /srv/hospital/app/hospital_backend && ./scripts/restart_services.sh >> /var/log/hospital_restart.log 2>&1") | crontab -
+```
+
+Verify:
+
+```bash
+crontab -l
+```
+
 ---
 
 ## 11) Manual Backup and Restore Operations
