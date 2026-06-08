@@ -1,8 +1,9 @@
+import re
 import uuid
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 
@@ -96,9 +97,33 @@ class VisitSession(models.Model):
 
     @classmethod
     def generate_visit_uid(cls) -> str:
-        prefix = timezone.localdate().strftime("VST-%Y-")
-        count = cls.objects.filter(visit_date__year=timezone.localdate().year).count() + 1
-        return f"{prefix}{count:04d}"
+        """Allocate the next per-year visit UID, e.g. ``VST-2026-0007``.
+
+        The sequence number is derived from the **highest UID already issued
+        this year**, not from a live row ``count()``. Using ``count()`` was a
+        bug: deleting a session made the count drop below an existing UID, so
+        the next check-in regenerated a UID that still belonged to a surviving
+        row and the ``unique`` constraint raised ``IntegrityError`` (HTTP 500).
+
+        Deriving from ``Max`` instead means deletions leave harmless gaps (e.g.
+        a missing ``0005``) rather than colliding. A residual race still exists
+        when two check-ins run concurrently and both read the same ``Max`` — the
+        caller guards against that with an ``IntegrityError`` retry loop, which
+        re-invokes this method so the second attempt sees the new maximum.
+        """
+        year = timezone.localdate().year
+        prefix = f"VST-{year}-"
+        last_uid = cls.objects.filter(visit_uid__startswith=prefix).aggregate(
+            max_uid=Max("visit_uid")
+        )["max_uid"]
+
+        next_number = 1
+        if last_uid:
+            match = re.search(r"(\d+)$", last_uid)
+            if match:
+                next_number = int(match.group(1)) + 1
+
+        return f"{prefix}{next_number:04d}"
 
     @classmethod
     def build_month_breakdown(cls, *, year: int, month: int):

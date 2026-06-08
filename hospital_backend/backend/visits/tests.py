@@ -421,3 +421,74 @@ class ReceptionReportEndpointTests(APITestCase):
         self.assertEqual(payload["completed_checkins"], 1)
         self.assertEqual(len(payload["items"]), 2)
         self.assertIn("patient", payload["items"][0])
+
+
+class VisitUidGenerationTests(APITestCase):
+    """Regression tests for the deletion-driven visit_uid collision (HTTP 500).
+
+    Old bug: ``generate_visit_uid`` derived the sequence number from a live
+    ``count()``. Deleting a session dropped the count below an existing UID, so
+    the next check-in regenerated a UID that still belonged to a surviving row
+    and the unique constraint raised IntegrityError → 500.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="uid-reception@example.com",
+            password="test-password",
+            role="reception",
+            full_name="UID Reception",
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _make_patient(self, file_number, name):
+        return Patient.objects.create(
+            file_number=file_number,
+            patient_category="deaddiction",
+            full_name=name,
+            date_of_birth=timezone.localdate() - timedelta(days=9000),
+            sex="male",
+            phone_number=f"90000{file_number[-5:]}",
+            address_line1="Address",
+        )
+
+    def _checkin(self, patient):
+        return self.client.post(
+            "/api/v1/sessions/checkin/",
+            {"patient_id": str(patient.id)},
+            format="json",
+        )
+
+    def test_generate_visit_uid_uses_max_not_count(self):
+        year = timezone.localdate().year
+        # Simulate a surviving high-numbered row with lower numbers deleted:
+        # only VST-<year>-0006 exists, so count()==1 but the max number is 6.
+        VisitSession.objects.create(
+            visit_uid=f"VST-{year}-0006",
+            patient=self._make_patient("UID000010", "Existing Six"),
+            checked_in_by=self.user,
+            visit_date=timezone.localdate(),
+        )
+        self.assertEqual(VisitSession.generate_visit_uid(), f"VST-{year}-0007")
+
+    def test_checkin_after_delete_does_not_collide(self):
+        patient_a = self._make_patient("UID000001", "Patient A")
+        patient_b = self._make_patient("UID000002", "Patient B")
+        patient_c = self._make_patient("UID000003", "Patient C")
+
+        resp_a = self._checkin(patient_a)
+        resp_b = self._checkin(patient_b)
+        self.assertEqual(resp_a.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp_b.status_code, status.HTTP_201_CREATED)
+
+        # Delete the LOWER-numbered session so count() drifts below the max UID,
+        # reproducing the exact condition that used to 500 the next check-in.
+        VisitSession.objects.get(patient=patient_a).delete()
+
+        resp_c = self._checkin(patient_c)
+        self.assertEqual(resp_c.status_code, status.HTTP_201_CREATED)
+
+        # New session must have a unique UID distinct from every survivor.
+        all_uids = list(VisitSession.objects.values_list("visit_uid", flat=True))
+        self.assertEqual(len(all_uids), len(set(all_uids)))
+        self.assertEqual(VisitSession.objects.filter(patient=patient_c).count(), 1)

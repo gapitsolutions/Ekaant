@@ -5,7 +5,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -27,6 +27,12 @@ from .models import CheckinVerificationMethod, VisitSession, VisitStage, VisitSt
 
 MAX_VERIFICATION_PHOTO_BYTES = 2 * 1024 * 1024
 ALLOWED_VERIFICATION_PHOTO_MIME_TYPES = {"image/jpeg", "image/png"}
+
+# How many times to regenerate visit_uid and retry the INSERT when a concurrent
+# check-in grabs the same UID (the Max-based generator has a small read→write
+# race window). Each retry re-reads the current maximum, so a handful of attempts
+# comfortably absorbs realistic reception-desk concurrency.
+MAX_CHECKIN_UID_RETRIES = 5
 
 
 def _decode_verification_photo_payload(payload: str) -> bytes:
@@ -338,20 +344,49 @@ class CheckinPatientView(APIView):
 
         prior_visits = VisitSession.objects.filter(patient=patient).count()
         now = timezone.now()
-        session = VisitSession.objects.create(
-            visit_uid=VisitSession.generate_visit_uid(),
-            patient=patient,
-            checked_in_by=request.user,
-            visit_type="first_visit" if prior_visits == 0 else "follow_up",
-            file_number=patient.file_number,  # denormalized snapshot of patient.file_number at check-in
-            outstanding_debt_at_checkin=patient.outstanding_debt,
-            status=VisitStatus.IN_PROGRESS,  # CHANGED: was COMPLETED — visit now enters pipeline
-            current_stage=VisitStage.PHARMACY,  # CHANGED: was COMPLETED — routed to pharmacy queue
-            completed_time=None,  # CHANGED: completed_time set later by dispense flow
-            verification_method=verification_method,
-            verification_photo_captured_at=verification_photo_captured_at
-            or (now if verification_method == CheckinVerificationMethod.PHOTO else None),
+        visit_type = "first_visit" if prior_visits == 0 else "follow_up"
+        resolved_photo_captured_at = verification_photo_captured_at or (
+            now if verification_method == CheckinVerificationMethod.PHOTO else None
         )
+
+        # Concurrency-safe insert: generate_visit_uid() derives the next number
+        # from the current Max, so deletions no longer cause collisions. The only
+        # remaining race is two simultaneous check-ins reading the same Max — we
+        # absorb that by retrying the INSERT inside its own atomic block. A retry
+        # re-reads the maximum and lands on the next free number.
+        session = None
+        for _ in range(MAX_CHECKIN_UID_RETRIES):
+            try:
+                with transaction.atomic():
+                    session = VisitSession.objects.create(
+                        visit_uid=VisitSession.generate_visit_uid(),
+                        patient=patient,
+                        checked_in_by=request.user,
+                        visit_type=visit_type,
+                        file_number=patient.file_number,  # denormalized snapshot of patient.file_number at check-in
+                        outstanding_debt_at_checkin=patient.outstanding_debt,
+                        status=VisitStatus.IN_PROGRESS,  # CHANGED: was COMPLETED — visit now enters pipeline
+                        current_stage=VisitStage.PHARMACY,  # CHANGED: was COMPLETED — routed to pharmacy queue
+                        completed_time=None,  # CHANGED: completed_time set later by dispense flow
+                        verification_method=verification_method,
+                        verification_photo_captured_at=resolved_photo_captured_at,
+                    )
+                break
+            except IntegrityError:
+                # A duplicate active session for this patient/day (the partial
+                # unique constraint) means a concurrent request already checked
+                # this patient in — that is a real 409, not a UID race, so stop.
+                if VisitSession.objects.filter(patient=patient, visit_date=today).exists():
+                    raise ConflictError("This patient is already checked in for today.")
+                # Otherwise it was a visit_uid collision from a concurrent
+                # check-in; loop to regenerate against the new maximum.
+                continue
+
+        if session is None:
+            raise ConflictError(
+                "Could not allocate a visit ID due to concurrent check-ins. Please retry."
+            )
+
         reconcile_followup_on_checkin(patient=patient, checkin_time=now)
 
         if verification_photo_bytes and verification_photo_mime_type:
