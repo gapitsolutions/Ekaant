@@ -14,6 +14,17 @@ export interface MedicineBatch {
   quantity: number;
 }
 
+// Lightweight supplier summary returned inline on Medicine — only the
+// fields the inventory row badges and the register/edit dialog picker
+// actually need. Distinct from the full ``Supplier`` type (which includes
+// contact details + audit timestamps).
+export interface MedicineSupplierRef {
+  id: string;
+  company_name: string;
+  is_active: boolean;
+  categories: SupplierCategory[];
+}
+
 export interface Medicine {
   id: string;
   name: string;
@@ -27,6 +38,7 @@ export interface Medicine {
   selling_price: string;
   is_active: boolean;
   batches: MedicineBatch[];
+  suppliers: MedicineSupplierRef[];
 }
 
 export interface MedicineListResponse {
@@ -44,6 +56,9 @@ export interface MedicineCreatePayload {
   tablets_per_strip?: number;
   mrp: string | number;
   selling_price: string | number;
+  // Optional explicit Medicine↔Supplier links. Omit on PATCH to preserve
+  // existing links; send ``[]`` to clear. See API_BLUEPRINT §7.4.
+  supplier_ids?: string[];
 }
 
 export interface MedicineUpdatePayload extends Partial<MedicineCreatePayload> {}

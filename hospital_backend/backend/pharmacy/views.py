@@ -212,7 +212,7 @@ class MedicineListCreateView(APIView):
     def get(self, request):
         queryset = (
             Medicine.objects.filter(is_active=True)
-            .prefetch_related("batches")
+            .prefetch_related("batches", "suppliers")
             .order_by("name")
         )
 

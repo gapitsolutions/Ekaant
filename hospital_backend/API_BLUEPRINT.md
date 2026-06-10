@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-10 (IST)
+> **Last Updated:** 2026-06-11 (IST)
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -781,6 +781,14 @@ Response:
         "is_active": true,
         "batches": [
           { "batch_number": "B-2024-01", "expiry_date": "2026-10-15", "quantity": 120 }
+        ],
+        "suppliers": [
+          {
+            "id": "uuid",
+            "company_name": "Abbott Healthcare Ltd",
+            "is_active": true,
+            "categories": ["BUP", "Rx"]
+          }
         ]
       }
     ],
@@ -790,6 +798,13 @@ Response:
 ```
 
 Batches are ordered FEFO (earliest expiry first) and include only active batches.
+
+`suppliers` is the explicit Medicine↔Supplier tracking relation declared at
+register/edit time (distinct from the implicit link via purchase invoices).
+Payload kept lightweight — only the fields the frontend needs for the
+badges on the inventory table row and the picker in the register/edit
+dialog (`is_active` to surface an "Inactive" badge, `categories` to
+de-emphasise category-mismatched suppliers in the picker).
 
 ### 7.4 `POST /api/v1/pharmacy/inventory/medicines/`
 
@@ -811,7 +826,8 @@ Request body:
   "reorder_level": 50,
   "tablets_per_strip": 10,
   "mrp": "125.00",
-  "selling_price": "110.00"
+  "selling_price": "110.00",
+  "supplier_ids": ["uuid", "uuid"]
 }
 ```
 
@@ -820,6 +836,10 @@ Validation:
 - `selling_price ≤ mrp`
 - `category=BUP` requires non-null `bup_category`; non-BUP must have null `bup_category`
 - Conditional unique constraint: `(name, category, bup_category)` must be unique among active medicines
+- `supplier_ids` (optional): list of Supplier UUIDs. Each id is checked
+  against the Supplier table; unknown ids return 400 with
+  `{"supplier_ids": [...]}`. Empty list is an explicit clear; omitting
+  the key on PATCH preserves existing links.
 
 Response (201): full medicine read payload.
 

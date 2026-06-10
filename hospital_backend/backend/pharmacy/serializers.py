@@ -86,6 +86,12 @@ class MedicineReadSerializer(serializers.ModelSerializer):
     """Medicine list/detail payload, with active batches inline."""
 
     batches = serializers.SerializerMethodField()
+    # Inline supplier summary — kept lightweight (id + company_name + the
+    # two flags the frontend uses to render badges) to avoid bloating the
+    # medicine list payload. ``categories`` is included so the frontend
+    # can de-emphasise suppliers whose categories don't include the
+    # current medicine's category.
+    suppliers = serializers.SerializerMethodField()
 
     class Meta:
         model = Medicine
@@ -102,6 +108,7 @@ class MedicineReadSerializer(serializers.ModelSerializer):
             "selling_price",
             "is_active",
             "batches",
+            "suppliers",
         ]
 
     def get_batches(self, obj: Medicine):
@@ -109,9 +116,35 @@ class MedicineReadSerializer(serializers.ModelSerializer):
         batches = obj.batches.filter(is_active=True).order_by("expiry_date")
         return [MedicineBatchReadSerializer.from_batch(b) for b in batches]
 
+    def get_suppliers(self, obj: Medicine):
+        # The view ``prefetch_related("suppliers")`` so iterating here
+        # doesn't trigger N+1.
+        return [
+            {
+                "id": str(s.id),
+                "company_name": s.company_name,
+                "is_active": s.is_active,
+                "categories": list(s.categories or []),
+            }
+            for s in obj.suppliers.all()
+        ]
+
 
 class MedicineWriteSerializer(serializers.ModelSerializer):
     """Used for both POST (create) and PATCH (partial update)."""
+
+    # Write-only side of the explicit Medicine↔Supplier relation. Optional;
+    # an absent key on PATCH is a no-op (existing links preserved), while
+    # an empty list ``[]`` is an explicit clear. PKRelatedField validates
+    # each id against the Supplier table — unknown ids raise 400 with the
+    # ``supplier_ids`` key so ``useApiErrors`` highlights the picker.
+    supplier_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        write_only=True,
+        required=False,
+        queryset=Supplier.objects.all(),
+        source="suppliers",
+    )
 
     class Meta:
         model = Medicine
@@ -125,6 +158,7 @@ class MedicineWriteSerializer(serializers.ModelSerializer):
             "tablets_per_strip",
             "mrp",
             "selling_price",
+            "supplier_ids",
         ]
 
     def validate(self, attrs):

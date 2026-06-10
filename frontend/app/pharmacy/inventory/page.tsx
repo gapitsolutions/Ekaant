@@ -40,6 +40,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Plus,
@@ -65,6 +70,9 @@ import {
   Eye,
   Upload,
   X,
+  Building2,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { FieldError } from "@/components/ui/field-error";
@@ -81,6 +89,7 @@ import {
   getExpiryReport,
   BUP_STRENGTHS,
   type Medicine,
+  type MedicineSupplierRef,
   type MedicineCategory,
   type BupStrength,
   type RemovalReason,
@@ -628,6 +637,43 @@ export default function InventoryWorkstationPage() {
                               <p className="text-[10px] text-slate-500 uppercase mt-0.5 tracking-wide">
                                 {m.salt}
                               </p>
+                              {/* Supplier chips — Option B. Capped at 2
+                                  inline; the rest collapse into "+N more"
+                                  with a title attribute listing the
+                                  remaining company names. */}
+                              {m.suppliers && m.suppliers.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                  <Building2 className="h-2.5 w-2.5 text-slate-400" />
+                                  {m.suppliers.slice(0, 2).map((s) => (
+                                    <span
+                                      key={s.id}
+                                      className={`inline-flex items-center gap-1 text-[9px] font-semibold rounded-full px-1.5 py-0.5 border ${
+                                        s.is_active
+                                          ? "bg-slate-50 text-slate-600 border-slate-200"
+                                          : "bg-slate-100 text-slate-400 border-slate-200 italic"
+                                      }`}
+                                      title={
+                                        s.is_active
+                                          ? s.company_name
+                                          : `${s.company_name} (inactive)`
+                                      }
+                                    >
+                                      {s.company_name}
+                                    </span>
+                                  ))}
+                                  {m.suppliers.length > 2 && (
+                                    <span
+                                      className="text-[9px] font-bold text-slate-400 px-1"
+                                      title={m.suppliers
+                                        .slice(2)
+                                        .map((s) => s.company_name)
+                                        .join(", ")}
+                                    >
+                                      +{m.suppliers.length - 2} more
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -809,6 +855,8 @@ export default function InventoryWorkstationPage() {
           setAddDialogOpen(false);
           loadMedicines();
         }}
+        suppliers={suppliers}
+        onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
       />
 
       <MedicineFormDialog
@@ -821,6 +869,8 @@ export default function InventoryWorkstationPage() {
           setEditTarget(null);
           loadMedicines();
         }}
+        suppliers={suppliers}
+        onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
       />
 
       {/* Low Stock Dialog */}
@@ -991,11 +1041,15 @@ function MedicineFormDialog({
   onOpenChange,
   editTarget,
   onSuccess,
+  suppliers,
+  onSupplierCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editTarget: Medicine | null;
   onSuccess: () => void;
+  suppliers: Supplier[];
+  onSupplierCreated: (s: Supplier) => void;
 }) {
   const isEdit = !!editTarget;
   const [category, setCategory] = useState<MedicineCategory>("Rx");
@@ -1007,6 +1061,9 @@ function MedicineFormDialog({
   const [sellingPrice, setSellingPrice] = useState("");
   const [reorderLevel, setReorderLevel] = useState("50");
   const [tabletsPerStrip, setTabletsPerStrip] = useState("10");
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+  const [supplierPickerOpen, setSupplierPickerOpen] = useState(false);
+  const [supplierCreateOpen, setSupplierCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pre-fill form when editing
@@ -1021,6 +1078,9 @@ function MedicineFormDialog({
       setSellingPrice(editTarget.selling_price);
       setReorderLevel(String(editTarget.reorder_level));
       setTabletsPerStrip(String(editTarget.tablets_per_strip));
+      setSelectedSupplierIds(
+        (editTarget.suppliers || []).map((s) => s.id),
+      );
     } else {
       resetForm();
     }
@@ -1036,7 +1096,54 @@ function MedicineFormDialog({
     setSellingPrice("");
     setReorderLevel("50");
     setTabletsPerStrip("10");
+    setSelectedSupplierIds([]);
   };
+
+  // ── Supplier picker derivations ─────────────────────────────────────
+  // The picker mixes the global supplier list with whatever is currently
+  // linked to ``editTarget``. We always show inactive suppliers that are
+  // already linked (so the user can see and remove a historical link);
+  // inactive suppliers that *aren't* linked stay visible too — the row
+  // just carries an "Inactive" badge.
+  const supplierOptions = useMemo(() => {
+    const map = new Map<string, MedicineSupplierRef>();
+    for (const s of suppliers) {
+      map.set(s.id, {
+        id: s.id,
+        company_name: s.company_name,
+        is_active: s.is_active,
+        categories: s.categories,
+      });
+    }
+    // Splice in any already-linked suppliers that the global list didn't
+    // return (e.g. excluded by a server-side filter) so they don't
+    // silently disappear from the row.
+    for (const s of editTarget?.suppliers || []) {
+      if (!map.has(s.id)) map.set(s.id, s);
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.company_name.localeCompare(b.company_name),
+    );
+  }, [suppliers, editTarget]);
+
+  const selectedSuppliers = useMemo(() => {
+    return supplierOptions.filter((s) => selectedSupplierIds.includes(s.id));
+  }, [supplierOptions, selectedSupplierIds]);
+
+  const toggleSupplier = (supplierId: string) => {
+    setSelectedSupplierIds((prev) =>
+      prev.includes(supplierId)
+        ? prev.filter((id) => id !== supplierId)
+        : [...prev, supplierId],
+    );
+  };
+
+  // Category mismatch hint: when a supplier's ``categories`` list doesn't
+  // include the medicine's current category, the row is rendered with a
+  // muted "Doesn't supply X" chip. The supplier is still selectable —
+  // pharmacist judgment trumps stored metadata.
+  const isCategoryMismatch = (s: MedicineSupplierRef): boolean =>
+    s.categories.length > 0 && !s.categories.includes(category);
 
   const handleSubmit = async () => {
     if (!name.trim() || !salt.trim() || !manufacturer.trim()) {
@@ -1065,6 +1172,10 @@ function MedicineFormDialog({
         tablets_per_strip: parseInt(tabletsPerStrip) || 10,
         mrp: mrpNum.toFixed(2),
         selling_price: spNum.toFixed(2),
+        // Always send the list (including ``[]``) so PATCH applies the
+        // user's current selection — the alternative (omit on empty)
+        // would silently preserve stale links after a deliberate clear.
+        supplier_ids: selectedSupplierIds,
       };
       if (isEdit && editTarget) {
         await updateInventoryMedicine(editTarget.id, payload);
@@ -1239,6 +1350,147 @@ function MedicineFormDialog({
               value={tabletsPerStrip}
               onChange={(e) => setTabletsPerStrip(e.target.value)}
               className="h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-center text-xs"
+            />
+          </div>
+
+          {/* Suppliers picker — optional. Multi-select + inline add. The
+              "+" button opens the same SupplierCreateDialog used by the
+              invoice tab; the new supplier auto-ticks here on success
+              and bubbles up to the parent's ``suppliers`` state via the
+              shared ``onSupplierCreated`` callback. */}
+          <div className="space-y-1.5 col-span-2">
+            <Label className="text-xs font-bold text-slate-500 flex items-center gap-2">
+              <Building2 className="h-3.5 w-3.5 text-slate-400" />
+              Suppliers
+              <span className="text-[10px] font-normal text-slate-400">
+                (optional — for tracking)
+              </span>
+            </Label>
+            <div className="flex gap-2">
+              <Popover
+                open={supplierPickerOpen}
+                onOpenChange={setSupplierPickerOpen}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-xs justify-between hover:bg-slate-100"
+                  >
+                    <span className="truncate">
+                      {selectedSuppliers.length === 0
+                        ? "Select suppliers"
+                        : `${selectedSuppliers.length} selected`}
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-[var(--radix-popover-trigger-width)] p-0 rounded-xl border-slate-200"
+                >
+                  <div className="max-h-64 overflow-y-auto p-1">
+                    {supplierOptions.length === 0 ? (
+                      <p className="px-3 py-6 text-center text-xs text-slate-400">
+                        No suppliers yet. Click + to add one.
+                      </p>
+                    ) : (
+                      supplierOptions.map((s) => {
+                        const checked = selectedSupplierIds.includes(s.id);
+                        const mismatch = isCategoryMismatch(s);
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => toggleSupplier(s.id)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left"
+                          >
+                            <div
+                              className={`h-4 w-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                                checked
+                                  ? "bg-primary border-primary"
+                                  : "border-slate-300 bg-white"
+                              }`}
+                            >
+                              {checked && (
+                                <Check className="h-3 w-3 text-white" />
+                              )}
+                            </div>
+                            <span
+                              className={`text-xs font-semibold truncate ${
+                                mismatch ? "text-slate-500" : "text-slate-700"
+                              }`}
+                            >
+                              {s.company_name}
+                            </span>
+                            {!s.is_active && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] uppercase font-bold px-1 py-0 border-slate-300 text-slate-500 bg-slate-50 flex-shrink-0"
+                              >
+                                Inactive
+                              </Badge>
+                            )}
+                            {mismatch && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] font-bold px-1 py-0 border-amber-200 text-amber-700 bg-amber-50 flex-shrink-0"
+                                title={`Supplier categories: ${s.categories.join(", ") || "none"}`}
+                              >
+                                Not {category}
+                              </Badge>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setSupplierCreateOpen(true)}
+                title="Add new supplier"
+                className="h-11 w-11 rounded-xl border-slate-200 bg-white hover:bg-slate-50 flex-shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {selectedSuppliers.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {selectedSuppliers.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full bg-primary/10 text-primary border border-primary/20 pl-2 pr-1 py-0.5"
+                  >
+                    {s.company_name}
+                    {!s.is_active && (
+                      <span className="text-[8px] uppercase text-slate-500">
+                        (inactive)
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleSupplier(s.id)}
+                      className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5"
+                      aria-label={`Remove ${s.company_name}`}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <SupplierCreateDialog
+              open={supplierCreateOpen}
+              onOpenChange={setSupplierCreateOpen}
+              onCreated={(s) => {
+                onSupplierCreated(s);
+                setSelectedSupplierIds((prev) => [...prev, s.id]);
+                setSupplierCreateOpen(false);
+              }}
             />
           </div>
         </div>

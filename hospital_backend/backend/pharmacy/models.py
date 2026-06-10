@@ -83,6 +83,17 @@ class Medicine(models.Model):
     tablets_per_strip = models.PositiveIntegerField(default=10)
     mrp = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    # Tracking-only relation: which suppliers stock this medicine. Distinct
+    # from the implicit Medicine↔Supplier link that arises from purchase
+    # invoices — this one is declared up-front by the pharmacist at
+    # register/edit time, so a brand-new medicine can already carry its
+    # known supplier(s) before any invoice has been booked. ``blank=True``
+    # because it's optional ("for tracking purposes"). PROTECT lives on
+    # PurchaseInvoice.supplier, so deleting a supplier with active
+    # invoices remains blocked; the M2M itself has no cascade impact.
+    suppliers = models.ManyToManyField(
+        "Supplier", blank=True, related_name="medicines"
+    )
     is_active = models.BooleanField(default=True)
     deletion_reason = models.CharField(max_length=255, blank=True, default="")
     deletion_notes = models.TextField(blank=True, default="")

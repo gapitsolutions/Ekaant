@@ -8,11 +8,13 @@ import {
   getInventoryStats,
   getLowStockReport,
   getPharmacyQueue,
+  getRevenueReport,
   type DispenseHistoryItem,
   type ExpiryReportRow,
   type InventoryStats,
   type LowStockReportItem,
   type PharmacyQueueItem,
+  type RevenueReportResponse,
 } from "@/lib/pharmacy-api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,16 +34,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
   Boxes,
   Calendar,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock,
   Eye,
   FileText,
   IndianRupee,
+  Loader2,
   Pill,
 } from "lucide-react";
 
@@ -88,6 +93,35 @@ function formatTime(value?: string | null): string {
   });
 }
 
+// Mini KPI tile used inside the Today's Revenue dialog. Mirrors the visual
+// language of the four cards on the reports page's revenue tab so the user
+// reads them the same way.
+function RevenueKpiTile({
+  label,
+  value,
+  icon,
+  iconBg,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  iconBg: string;
+}) {
+  return (
+    <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-4 flex items-center gap-3">
+      <div
+        className={`h-10 w-10 rounded-lg flex items-center justify-center ${iconBg}`}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-slate-500 font-medium truncate">{label}</p>
+        <p className="text-lg font-bold text-slate-800 truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PharmacyDashboard() {
@@ -105,6 +139,8 @@ export default function PharmacyDashboard() {
   const [isPendingDispenseDialogOpen, setIsPendingDispenseDialogOpen] =
     useState(false);
   const [isDispensedTodayDialogOpen, setIsDispensedTodayDialogOpen] =
+    useState(false);
+  const [isTodaysRevenueDialogOpen, setIsTodaysRevenueDialogOpen] =
     useState(false);
 
   // Lazy-loaded detail data (fetched only when dialog opens)
@@ -124,6 +160,15 @@ export default function PharmacyDashboard() {
   const [dispensedTodayPage, setDispensedTodayPage] = useState(1);
   const [isLoadingDispensedToday, setIsLoadingDispensedToday] = useState(false);
   const DISPENSED_TODAY_PAGE_SIZE = 50;
+
+  // Today's revenue breakdown — fetched on every dialog open (the call is a
+  // single aggregation; pharmacy revenue is live so cached numbers would feel
+  // stale during a working session). Only the summary is stored — the
+  // ``breakdown`` array from /reports/revenue/ is irrelevant for a single day.
+  const [todaysRevenueSummary, setTodaysRevenueSummary] = useState<
+    RevenueReportResponse["summary"] | null
+  >(null);
+  const [isLoadingTodaysRevenue, setIsLoadingTodaysRevenue] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setIsLoadingStats(true);
@@ -238,6 +283,27 @@ export default function PharmacyDashboard() {
     }
   };
 
+  const openTodaysRevenueDialog = async () => {
+    setIsTodaysRevenueDialogOpen(true);
+    setIsLoadingTodaysRevenue(true);
+    try {
+      // ``range=daily&date=<local today>`` returns the four KPIs we want in
+      // a single round-trip. Local-tz ISO so it matches what the user sees
+      // on the dashboard chip and what the reports page sends.
+      const localToday = new Date().toLocaleDateString("en-CA");
+      const data = await getRevenueReport({
+        range: "daily",
+        date: localToday,
+      });
+      setTodaysRevenueSummary(data.summary);
+    } catch {
+      setTodaysRevenueSummary(null);
+      toast.error("Failed to load today's revenue breakdown");
+    } finally {
+      setIsLoadingTodaysRevenue(false);
+    }
+  };
+
   // ── Derived values ──
 
   const today = useMemo(
@@ -290,7 +356,7 @@ export default function PharmacyDashboard() {
       iconBg: "bg-blue-100",
       iconColor: "text-blue-500",
       accent: "bg-blue-500",
-      onClick: undefined as undefined | (() => void),
+      onClick: () => void openTodaysRevenueDialog(),
     },
   ];
 
@@ -875,9 +941,7 @@ export default function PharmacyDashboard() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={
-                    dispensedTodayPage <= 1 || isLoadingDispensedToday
-                  }
+                  disabled={dispensedTodayPage <= 1 || isLoadingDispensedToday}
                   onClick={() =>
                     void loadDispensedTodayPage(dispensedTodayPage - 1)
                   }
@@ -889,9 +953,7 @@ export default function PharmacyDashboard() {
                   Page {dispensedTodayPage} of{" "}
                   {Math.max(
                     1,
-                    Math.ceil(
-                      dispensedTodayTotal / DISPENSED_TODAY_PAGE_SIZE,
-                    ),
+                    Math.ceil(dispensedTodayTotal / DISPENSED_TODAY_PAGE_SIZE),
                   )}
                 </span>
                 <Button
@@ -915,7 +977,10 @@ export default function PharmacyDashboard() {
       </Dialog>
 
       {/* ── Low Stock Dialog ── */}
-      <Dialog open={isLowStockDialogOpen} onOpenChange={setIsLowStockDialogOpen}>
+      <Dialog
+        open={isLowStockDialogOpen}
+        onOpenChange={setIsLowStockDialogOpen}
+      >
         <DialogContent className="sm:max-w-[600px] rounded-2xl p-0 overflow-hidden bg-white">
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white">
             <DialogHeader>
@@ -963,7 +1028,7 @@ export default function PharmacyDashboard() {
                       <TableRow key={item.id}>
                         <TableCell className="font-semibold text-sm text-slate-700">
                           <p>{item.name}</p>
-                          <p className="text-xs text-slate-400">{item.salt}</p>
+                          {/* <p className="text-xs text-slate-400">{item.salt}</p> */}
                         </TableCell>
                         <TableCell className="text-xs">
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">
@@ -986,11 +1051,85 @@ export default function PharmacyDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Expired Medicines Dialog (expiry_date < today) ── */}
+      {/* ── Today's Revenue Dialog ── */}
       <Dialog
-        open={isExpiredDialogOpen}
-        onOpenChange={setIsExpiredDialogOpen}
+        open={isTodaysRevenueDialogOpen}
+        onOpenChange={setIsTodaysRevenueDialogOpen}
       >
+        <DialogContent className="sm:max-w-[640px] rounded-2xl p-0 overflow-hidden bg-white">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-6 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <IndianRupee className="h-6 w-6 text-blue-100" />
+                Today&apos;s Revenue
+              </DialogTitle>
+              <p className="text-blue-50/90 text-sm mt-1">
+                {new Date().toLocaleDateString("en-IN", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            </DialogHeader>
+          </div>
+          <div className="p-6 bg-slate-50">
+            {isLoadingTodaysRevenue ? (
+              <div className="flex items-center justify-center py-12 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Loading today&apos;s breakdown…
+              </div>
+            ) : todaysRevenueSummary ? (
+              <div className="grid grid-cols-2 gap-4">
+                <RevenueKpiTile
+                  label="Total Revenue"
+                  value={formatCurrency(todaysRevenueSummary.total_revenue)}
+                  icon={<IndianRupee className="h-5 w-5 text-emerald-600" />}
+                  iconBg="bg-emerald-100"
+                />
+                <RevenueKpiTile
+                  label="Cash Sales"
+                  value={formatCurrency(todaysRevenueSummary.total_cash)}
+                  icon={<IndianRupee className="h-5 w-5 text-amber-600" />}
+                  iconBg="bg-amber-100"
+                />
+                <RevenueKpiTile
+                  label="Online Sales"
+                  value={formatCurrency(todaysRevenueSummary.total_online)}
+                  icon={<Activity className="h-5 w-5 text-blue-600" />}
+                  iconBg="bg-blue-100"
+                />
+                <RevenueKpiTile
+                  label="Transactions"
+                  value={String(todaysRevenueSummary.total_transactions)}
+                  icon={<CalendarDays className="h-5 w-5 text-purple-600" />}
+                  iconBg="bg-purple-100"
+                />
+              </div>
+            ) : (
+              <p className="py-12 text-center text-slate-400 italic">
+                No revenue data available.
+              </p>
+            )}
+            <div className="mt-6 flex justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsTodaysRevenueDialogOpen(false);
+                  navigate("/pharmacy/reports");
+                }}
+                className="text-primary hover:text-primary hover:bg-primary/5 font-semibold"
+              >
+                View full revenue report
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Expired Medicines Dialog (expiry_date < today) ── */}
+      <Dialog open={isExpiredDialogOpen} onOpenChange={setIsExpiredDialogOpen}>
         <DialogContent className="sm:max-w-[700px] rounded-2xl p-0 overflow-hidden bg-white">
           <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white">
             <DialogHeader>
