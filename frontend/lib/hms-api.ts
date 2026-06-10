@@ -629,9 +629,19 @@ export interface CheckinHistoryItem {
   patient: CheckinHistoryPatientSnapshot;
 }
 
+export interface CheckinHistoryStats {
+  total: number;
+  by_verification_method: Record<CheckinHistoryVerificationMethod, number>;
+}
+
 export interface CheckinHistoryListResponse {
   items: CheckinHistoryItem[];
   pagination: { page: number; pageSize: number; total: number };
+  // Range-scoped summary for the four cards on the reception check-in
+  // history page. Scoped by q/status/current_stage/date range; ignores
+  // verification_method so the cards stay stable when the table is
+  // narrowed via the method dropdown. See API_BLUEPRINT §6.7.
+  stats: CheckinHistoryStats;
 }
 
 export interface DeleteCheckinHistoryVisitResponse {

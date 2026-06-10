@@ -6,7 +6,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -521,9 +521,6 @@ class ReceptionCheckinHistoryListView(APIView):
                 | Q(patient__phone_number__icontains=query)
             )
 
-        if verification_method:
-            queryset = queryset.filter(verification_method=verification_method)
-
         if status_filter:
             queryset = queryset.filter(status=status_filter)
 
@@ -539,11 +536,45 @@ class ReceptionCheckinHistoryListView(APIView):
         if end_date:
             queryset = queryset.filter(visit_date__lte=end_date)
 
+        # Snapshot for the per-method breakdown cards on the frontend.
+        # Intentionally captured BEFORE applying ``verification_method`` so
+        # that picking a method from the filter dropdown narrows the table
+        # only — the four summary cards keep describing the same underlying
+        # dataset (date range + search + status). Without this branch the
+        # frontend would have to back-out the method filter to compute the
+        # breakdown, which it can't do without a second round-trip.
+        stats_queryset = queryset
+        # ``queryset`` is ordered by ``-checkin_time`` for the list view.
+        # ``.values(X).annotate(Count(...))`` on an ordered queryset adds the
+        # ordering field to the GROUP BY, so each (verification_method,
+        # checkin_time) row becomes its own group of 1 and ``dict(...)``
+        # collapses them to a single "1" per method. Strip ordering with an
+        # empty ``order_by()`` so the GROUP BY contains only the bucket.
+        breakdown_rows = (
+            stats_queryset.order_by()
+            .values("verification_method")
+            .annotate(c=Count("id"))
+            .values_list("verification_method", "c")
+        )
+        breakdown_map = dict(breakdown_rows)
+        stats = {
+            "total": stats_queryset.count(),
+            "by_verification_method": {
+                method.value: breakdown_map.get(method.value, 0)
+                for method in CheckinVerificationMethod
+            },
+        }
+
+        if verification_method:
+            queryset = queryset.filter(verification_method=verification_method)
+
         paginated_queryset, pagination = paginate_queryset(queryset, page, page_size)
         items = [
             _checkin_history_session_payload(session, request) for session in paginated_queryset
         ]
-        return success_response({"items": items, "pagination": pagination})
+        return success_response(
+            {"items": items, "pagination": pagination, "stats": stats}
+        )
 
 
 class ReceptionCheckinHistoryPhotoView(APIView):

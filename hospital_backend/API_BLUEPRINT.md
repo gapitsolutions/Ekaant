@@ -642,6 +642,25 @@ Response item fields:
 
 Plus `pagination: {page, pageSize, total}`.
 
+Plus `stats`: per-range summary used by the four cards on the reception
+check-in history page (the cards must reflect the full matched set, not
+the current page of the table). Shape:
+
+```
+stats: {
+  total: number,
+  by_verification_method: { fingerprint: number, photo: number, manual: number },
+}
+```
+
+Scope: `stats` is computed AFTER `q`, `status`, `current_stage`,
+`today_only`, `start_date`, `end_date` are applied, but BEFORE
+`verification_method`. So `stats.total` equals `pagination.total` only
+when `verification_method` is unset; when set, `pagination.total` is the
+narrowed table count while `stats.total` is the date-range total. This
+lets the frontend show a stable breakdown regardless of which method is
+selected in the filter dropdown.
+
 ### 6.8 `GET /api/v1/receptionist/checkin-history/<session_id>/verification-photo/`
 
 View: `ReceptionCheckinHistoryPhotoView.get`

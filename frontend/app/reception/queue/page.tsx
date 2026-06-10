@@ -43,6 +43,7 @@ import {
   deleteReceptionCheckinHistoryVisit,
   getReceptionCheckinHistory,
   type CheckinHistoryItem,
+  type CheckinHistoryStats,
   type CheckinHistoryVerificationMethod,
 } from "@/lib/hms-api";
 import {
@@ -74,12 +75,23 @@ export default function ReceptionQueuePage() {
   const [statusFilter, setStatusFilter] = useState<
     "all" | "in_progress" | "completed" | "cancelled"
   >("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // Default the range to today so the four summary cards (and the table)
+  // open on today's data. Cleared / widened by the user via the date
+  // inputs; backend treats an empty range as "all time".
+  const todayIso = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in local tz
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(todayIso);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 50,
     total: 0,
+  });
+  // ``stats`` powers the four cards. It is the backend's aggregate over
+  // the full date-range / search / status match (see API_BLUEPRINT §6.7),
+  // independent of pagination and of the verification_method filter.
+  const [stats, setStats] = useState<CheckinHistoryStats>({
+    total: 0,
+    by_verification_method: { fingerprint: 0, photo: 0, manual: 0 },
   });
 
   useEffect(() => {
@@ -115,6 +127,9 @@ export default function ReceptionQueuePage() {
             total: response.items?.length || 0,
           },
         );
+        if (response.stats) {
+          setStats(response.stats);
+        }
         setLastRefreshedAt(new Date());
       })
       .catch((error: unknown) => {
@@ -166,6 +181,9 @@ export default function ReceptionQueuePage() {
             total: response.items?.length || 0,
           },
         );
+        if (response.stats) {
+          setStats(response.stats);
+        }
         setLastRefreshedAt(new Date());
       })
       .catch((error: unknown) => {
@@ -216,15 +234,18 @@ export default function ReceptionQueuePage() {
   const pageStart = pagination.total === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageEnd = Math.min(page * pageSize, pagination.total || 0);
 
-  const verificationCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const m of ALL_VERIFICATION_METHODS) counts[m] = 0;
-    for (const item of historyItems) {
-      counts[item.verification_method] =
-        (counts[item.verification_method] ?? 0) + 1;
+  // Human label for the date-range the cards summarise. The cards always
+  // describe the matched range; the table may show a narrower view if a
+  // verification method is also picked.
+  const rangeLabel = useMemo(() => {
+    if (!startDate && !endDate) return "All time";
+    if (startDate && endDate && startDate === endDate) {
+      return startDate === todayIso ? "Today" : startDate;
     }
-    return counts;
-  }, [historyItems]);
+    if (startDate && endDate) return `${startDate} → ${endDate}`;
+    if (startDate) return `From ${startDate}`;
+    return `Until ${endDate}`;
+  }, [startDate, endDate, todayIso]);
 
   const formatTime = (value?: string | null) => {
     if (!value) return "-";
@@ -305,21 +326,24 @@ export default function ReceptionQueuePage() {
         actions={
           <div className="bg-[#e6f4f1] text-primary font-bold px-4 py-2 rounded-lg border border-primary/20 shadow-sm flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            {pagination.total} {pagination.total === 1 ? 'Check-in' : 'Check-ins'} Total
+            {stats.total} {stats.total === 1 ? 'Check-in' : 'Check-ins'} · {rangeLabel}
           </div>
         }
       />
 
-      {/* 1 total-records card + 1 card per verification method */}
+      {/* 1 total-records card + 1 card per verification method.
+          Counts come from ``stats`` — backend aggregate over the matched
+          date range, independent of pagination and of the verification
+          method filter. See API_BLUEPRINT §6.7. */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="border-none shadow-sm bg-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">Total Records</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-slate-800">{pagination.total}</p>
+            <p className="text-3xl font-bold text-slate-800">{stats.total}</p>
             <p className="text-muted-foreground text-xs mt-1">
-              Matching history entries
+              {rangeLabel}
             </p>
           </CardContent>
         </Card>
@@ -336,9 +360,9 @@ export default function ReceptionQueuePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-slate-800">
-                  {verificationCounts[method] ?? 0}
+                  {stats.by_verification_method[method] ?? 0}
                 </p>
-                <p className="text-muted-foreground text-xs mt-1">Current page count</p>
+                <p className="text-muted-foreground text-xs mt-1">{rangeLabel}</p>
               </CardContent>
             </Card>
           );
