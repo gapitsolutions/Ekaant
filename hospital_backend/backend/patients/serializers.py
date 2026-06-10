@@ -2,6 +2,7 @@ import base64
 import binascii
 
 from django.core.files.base import ContentFile
+from django.db import IntegrityError
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
@@ -405,6 +406,7 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = (
+            "file_number",
             "hdams_id",
             "full_name",
             "aadhaar_number",
@@ -467,6 +469,20 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
             "photo_base64",
             "photo_mime_type",
         )
+        # ``file_number`` and ``hdams_id`` are model-level unique. DRF's
+        # ModelSerializer would otherwise auto-attach a ``UniqueValidator``
+        # that returns a 400 with field-level errors — we want a 409
+        # ``ConflictError`` instead (matches the registration semantics and
+        # gives the frontend a single error shape to toast). We re-add the
+        # regex validator for ``file_number`` explicitly so format checks
+        # still run.
+        extra_kwargs = {
+            "file_number": {
+                "validators": [FILE_NUMBER_VALIDATOR],
+                "max_length": FILE_NUMBER_MAX_LENGTH,
+            },
+            "hdams_id": {"validators": []},
+        }
 
     def validate(self, attrs):
         photo_base64 = attrs.get("photo_base64", "")
@@ -523,6 +539,45 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
             raise ConflictError("This Aadhaar number is already registered.")
         return digits
 
+    def validate_file_number(self, value):
+        # Mirrors PatientRegistrationSerializer.validate_file_number but
+        # excludes the current row so saving without changing the file
+        # number doesn't self-collide. 409 is the consistent collision
+        # shape across the patients module — the frontend toasts the
+        # ``message`` and (optionally) reads ``last_file_number`` from the
+        # payload to suggest the next id.
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("File number is required.")
+        duplicate_exists = (
+            Patient.objects.filter(file_number__iexact=value)
+            .exclude(pk=self.instance.pk)
+            .exists()
+        )
+        if duplicate_exists:
+            raise ConflictError(
+                "This file number already exists.",
+                extra={"last_file_number": Patient.latest_file_number()},
+            )
+        return value
+
+    def validate_hdams_id(self, value):
+        # ``hdams_id`` is nullable-unique on the model. Treat blank input as
+        # ``None`` so multiple patients can legitimately have "no HDAMS id"
+        # without colliding on the unique constraint (which would surface
+        # as a 500 IntegrityError otherwise).
+        cleaned = (value or "").strip()
+        if not cleaned:
+            return None
+        duplicate_exists = (
+            Patient.objects.filter(hdams_id__iexact=cleaned)
+            .exclude(pk=self.instance.pk)
+            .exists()
+        )
+        if duplicate_exists:
+            raise ConflictError("This HDAMS ID is already in use.")
+        return cleaned
+
     def update(self, instance, validated_data):
         # --- photo handling ---
         photo_bytes = validated_data.pop("_decoded_photo", None)
@@ -538,7 +593,28 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
                 timezone.now() if fingerprint_template else None
             )
 
-        instance = super().update(instance, validated_data)
+        # ``validate_file_number`` / ``validate_hdams_id`` /
+        # ``validate_aadhaar_number`` pre-check uniqueness, but a concurrent
+        # edit on another row can still slip in between the SELECT and the
+        # UPDATE. The DB unique constraints are the source of truth — catch
+        # the IntegrityError and surface it as a 409 with a structured
+        # message so the frontend toasts the right hint instead of a 500.
+        try:
+            instance = super().update(instance, validated_data)
+        except IntegrityError as exc:
+            error_text = str(exc).lower()
+            if "file_number" in error_text:
+                raise ConflictError(
+                    "This file number already exists.",
+                    extra={"last_file_number": Patient.latest_file_number()},
+                ) from exc
+            if "hdams_id" in error_text:
+                raise ConflictError("This HDAMS ID is already in use.") from exc
+            if "aadhaar_number" in error_text:
+                raise ConflictError(
+                    "This Aadhaar number is already registered."
+                ) from exc
+            raise
 
         # Save new photo (replaces existing file on disk).
         if photo_bytes and photo_mime_type:

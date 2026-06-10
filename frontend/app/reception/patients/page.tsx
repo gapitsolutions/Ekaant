@@ -54,6 +54,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { toastApiError } from "@/lib/api-errors";
 import {
   Search,
   User,
@@ -324,6 +325,7 @@ export default function PatientDataPage() {
   const buildPatientUpdatePayload = (
     patient: Patient,
   ): PatientProfileUpdatePayload => ({
+    file_number: patient.file_number,
     hdams_id: patient.hdams_id || undefined,
     full_name: patient.full_name,
     aadhaar_number: patient.aadhaar_number || undefined,
@@ -847,8 +849,12 @@ export default function PatientDataPage() {
       toast.success("Patient profile updated");
       setIsEditOpen(false);
       setEditingPatient(null);
-    } catch {
-      toast.error("Failed to save patient profile");
+    } catch (error) {
+      // Surfaces backend ``message`` from ConflictError (409) — file
+      // number, HDAMS ID, and Aadhaar collisions land here with a
+      // human-readable hint. Falls back to the generic message for
+      // anything else.
+      toastApiError(error, "Failed to save patient profile");
     } finally {
       setIsSavingPatient(false);
     }

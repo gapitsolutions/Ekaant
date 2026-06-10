@@ -428,9 +428,22 @@ Serializer: `PatientGeneralUpdateSerializer` (partial update)
 Working flow:
 
 1. Fetch patient
-2. Validate/normalize update fields (DOB, phone, Aadhaar uniqueness excluding self, fingerprint fields)
-3. Save partial update; manages `fingerprint_enrolled_at` based on `fingerprint_template` changes
-4. Return full `PatientGeneralDataSerializer` response
+2. Validate/normalize update fields (DOB, phone, fingerprint fields)
+3. Pre-check uniqueness (excluding self) on `file_number`, `hdams_id`, and
+   `aadhaar_number`. Each emits a **409 ConflictError** with a
+   human-readable `message` on collision; the `file_number` 409 also ships
+   `last_file_number` in the payload so the frontend can suggest the next
+   available id. Empty `hdams_id` is stored as NULL (multiple patients
+   with no HDAMS id do not collide on the partial-unique index).
+4. Save partial update; manages `fingerprint_enrolled_at` based on `fingerprint_template` changes
+5. Wraps `save()` in an `IntegrityError` handler that re-raises as 409 for
+   the same three unique fields, in case a concurrent edit slips through
+   the pre-check race window.
+6. Return full `PatientGeneralDataSerializer` response
+
+Editable identity fields: `file_number`, `hdams_id`, `aadhaar_number` —
+all subject to the uniqueness rules above. `file_number` additionally
+runs the `^[A-Za-z0-9-]+$` regex validator.
 
 ### 5.9 `GET /api/v1/patients/<patient_id>/visits/`
 

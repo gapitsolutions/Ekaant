@@ -213,6 +213,7 @@ export interface DeletePatientResponse {
 }
 
 export interface PatientProfileUpdatePayload {
+  file_number?: string;
   hdams_id?: string;
   full_name?: string;
   aadhaar_number?: string;
