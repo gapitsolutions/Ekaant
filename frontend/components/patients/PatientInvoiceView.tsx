@@ -141,6 +141,18 @@ export function PatientInvoiceView({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {(invoice.amendments?.length ?? 0) > 0 && (
+            <Badge
+              variant="outline"
+              className="bg-amber-50 text-amber-700 border-amber-200 px-2 py-0.5 text-[10px] font-bold"
+              title={invoice.amendments[0]?.reason}
+            >
+              AMENDED{" "}
+              {invoice.amendments.length > 1
+                ? `×${invoice.amendments.length}`
+                : ""}
+            </Badge>
+          )}
           <Badge
             variant="outline"
             className={
@@ -254,6 +266,28 @@ export function PatientInvoiceView({
             </span>
           </div>
         </div>
+
+        {/* Amendment history — newest first, matches API ordering */}
+        {(invoice.amendments?.length ?? 0) > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+              Amendment history
+            </p>
+            {invoice.amendments.map((a, idx) => (
+              <p key={idx} className="text-[10px] text-amber-800">
+                {new Date(a.amended_at).toLocaleString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                — {a.reason}
+                {a.amended_by_name ? ` (${a.amended_by_name})` : ""}
+              </p>
+            ))}
+          </div>
+        )}
 
         {/* Pharmacist info */}
         {invoice.pharmacist && (

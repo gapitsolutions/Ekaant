@@ -381,6 +381,7 @@ export interface DispenseHistoryItem {
   pharmacist: string;
   status: DispenseStatus;
   payment_method: PaymentMethod;
+  is_amended: boolean;
 }
 
 export interface DispenseHistoryResponse {
@@ -414,6 +415,8 @@ export async function getDispenseHistory(options?: {
 // ── Dispense Invoice Detail (per visit session) ──
 export interface DispenseInvoiceLineItem {
   id: string;
+  // Needed to rebuild the amend payload from the read payload.
+  medicine_id: string;
   medicine_name: string;
   salt: string;
   category: string;
@@ -423,6 +426,15 @@ export interface DispenseInvoiceLineItem {
   quantity: number;
   unit_price: string;
   total: string;
+}
+
+// One row per post-dispense correction, newest first. The full
+// pre-amendment snapshot lives server-side (DispenseInvoiceAmendment);
+// the API exposes only what the UI shows.
+export interface DispenseAmendmentInfo {
+  amended_at: string;
+  amended_by_name: string;
+  reason: string;
 }
 
 export interface DispenseInvoiceDetail {
@@ -443,7 +455,9 @@ export interface DispenseInvoiceDetail {
   pharmacist: string;
   status: DispenseStatus;
   notes: string;
+  next_followup_date: string | null;
   items: DispenseInvoiceLineItem[];
+  amendments: DispenseAmendmentInfo[];
 }
 
 export async function getDispenseInvoiceBySession(
@@ -452,6 +466,31 @@ export async function getDispenseInvoiceBySession(
   return apiRequest<DispenseInvoiceDetail>(
     `/api/v1/pharmacy/dispense/${sessionId}/`,
     {},
+  );
+}
+
+// ── Dispense Amend (post-dispense correction) ──
+export interface DispenseAmendPayload {
+  amend_reason: string;
+  line_items: DispenseLineItemPayload[];
+  payment: DispensePaymentPayload;
+  next_followup_date?: string | null;
+}
+
+// PATCH /pharmacy/dispense/<session_id>/ — revert-then-reapply correction.
+// Stock ledger gets corrective rows; pre-amendment state is snapshot
+// server-side. Returns the refreshed full detail payload. See
+// API_BLUEPRINT §7.14a.
+export async function amendDispense(
+  sessionId: string,
+  payload: DispenseAmendPayload,
+): Promise<DispenseInvoiceDetail> {
+  return apiRequest<DispenseInvoiceDetail>(
+    `/api/v1/pharmacy/dispense/${sessionId}/`,
+    {
+      method: "PATCH",
+      body: payload,
+    },
   );
 }
 

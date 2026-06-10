@@ -39,6 +39,7 @@ from .models import (
 )
 from .serializers import (
     AuditRemovalCreateSerializer,
+    DispenseAmendSerializer,
     DispenseCancelSerializer,
     DispenseCreateSerializer,
     DispenseInvoiceListItemSerializer,
@@ -573,13 +574,71 @@ class DispenseCreateView(APIView):
         )
 
 
-class DispenseInvoiceDetailView(APIView):
-    """Return the full dispense invoice (with line items) for a visit session.
+def _dispense_invoice_detail_payload(invoice: DispenseInvoice) -> dict:
+    """Full invoice payload shared by GET and PATCH (amend) responses."""
+    items = [
+        {
+            "id": str(item.id),
+            "medicine_id": str(item.medicine_id),
+            "medicine_name": item.medicine_name,
+            "salt": item.salt,
+            "category": item.category,
+            "batch_number": item.batch_number,
+            "dose": item.dose,
+            "days": item.days,
+            "quantity": item.quantity,
+            "unit_price": str(item.unit_price),
+            "total": str(item.total),
+        }
+        for item in invoice.items.all()
+    ]
+    amendments = [
+        {
+            "amended_at": amendment.amended_at,
+            "amended_by_name": (
+                amendment.amended_by.full_name if amendment.amended_by_id else ""
+            ),
+            "reason": amendment.reason,
+        }
+        for amendment in invoice.amendments.select_related("amended_by")
+    ]
+    return {
+        "id": str(invoice.id),
+        "invoice_number": invoice.invoice_number,
+        "session_id": str(invoice.visit_session_id),
+        "patient_id": str(invoice.patient_id),
+        "patient_name": invoice.patient.full_name if invoice.patient_id else "",
+        "dispense_date": invoice.dispense_date,
+        "dispense_time": invoice.dispense_time,
+        "subtotal": str(invoice.subtotal),
+        "discount_percentage": str(invoice.discount_percentage),
+        "discount_amount": str(invoice.discount_amount),
+        "net_payable": str(invoice.net_payable),
+        "payment_method": invoice.payment_method,
+        "cash_amount": str(invoice.cash_amount),
+        "online_amount": str(invoice.online_amount),
+        "pharmacist": invoice.dispensed_by.full_name if invoice.dispensed_by_id else "",
+        "status": invoice.status,
+        "notes": invoice.notes,
+        "next_followup_date": invoice.next_followup_date,
+        "items": items,
+        "amendments": amendments,
+    }
 
-    Used by the patient profile's "View Invoice" expansion.
+
+class DispenseInvoiceDetailView(APIView):
+    """Full dispense invoice (with line items) for a visit session.
+
+    GET — used by the patient profile's "View Invoice" expansion and the
+    pharmacy invoice history dialog.
+    PATCH — post-dispense amendment (pharmacist corrects a wrongly recorded
+    dispense). See ``services.amend_dispense_for_session``.
     """
 
-    permission_classes = [IsReceptionAdminOrPharmacist]
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsReceptionAdminOrPharmacist()]
+        return [IsPharmacistOrAdmin()]
 
     def get(self, request, session_id):
         invoice = get_object_or_404(
@@ -587,43 +646,17 @@ class DispenseInvoiceDetailView(APIView):
             .prefetch_related("items__medicine"),
             visit_session_id=session_id,
         )
-        items = [
-            {
-                "id": str(item.id),
-                "medicine_name": item.medicine_name,
-                "salt": item.salt,
-                "category": item.category,
-                "batch_number": item.batch_number,
-                "dose": item.dose,
-                "days": item.days,
-                "quantity": item.quantity,
-                "unit_price": str(item.unit_price),
-                "total": str(item.total),
-            }
-            for item in invoice.items.all()
-        ]
-        return success_response(
-            {
-                "id": str(invoice.id),
-                "invoice_number": invoice.invoice_number,
-                "session_id": str(invoice.visit_session_id),
-                "patient_id": str(invoice.patient_id),
-                "patient_name": invoice.patient.full_name if invoice.patient_id else "",
-                "dispense_date": invoice.dispense_date,
-                "dispense_time": invoice.dispense_time,
-                "subtotal": str(invoice.subtotal),
-                "discount_percentage": str(invoice.discount_percentage),
-                "discount_amount": str(invoice.discount_amount),
-                "net_payable": str(invoice.net_payable),
-                "payment_method": invoice.payment_method,
-                "cash_amount": str(invoice.cash_amount),
-                "online_amount": str(invoice.online_amount),
-                "pharmacist": invoice.dispensed_by.full_name if invoice.dispensed_by_id else "",
-                "status": invoice.status,
-                "notes": invoice.notes,
-                "items": items,
-            }
+        return success_response(_dispense_invoice_detail_payload(invoice))
+
+    def patch(self, request, session_id):
+        serializer = DispenseAmendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invoice = services.amend_dispense_for_session(
+            session_id=session_id,
+            data=serializer.validated_data,
+            user=request.user,
         )
+        return success_response(_dispense_invoice_detail_payload(invoice))
 
 
 class DispenseCancelView(APIView):
@@ -666,9 +699,15 @@ class DispenseHistoryListView(APIView):
     permission_classes = [IsReceptionAdminOrPharmacist]
 
     def get(self, request):
-        queryset = DispenseInvoice.objects.select_related(
-            "patient", "dispensed_by", "visit_session"
-        ).order_by("-dispense_time")
+        # ``amendment_count`` powers the "Amended" badge in the history
+        # table without an N+1 ``exists()`` per row.
+        queryset = (
+            DispenseInvoice.objects.select_related(
+                "patient", "dispensed_by", "visit_session"
+            )
+            .annotate(amendment_count=Count("amendments"))
+            .order_by("-dispense_time")
+        )
 
         q = (request.query_params.get("q") or "").strip()
         start_date = (request.query_params.get("start_date") or "").strip()

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     DispenseInvoice,
+    DispenseInvoiceAmendment,
     DispenseInvoiceItem,
     Medicine,
     MedicineBatch,
@@ -189,6 +190,45 @@ class DispenseInvoiceItemAdmin(admin.ModelAdmin):
     list_filter = ("category",)
     autocomplete_fields = ("medicine",)
     readonly_fields = ("created_at",)
+
+
+@admin.register(DispenseInvoiceAmendment)
+class DispenseInvoiceAmendmentAdmin(admin.ModelAdmin):
+    """Append-only amendment audit log, exposed read-only in admin."""
+
+    list_display = (
+        "invoice",
+        "amended_by",
+        "amended_at",
+        "reason",
+    )
+    list_filter = ("amended_at",)
+    search_fields = (
+        "invoice__invoice_number",
+        "invoice__patient__full_name",
+        "invoice__patient__file_number",
+        "amended_by__full_name",
+        "reason",
+    )
+    date_hierarchy = "amended_at"
+    ordering = ("-amended_at",)
+    list_select_related = ("invoice", "invoice__patient", "amended_by")
+    readonly_fields = (
+        "invoice",
+        "amended_by",
+        "amended_at",
+        "reason",
+        "previous_state",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(StockAuditRemoval)

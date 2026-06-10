@@ -26,9 +26,13 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { PatientInvoiceView } from "@/components/patients/PatientInvoiceView";
 import {
   Download,
@@ -38,14 +42,23 @@ import {
   FileText,
   User,
   CheckCircle2,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
+  amendDispense,
   getDispenseHistory,
   getDispenseInvoiceBySession,
+  getInventoryMedicines,
   type DispenseHistoryItem,
   type DispenseInvoiceDetail,
+  type DispenseLineItemPayload,
   type DispenseStatus,
+  type Medicine,
+  type PaymentMethod,
 } from "@/lib/pharmacy-api";
+import { toastApiError } from "@/lib/api-errors";
 import { generateInvoicePdf } from "@/lib/export/generateInvoicePdf";
 
 type ActiveInvoice = {
@@ -98,6 +111,10 @@ export default function InvoiceHistoryPage() {
   const [invoiceCache, setInvoiceCache] = useState<
     Record<string, DispenseInvoiceDetail>
   >({});
+  // Row whose invoice is being amended (null = amend dialog closed).
+  const [amendTarget, setAmendTarget] = useState<DispenseHistoryItem | null>(
+    null,
+  );
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -266,6 +283,23 @@ export default function InvoiceHistoryPage() {
 
     return (
       <div className="flex items-center gap-2 sm:justify-end">
+        {item.status === "success" && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg border-amber-200 text-amber-700 font-semibold hover:bg-amber-50 hover:text-amber-800"
+            onClick={() => setAmendTarget(item)}
+            disabled={!hasSession || isViewing || isDownloading}
+            title={
+              !hasSession
+                ? "Session reference unavailable"
+                : "Correct this invoice (quantities, medicines, payment)"
+            }
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+            Edit
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -563,6 +597,14 @@ export default function InvoiceHistoryPage() {
                               <Badge className={statusBadgeClass(it.status)}>
                                 {it.status}
                               </Badge>
+                              {it.is_amended && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-200 text-amber-700 bg-amber-50 font-semibold"
+                                >
+                                  Amended
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="py-4 text-right align-top">
@@ -612,6 +654,14 @@ export default function InvoiceHistoryPage() {
                           <Badge className={statusBadgeClass(it.status)}>
                             {it.status}
                           </Badge>
+                          {it.is_amended && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-200 text-amber-700 bg-amber-50 font-semibold"
+                            >
+                              Amended
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-3 pt-1">
@@ -683,6 +733,522 @@ export default function InvoiceHistoryPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <AmendInvoiceDialog
+        historyItem={amendTarget}
+        onClose={() => setAmendTarget(null)}
+        onAmended={(detail) => {
+          // The PATCH response is the fresh full detail — keep the View /
+          // Download cache in sync and refresh the list so the new amount
+          // and the "Amended" badge appear immediately.
+          setInvoiceCache((prev) => ({ ...prev, [detail.session_id]: detail }));
+          setAmendTarget(null);
+          void loadHistory();
+        }}
+      />
     </>
+  );
+}
+
+// ────────── Amend Invoice Dialog ──────────
+//
+// Post-dispense correction (API_BLUEPRINT §7.14a). Loads a FRESH copy of
+// the invoice on every open (no cache — another pharmacist may have
+// amended it since), lets the pharmacist edit line items / payment /
+// discount, and submits the whole corrected state with a mandatory
+// reason. The backend reverts-then-reapplies stock and snapshots the
+// previous state into the amendment audit table.
+
+interface AmendLineDraft {
+  key: string;
+  medicine_id: string;
+  medicine_name: string;
+  batch_number: string;
+  dose: string;
+  days: string;
+  qty: string;
+  unit_price: string;
+}
+
+function AmendInvoiceDialog({
+  historyItem,
+  onClose,
+  onAmended,
+}: {
+  historyItem: DispenseHistoryItem | null;
+  onClose: () => void;
+  onAmended: (detail: DispenseInvoiceDetail) => void;
+}) {
+  const open = historyItem !== null;
+  const sessionId = historyItem?.session_id || "";
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [lines, setLines] = useState<AmendLineDraft[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
+  const [cashAmount, setCashAmount] = useState("");
+  const [onlineAmount, setOnlineAmount] = useState("");
+  const [discount, setDiscount] = useState("0");
+  const [notes, setNotes] = useState("");
+  const [reason, setReason] = useState("");
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [addMedicineId, setAddMedicineId] = useState("");
+
+  // Fresh load on every open.
+  useEffect(() => {
+    if (!open || !sessionId) return;
+    setIsLoading(true);
+    setLoadError("");
+    setReason("");
+    setAddMedicineId("");
+    Promise.all([
+      getDispenseInvoiceBySession(sessionId),
+      getInventoryMedicines(),
+    ])
+      .then(([detail, meds]) => {
+        setInvoiceNumber(detail.invoice_number);
+        setLines(
+          detail.items.map((item) => ({
+            key: item.id,
+            medicine_id: item.medicine_id,
+            medicine_name: item.medicine_name,
+            batch_number: item.batch_number,
+            dose: item.dose,
+            days: String(item.days),
+            qty: String(item.quantity),
+            unit_price: item.unit_price,
+          })),
+        );
+        const method = detail.payment_method;
+        setPaymentMethod(
+          method === "Online" || method === "Split" ? method : "Cash",
+        );
+        setCashAmount(detail.cash_amount);
+        setOnlineAmount(detail.online_amount);
+        setDiscount(detail.discount_amount);
+        setNotes(detail.notes);
+        setMedicines(meds.items || []);
+      })
+      .catch((error: unknown) => {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load the invoice for editing.",
+        );
+      })
+      .finally(() => setIsLoading(false));
+  }, [open, sessionId]);
+
+  const subtotal = useMemo(
+    () =>
+      lines.reduce(
+        (sum, line) =>
+          sum +
+          (parseInt(line.qty) || 0) * (parseFloat(line.unit_price) || 0),
+        0,
+      ),
+    [lines],
+  );
+  const netPayable = Math.max(0, subtotal - (parseFloat(discount) || 0));
+
+  const updateLine = (key: string, patch: Partial<AmendLineDraft>) => {
+    setLines((prev) =>
+      prev.map((line) => (line.key === key ? { ...line, ...patch } : line)),
+    );
+  };
+
+  // Batch options for a line: the medicine's active batches (FEFO order
+  // from the API) plus the line's current batch if the list doesn't have
+  // it (fully depleted by this very invoice, or expired). The backend
+  // restores this invoice's stock before re-validating, so the quantities
+  // shown here UNDERSTATE what is actually available for same-batch reuse.
+  const batchOptionsFor = (line: AmendLineDraft): string[] => {
+    const med = medicines.find((m) => m.id === line.medicine_id);
+    const numbers = (med?.batches || []).map((b) => b.batch_number);
+    if (line.batch_number && !numbers.includes(line.batch_number)) {
+      return [line.batch_number, ...numbers];
+    }
+    return numbers;
+  };
+
+  const handleAddLine = (medicineId: string) => {
+    const med = medicines.find((m) => m.id === medicineId);
+    if (!med) return;
+    const firstBatch = med.batches[0]?.batch_number || "";
+    setLines((prev) => [
+      ...prev,
+      {
+        key: `new-${Date.now()}-${prev.length}`,
+        medicine_id: med.id,
+        medicine_name: med.name,
+        batch_number: firstBatch,
+        dose: "",
+        days: "1",
+        qty: "1",
+        unit_price: med.selling_price,
+      },
+    ]);
+    setAddMedicineId("");
+  };
+
+  const handleSubmit = async () => {
+    if (!sessionId) return;
+    if (!reason.trim()) {
+      toast.error("Amendment reason is required.");
+      return;
+    }
+    if (lines.length === 0) {
+      toast.error(
+        "At least one line item is required. Use Cancel Invoice to void the whole dispense.",
+      );
+      return;
+    }
+    for (const line of lines) {
+      if (!line.batch_number) {
+        toast.error(`Select a batch for ${line.medicine_name}.`);
+        return;
+      }
+      if (!line.dose.trim()) {
+        toast.error(`Enter a dose for ${line.medicine_name}.`);
+        return;
+      }
+      if ((parseInt(line.days) || 0) < 1 || (parseInt(line.qty) || 0) < 1) {
+        toast.error(
+          `Days and quantity must be at least 1 for ${line.medicine_name}.`,
+        );
+        return;
+      }
+      if ((parseFloat(line.unit_price) || -1) < 0) {
+        toast.error(`Unit price is invalid for ${line.medicine_name}.`);
+        return;
+      }
+    }
+    if (paymentMethod === "Split") {
+      const split =
+        (parseFloat(cashAmount) || 0) + (parseFloat(onlineAmount) || 0);
+      if (Math.abs(split - netPayable) > 0.01) {
+        toast.error("Cash + Online must equal the net payable for Split.");
+        return;
+      }
+    }
+
+    const lineItems: DispenseLineItemPayload[] = lines.map((line) => ({
+      medicine_id: line.medicine_id,
+      batch_number: line.batch_number,
+      dose: line.dose.trim(),
+      days: parseInt(line.days),
+      qty: parseInt(line.qty),
+      unit_price: (parseFloat(line.unit_price) || 0).toFixed(2),
+    }));
+
+    setIsSubmitting(true);
+    try {
+      const detail = await amendDispense(sessionId, {
+        amend_reason: reason.trim(),
+        line_items: lineItems,
+        payment: {
+          payment_method: paymentMethod,
+          cash_amount:
+            paymentMethod === "Split"
+              ? (parseFloat(cashAmount) || 0).toFixed(2)
+              : 0,
+          online_amount:
+            paymentMethod === "Split"
+              ? (parseFloat(onlineAmount) || 0).toFixed(2)
+              : 0,
+          discount: (parseFloat(discount) || 0).toFixed(2),
+          notes,
+        },
+      });
+      toast.success(`Invoice ${detail.invoice_number} amended.`);
+      onAmended(detail);
+    } catch (error) {
+      toastApiError(error, "Failed to amend the invoice");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o && !isSubmitting) onClose();
+      }}
+    >
+      <DialogContent className="w-[96vw] max-w-3xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-5 w-5 text-amber-600" />
+            Amend Invoice{invoiceNumber ? ` — ${invoiceNumber}` : ""}
+          </DialogTitle>
+          <DialogDescription>
+            Corrects a wrongly recorded dispense for{" "}
+            <span className="font-semibold">{historyItem?.patient}</span>.
+            Stock is adjusted automatically and the previous state is kept in
+            the amendment audit trail. A reason is mandatory.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12 text-slate-400">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Loading invoice…
+          </div>
+        ) : loadError ? (
+          <p className="py-8 text-center text-sm text-rose-600">{loadError}</p>
+        ) : (
+          <div className="space-y-5">
+            {/* ── Line items ── */}
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Line items
+              </Label>
+              <div className="space-y-2">
+                {lines.map((line) => (
+                  <div
+                    key={line.key}
+                    className="grid grid-cols-12 gap-2 items-end rounded-xl border border-slate-200 bg-slate-50/50 p-3"
+                  >
+                    <div className="col-span-12 sm:col-span-4">
+                      <p className="text-xs font-bold text-slate-700 truncate">
+                        {line.medicine_name}
+                      </p>
+                      <Select
+                        value={line.batch_number}
+                        onValueChange={(v) =>
+                          updateLine(line.key, { batch_number: v })
+                        }
+                      >
+                        <SelectTrigger className="h-9 mt-1 text-xs bg-white">
+                          <SelectValue placeholder="Batch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {batchOptionsFor(line).map((batchNumber) => (
+                            <SelectItem key={batchNumber} value={batchNumber}>
+                              {batchNumber}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3 sm:col-span-2">
+                      <Label className="text-[10px] text-slate-400">Dose</Label>
+                      <Input
+                        value={line.dose}
+                        onChange={(e) =>
+                          updateLine(line.key, { dose: e.target.value })
+                        }
+                        placeholder="5mg"
+                        className="h-9 text-xs bg-white"
+                      />
+                    </div>
+                    <div className="col-span-3 sm:col-span-1">
+                      <Label className="text-[10px] text-slate-400">Days</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={line.days}
+                        onChange={(e) =>
+                          updateLine(line.key, { days: e.target.value })
+                        }
+                        className="h-9 text-xs bg-white text-center"
+                      />
+                    </div>
+                    <div className="col-span-3 sm:col-span-2">
+                      <Label className="text-[10px] text-slate-400">Qty</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={line.qty}
+                        onChange={(e) =>
+                          updateLine(line.key, { qty: e.target.value })
+                        }
+                        className="h-9 text-xs bg-white text-center"
+                      />
+                    </div>
+                    <div className="col-span-2 sm:col-span-2">
+                      <Label className="text-[10px] text-slate-400">
+                        Price (₹)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.unit_price}
+                        onChange={(e) =>
+                          updateLine(line.key, { unit_price: e.target.value })
+                        }
+                        className="h-9 text-xs bg-white text-center"
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          setLines((prev) =>
+                            prev.filter((l) => l.key !== line.key),
+                          )
+                        }
+                        className="h-9 w-9 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                        title="Remove line"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add medicine */}
+              <div className="flex items-center gap-2">
+                <Select value={addMedicineId} onValueChange={handleAddLine}>
+                  <SelectTrigger className="h-9 flex-1 text-xs bg-white">
+                    <SelectValue placeholder="Add a medicine…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {medicines.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} ({m.category})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Plus className="h-4 w-4 text-slate-400" />
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Batch stock checks run on save against the corrected state —
+                quantities currently on this invoice are released first, so
+                keeping or reducing an existing line never fails for stock.
+              </p>
+            </div>
+
+            {/* ── Payment ── */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-slate-500">
+                  Payment method
+                </Label>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
+                >
+                  <SelectTrigger className="h-10 mt-1 bg-white text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Online">Online</SelectItem>
+                    <SelectItem value="Split">Split (Cash + Online)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-slate-500">
+                  Discount (₹)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  className="h-10 mt-1 bg-white text-xs"
+                />
+              </div>
+              {paymentMethod === "Split" && (
+                <>
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500">
+                      Cash amount (₹)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={cashAmount}
+                      onChange={(e) => setCashAmount(e.target.value)}
+                      className="h-10 mt-1 bg-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500">
+                      Online amount (₹)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={onlineAmount}
+                      onChange={(e) => setOnlineAmount(e.target.value)}
+                      className="h-10 mt-1 bg-white text-xs"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ── Totals preview ── */}
+            <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 px-4 py-3">
+              <span className="text-xs text-slate-500 font-medium">
+                Subtotal ₹{subtotal.toFixed(2)}
+                {(parseFloat(discount) || 0) > 0
+                  ? ` − ₹${(parseFloat(discount) || 0).toFixed(2)} discount`
+                  : ""}
+              </span>
+              <span className="text-lg font-black text-primary font-mono">
+                ₹{netPayable.toFixed(2)}
+              </span>
+            </div>
+
+            {/* ── Reason ── */}
+            <div>
+              <Label className="text-xs font-bold text-slate-500">
+                Amendment reason <span className="text-rose-500">*</span>
+              </Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Typed 50 instead of 30 tablets"
+                rows={2}
+                maxLength={255}
+                className="mt-1 bg-white text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={isSubmitting || isLoading || Boolean(loadError)}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Pencil className="h-4 w-4 mr-2" />
+                Save amendment
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

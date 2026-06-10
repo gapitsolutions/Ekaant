@@ -24,6 +24,7 @@ from visits.models import VisitSession, VisitStage, VisitStatus
 
 from .models import (
     DispenseInvoice,
+    DispenseInvoiceAmendment,
     DispenseInvoiceItem,
     DispenseStatus,
     Medicine,
@@ -678,6 +679,296 @@ def cancel_dispense_for_session(*, session_id, reason: str, user) -> DispenseInv
         invoice.invoice_number,
         session.visit_uid,
         reason,
+        getattr(user, "full_name", "?"),
+    )
+    return invoice
+
+
+# ────────────────────────────────────────────────────────────
+# Amend (post-dispense correction, pharmacist-only)
+# ────────────────────────────────────────────────────────────
+
+
+def _amendment_snapshot(invoice: DispenseInvoice, old_items) -> dict:
+    """JSON-safe snapshot of the invoice exactly as it was pre-amendment."""
+    return {
+        "items": [
+            {
+                "medicine_id": str(item.medicine_id),
+                "medicine_name": item.medicine_name,
+                "salt": item.salt,
+                "category": item.category,
+                "batch_number": item.batch_number,
+                "expiry_date": str(item.expiry_date),
+                "dose": item.dose,
+                "days": item.days,
+                "quantity": item.quantity,
+                "unit_price": str(item.unit_price),
+                "total": str(item.total),
+            }
+            for item in old_items
+        ],
+        "subtotal": str(invoice.subtotal),
+        "discount_percentage": str(invoice.discount_percentage),
+        "discount_amount": str(invoice.discount_amount),
+        "net_payable": str(invoice.net_payable),
+        "payment_method": invoice.payment_method,
+        "cash_amount": str(invoice.cash_amount),
+        "online_amount": str(invoice.online_amount),
+        "notes": invoice.notes,
+        "next_followup_date": (
+            str(invoice.next_followup_date) if invoice.next_followup_date else None
+        ),
+    }
+
+
+@transaction.atomic
+def amend_dispense_for_session(*, session_id, data: dict, user) -> DispenseInvoice:
+    """Correct a successful dispense invoice in place (revert-then-reapply).
+
+    The invoice and its line items are updated; the StockMovement ledger is
+    NEVER rewritten — the amendment appends an ``adjustment`` row restoring
+    each old item, then fresh ``dispense`` rows for the new items, so the
+    before/after quantity chain stays unbroken and the correction is
+    explicitly narrated in the ledger. The pre-amendment state is snapshot
+    into the append-only ``DispenseInvoiceAmendment`` table.
+
+    Lock order mirrors ``cancel_dispense_for_session`` (session → invoice →
+    batches) so a concurrent amend and cancel cannot deadlock.
+    """
+    reason = data["amend_reason"]
+    line_items = data["line_items"]
+    payment = data["payment"]
+
+    try:
+        session = (
+            VisitSession.objects.select_related("patient")
+            .select_for_update()
+            .get(id=session_id)
+        )
+    except VisitSession.DoesNotExist:
+        raise serializers.ValidationError("Visit session not found.")
+
+    invoice = (
+        DispenseInvoice.objects.select_for_update()
+        .filter(visit_session=session)
+        .first()
+    )
+    if invoice is None:
+        raise serializers.ValidationError(
+            "No dispense invoice exists for this visit."
+        )
+    if invoice.status == DispenseStatus.CANCELLED:
+        raise ConflictError(
+            "Cannot amend a cancelled invoice. Re-dispense is not supported."
+        )
+
+    old_items = list(invoice.items.select_related("medicine"))
+
+    # Per-batch totals of the ORIGINAL invoice. Basis for the expiry
+    # exemption below: re-applying a batch the patient already received,
+    # at up to its original quantity, must not be blocked just because the
+    # batch expired between dispense and correction — no *new* stock leaves
+    # the shelf in that case.
+    original_batch_qty: dict = defaultdict(int)
+    for item in old_items:
+        original_batch_qty[item.batch_id] += item.quantity
+
+    # Resolve new line items (existence checks only — stock/expiry checks
+    # run after locking).
+    medicine_cache: dict[str, Medicine] = {}
+    batch_cache: dict[tuple[str, str], MedicineBatch] = {}
+    resolved: list[dict] = []
+    for raw in line_items:
+        medicine_id = str(raw["medicine_id"])
+        if medicine_id not in medicine_cache:
+            try:
+                medicine_cache[medicine_id] = Medicine.objects.get(
+                    id=medicine_id, is_active=True
+                )
+            except Medicine.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Medicine {medicine_id} not found or inactive."
+                )
+        medicine = medicine_cache[medicine_id]
+
+        key = (medicine_id, raw["batch_number"])
+        if key not in batch_cache:
+            # No ``is_active=True`` filter here (unlike create): a batch the
+            # original invoice fully depleted is inactive right now, but the
+            # revert below restores its stock and reactivates it.
+            try:
+                batch_cache[key] = MedicineBatch.objects.get(
+                    medicine=medicine, batch_number=raw["batch_number"]
+                )
+            except MedicineBatch.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Batch {raw['batch_number']} not found for medicine {medicine.name}."
+                )
+        resolved.append(
+            {"medicine": medicine, "batch": batch_cache[key], "raw": raw}
+        )
+
+    # Lock the union of old + new batches in deterministic order.
+    all_batch_ids = sorted(
+        {item.batch_id for item in old_items}
+        | {entry["batch"].id for entry in resolved},
+    )
+    locked_batches = {
+        b.id: b
+        for b in MedicineBatch.objects.select_for_update()
+        .filter(id__in=all_batch_ids)
+        .order_by("id")
+    }
+
+    # Snapshot BEFORE any mutation.
+    snapshot = _amendment_snapshot(invoice, old_items)
+
+    # ── Revert: restore stock for every original item ──
+    for item in old_items:
+        batch = locked_batches[item.batch_id]
+        qty_before = batch.quantity
+        batch.quantity = qty_before + item.quantity
+        if not batch.is_active and batch.quantity > 0:
+            batch.is_active = True
+        batch.save(update_fields=["quantity", "is_active", "updated_at"])
+
+        _log_stock_movement(
+            medicine=item.medicine,
+            batch=batch,
+            movement_type=MovementType.ADJUSTMENT,
+            quantity_change=item.quantity,
+            quantity_before=qty_before,
+            quantity_after=batch.quantity,
+            reference_type="dispenseinvoice",
+            reference_id=invoice.id,
+            performed_by=user,
+            notes=f"amend revert: {reason[:200]}",
+        )
+
+    invoice.items.all().delete()
+
+    # ── Validate new items against post-revert stock ──
+    today = timezone.localdate()
+    new_batch_totals: dict = defaultdict(int)
+    for entry in resolved:
+        new_batch_totals[entry["batch"].id] += int(entry["raw"]["qty"])
+
+    for batch_id, total_qty in new_batch_totals.items():
+        batch = locked_batches[batch_id]
+        if batch.expiry_date < today and total_qty > original_batch_qty.get(
+            batch_id, 0
+        ):
+            raise serializers.ValidationError(
+                f"Batch {batch.batch_number} is expired; quantity can be "
+                f"reduced but not increased beyond the originally dispensed "
+                f"{original_batch_qty.get(batch_id, 0)}."
+            )
+        if batch.quantity < total_qty:
+            raise ConflictError(
+                f"Insufficient stock for batch {batch.batch_number}. "
+                f"Available: {batch.quantity}, Requested: {total_qty}"
+            )
+
+    totals = _build_payment_totals(line_items, payment)
+
+    # ── Reapply: create new items, deduct stock, log dispense rows ──
+    for entry in resolved:
+        medicine: Medicine = entry["medicine"]
+        batch: MedicineBatch = locked_batches[entry["batch"].id]
+        raw = entry["raw"]
+        line_qty = int(raw["qty"])
+        line_total = _q2(Decimal(line_qty) * Decimal(raw["unit_price"]))
+
+        item = DispenseInvoiceItem.objects.create(
+            dispense_invoice=invoice,
+            medicine=medicine,
+            batch=batch,
+            medicine_name=medicine.name,
+            salt=medicine.salt,
+            category=medicine.category,
+            batch_number=batch.batch_number,
+            expiry_date=batch.expiry_date,
+            dose=raw["dose"],
+            days=raw["days"],
+            quantity=line_qty,
+            unit_price=raw["unit_price"],
+            total=line_total,
+        )
+
+        qty_before = batch.quantity
+        batch.quantity = qty_before - line_qty
+        if batch.quantity == 0:
+            batch.is_active = False
+        batch.save(update_fields=["quantity", "is_active", "updated_at"])
+
+        _log_stock_movement(
+            medicine=medicine,
+            batch=batch,
+            movement_type=MovementType.DISPENSE,
+            quantity_change=-line_qty,
+            quantity_before=qty_before,
+            quantity_after=batch.quantity,
+            reference_type="dispenseinvoiceitem",
+            reference_id=item.id,
+            performed_by=user,
+            notes=(
+                f"{session.patient_id} | amend"
+                if medicine.category == "BUP"
+                else "amend"
+            ),
+        )
+
+    # ── Update invoice money fields + metadata ──
+    invoice.subtotal = totals["subtotal"]
+    invoice.discount_percentage = totals["discount_percentage"]
+    invoice.discount_amount = totals["discount_amount"]
+    invoice.net_payable = totals["net_payable"]
+    invoice.payment_method = payment["payment_method"]
+    invoice.cash_amount = totals["cash_amount"]
+    invoice.online_amount = totals["online_amount"]
+    invoice.notes = payment.get("notes", "") or ""
+    if "next_followup_date" in data:
+        invoice.next_followup_date = data.get("next_followup_date")
+    invoice.save(
+        update_fields=[
+            "subtotal",
+            "discount_percentage",
+            "discount_amount",
+            "net_payable",
+            "payment_method",
+            "cash_amount",
+            "online_amount",
+            "notes",
+            "next_followup_date",
+            "updated_at",
+        ]
+    )
+
+    # Keep the visit's denormalised total in sync (drives reception
+    # check-in history and reports).
+    session.medicines_total = totals["net_payable"]
+    session.save(update_fields=["medicines_total", "updated_at"])
+
+    next_followup = data.get("next_followup_date")
+    if next_followup:
+        Patient.objects.filter(id=session.patient_id).update(
+            next_followup_date=next_followup
+        )
+
+    DispenseInvoiceAmendment.objects.create(
+        invoice=invoice,
+        amended_by=user,
+        reason=reason,
+        previous_state=snapshot,
+    )
+
+    logger.info(
+        "DISPENSE_AMEND: %s | session=%s | reason=%s | new_amount=%s | by=%s",
+        invoice.invoice_number,
+        session.visit_uid,
+        reason,
+        invoice.net_payable,
         getattr(user, "full_name", "?"),
     )
     return invoice

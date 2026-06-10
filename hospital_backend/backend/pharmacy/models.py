@@ -451,6 +451,48 @@ class DispenseInvoiceItem(models.Model):
         ]
 
 
+class DispenseInvoiceAmendment(models.Model):
+    """Append-only audit record of a post-dispense invoice correction.
+
+    Created by ``services.amend_dispense_for_session`` every time a
+    pharmacist edits a successful dispense invoice (wrong quantity, wrong
+    medicine, wrong payment split, ...). ``previous_state`` snapshots the
+    invoice exactly as it was before the amendment — line items, totals,
+    payment method, notes, follow-up date — so no history is lost even
+    though the invoice and its items are updated in place.
+
+    Stock corrections are NOT stored here: they live in the
+    :class:`StockMovement` ledger as corrective rows (an ``adjustment``
+    restoring the old items followed by fresh ``dispense`` rows for the
+    new ones), keeping the ledger append-only and the before/after
+    quantity chain unbroken.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice = models.ForeignKey(
+        DispenseInvoice, on_delete=models.CASCADE, related_name="amendments"
+    )
+    amended_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="dispense_amendments",
+    )
+    amended_at = models.DateTimeField(auto_now_add=True)
+    reason = models.CharField(max_length=255)
+    previous_state = models.JSONField()
+
+    class Meta:
+        ordering = ["-amended_at"]
+        verbose_name = "Dispense Invoice Amendment"
+        verbose_name_plural = "Dispense Invoice Amendments"
+        indexes = [
+            Index(fields=["invoice", "-amended_at"]),
+        ]
+
+    def __str__(self):
+        return f"Amendment of {self.invoice.invoice_number} @ {self.amended_at:%Y-%m-%d %H:%M}"
+
+
 class StockAuditRemoval(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT)

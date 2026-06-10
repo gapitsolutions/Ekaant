@@ -64,6 +64,18 @@ export async function generateInvoicePdf(
   doc.setFont("helvetica", "bold");
   doc.setTextColor(invoice.status === "success" ? "#16a34a" : "#dc2626");
   doc.text(statusText, pageWidth - 14, y, { align: "right" });
+
+  // Amendment stamp — printed record must disclose post-dispense edits.
+  const amendmentCount = invoice.amendments?.length ?? 0;
+  if (amendmentCount > 0) {
+    doc.setTextColor("#d97706");
+    doc.text(
+      `AMENDED${amendmentCount > 1 ? ` x${amendmentCount}` : ""}`,
+      pageWidth - 14,
+      y + 4,
+      { align: "right" },
+    );
+  }
   y += 8;
 
   // ── Patient / Invoice info grid ──
@@ -208,6 +220,23 @@ export async function generateInvoicePdf(
     doc.setFont("helvetica", "italic");
     doc.setTextColor("#94a3b8");
     doc.text(`Dispensed by: ${invoice.pharmacist}`, 14, y);
+    y += 5;
+  }
+
+  // ── Amendment disclosure ── (newest first, matches API ordering)
+  if (amendmentCount > 0) {
+    const latest = invoice.amendments[0];
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor("#d97706");
+    doc.text(
+      `Last amended ${new Date(latest.amended_at).toLocaleString("en-IN")}` +
+        `${latest.amended_by_name ? ` by ${latest.amended_by_name}` : ""}` +
+        ` — ${latest.reason}`,
+      14,
+      y,
+      { maxWidth: pageWidth - 28 },
+    );
     y += 5;
   }
 

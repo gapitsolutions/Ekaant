@@ -1248,9 +1248,11 @@ Permission: `IsReceptionAdminOrPharmacist`
   "pharmacist": "Dr. Pharmacist",
   "status": "success",
   "notes": "",
+  "next_followup_date": null,
   "items": [
     {
       "id": "<uuid>",
+      "medicine_id": "<uuid>",
       "medicine_name": "Diazepam 5mg",
       "salt": "Diazepam",
       "category": "Rx",
@@ -1261,12 +1263,106 @@ Permission: `IsReceptionAdminOrPharmacist`
       "unit_price": "8.00",
       "total": "56.00"
     }
+  ],
+  "amendments": [
+    {
+      "amended_at": "2026-06-11T11:20:00+05:30",
+      "amended_by_name": "Dr. Pharmacist",
+      "reason": "Wrong quantity entered for Diazepam"
+    }
   ]
 }
 ```
 
+`amendments` is ordered newest-first (empty list when the invoice was never
+amended). `medicine_id` is included so the amend dialog can rebuild the
+write payload from the read payload.
+
 **Errors:**
 - 404: no dispense invoice found for the given session
+
+### 7.14a `PATCH /api/v1/pharmacy/dispense/<session_id>/`
+
+View: `DispenseInvoiceDetailView.patch`
+Serializer: `DispenseAmendSerializer`
+Service: `services.amend_dispense_for_session`
+Permission: `IsPharmacistOrAdmin`
+Transaction: atomic; lock order session → invoice → union of old+new batches (mirrors cancel, so concurrent amend/cancel cannot deadlock)
+
+**Use case:** Pharmacist corrects a wrongly recorded dispense (wrong
+quantity / medicine / batch / payment split) after the fact. The invoice
+and its line items are updated **in place**; the StockMovement ledger is
+never rewritten — the amendment appends corrective rows.
+
+Request body (same shape as §7.13 create minus `session_id`, plus a
+mandatory reason):
+
+```json
+{
+  "amend_reason": "Typed 50 instead of 30 tablets",
+  "line_items": [
+    {
+      "medicine_id": "uuid",
+      "batch_number": "B001",
+      "dose": "5mg",
+      "days": 7,
+      "qty": 30,
+      "unit_price": "8.00"
+    }
+  ],
+  "payment": {
+    "payment_method": "Cash",
+    "cash_amount": 0,
+    "online_amount": 0,
+    "discount": 0,
+    "notes": ""
+  },
+  "next_followup_date": null
+}
+```
+
+Behaviour (revert-then-reapply, all inside one transaction):
+
+1. Snapshot the pre-amendment invoice (items, totals, payment, notes,
+   follow-up date) into the append-only `DispenseInvoiceAmendment` table
+   (`amended_by`, `amended_at`, `reason`, `previous_state` JSON).
+2. Restore stock for every original item; one `adjustment` StockMovement
+   per item (`notes="amend revert: <reason>"`), reactivating depleted
+   batches.
+3. Delete the old `DispenseInvoiceItem` rows (content preserved in the
+   snapshot).
+4. Validate + apply the new items exactly like create: active medicine,
+   batch exists, per-batch stock sufficiency. **Expiry exemption:** a
+   batch present on the original invoice may be re-applied up to its
+   originally dispensed quantity even if now expired (no new stock leaves
+   the shelf); increases or newly added batches require a non-expired
+   batch.
+5. Create new items, deduct stock, one `dispense` StockMovement per item
+   (`notes="amend"`, BUP rows keep the patient-id convention with an
+   `| amend` suffix).
+6. Recompute totals server-side (`_build_payment_totals` — same money
+   policy as create), update the invoice money fields / notes /
+   follow-up date, sync `VisitSession.medicines_total`, and update the
+   patient's `next_followup_date` when provided.
+
+Immutable through this endpoint: `invoice_number`, `visit_session`,
+`patient`, `dispensed_by`, `dispense_date` / `dispense_time` (revenue
+stays on the original date), `status` (only cancel changes it).
+
+Ripple effects: revenue report, consumption report, dashboard
+`todays_revenue`, and reception check-in history `medicines_total`
+recompute automatically from the amended rows — including retroactively
+for past dates.
+
+Response (200): full §7.14 detail payload (with the new `amendments`
+entry included).
+
+Errors:
+
+- 400: session/invoice not found, validation failures (expired-batch
+  increase, unknown medicine/batch, empty `amend_reason`, < 1 line item)
+- 409: invoice is cancelled (`"Cannot amend a cancelled invoice."`),
+  insufficient stock for a requested increase
 
 ### 7.15 `POST /api/v1/pharmacy/dispense/<session_id>/cancel/`
 
@@ -1341,9 +1437,13 @@ Response item shape:
   "time": "10:30 AM",
   "pharmacist": "Dr. Pharmacist",
   "status": "success",
-  "payment_method": "Cash"
+  "payment_method": "Cash",
+  "is_amended": false
 }
 ```
+
+`is_amended` is true when the invoice has at least one §7.14a amendment
+(annotated via `Count("amendments")` — no per-row query).
 
 Plus `pagination: {page, pageSize, total}`.
 
@@ -1830,6 +1930,7 @@ Stock movement type reference:
 - `GET    /api/v1/pharmacy/queue/`
 - `POST   /api/v1/pharmacy/dispense/`
 - `GET    /api/v1/pharmacy/dispense/<session_id>/`
+- `PATCH  /api/v1/pharmacy/dispense/<session_id>/`
 - `POST   /api/v1/pharmacy/dispense/<session_id>/cancel/`
 - `GET    /api/v1/pharmacy/dispense-history/`
 - `GET    /api/v1/pharmacy/reports/revenue/`

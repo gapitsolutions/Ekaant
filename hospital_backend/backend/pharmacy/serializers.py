@@ -528,6 +528,34 @@ class DispenseCreateSerializer(serializers.Serializer):
         return value
 
 
+class DispenseAmendSerializer(serializers.Serializer):
+    """Body for PATCH /pharmacy/dispense/<session_id>/ (post-dispense edit).
+
+    Same shape as create minus ``session_id`` (taken from the URL), plus a
+    mandatory ``amend_reason`` — every amendment is recorded in the
+    append-only ``DispenseInvoiceAmendment`` audit table, so the reason is
+    as non-negotiable as it is for cancellation.
+    """
+
+    amend_reason = serializers.CharField(max_length=255)
+    line_items = DispenseLineItemWriteSerializer(many=True, min_length=1)
+    payment = PaymentWriteSerializer()
+    next_followup_date = serializers.DateField(required=False, allow_null=True)
+
+    def validate_amend_reason(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Amendment reason is required.")
+        return value
+
+    def validate_next_followup_date(self, value):
+        if value is not None and value <= timezone.localdate():
+            raise serializers.ValidationError(
+                "Follow-up date must be in the future."
+            )
+        return value
+
+
 class DispenseCancelSerializer(serializers.Serializer):
     """Body for cancel endpoint. Reason is required for audit clarity."""
 
@@ -578,4 +606,7 @@ class DispenseInvoiceListItemSerializer(serializers.Serializer):
             else "",
             "status": invoice.status,
             "payment_method": invoice.payment_method,
+            # Set via ``annotate(amendment_count=Count("amendments"))`` in
+            # the history view; defaults to 0 when the annotation is absent.
+            "is_amended": getattr(invoice, "amendment_count", 0) > 0,
         }
