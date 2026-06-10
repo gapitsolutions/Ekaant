@@ -969,6 +969,11 @@ Side effects per item:
 2. Compute `line_total = quantity * purchase_price * (1 + gst/100)`.
 3. Create `PurchaseInvoiceItem`.
 4. Create `StockMovement` (`movement_type=purchase`).
+5. Add the invoice's supplier to the medicine's `suppliers` M2M
+   (idempotent — no-op if the link already exists). This is how the
+   explicit Medicine↔Supplier tracking relation grows from real
+   purchase activity without an extra UI step. See §7.3 for the
+   `Medicine.suppliers` field shape, and Edit Medicine for manual prune.
 
 Finally updates invoice `total_amount` and `items_count`.
 

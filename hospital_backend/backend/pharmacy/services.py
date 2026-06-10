@@ -181,6 +181,13 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
             line_total=line_total,
         )
 
+        # Auto-track the supplier on the medicine's M2M for inventory
+        # display. ``.add()`` is idempotent — a no-op if the link already
+        # exists, so repeat invoices from the same supplier don't bloat the
+        # through table. Runs inside the outer @transaction.atomic, so a
+        # downstream failure rolls this back with the rest of the invoice.
+        medicine.suppliers.add(supplier)
+
         _log_stock_movement(
             medicine=medicine,
             batch=batch,
