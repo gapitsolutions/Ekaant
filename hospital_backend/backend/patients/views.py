@@ -280,6 +280,10 @@ class ReceptionistPatientListView(APIView):
 
     def get(self, request):
         query = request.query_params.get("q", "").strip()
+        # Optional repeated-key param (``?search_fields=file_number&search_fields=full_name``).
+        # When provided alongside ``q`` it narrows the OR-filter to just those
+        # fields. Absent or empty → legacy "all fields" behaviour.
+        search_fields = _multi_values(request, "search_fields")
         try:
             page = int(request.query_params.get("page", 1))
         except (TypeError, ValueError):
@@ -291,7 +295,9 @@ class ReceptionistPatientListView(APIView):
 
         queryset = Patient.objects.all()
         if query:
-            queryset = patient_search_queryset(query)
+            queryset = patient_search_queryset(
+                query, fields=search_fields or None
+            )
 
         queryset = _apply_reception_list_filters(request, queryset)
         queryset = _order_by_file_number_natural(queryset)

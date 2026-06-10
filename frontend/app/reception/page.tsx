@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/lib/auth-context";
@@ -241,12 +238,13 @@ export default function ReceptionDashboard() {
           icon: Clock,
           borderColor: "border-t-[#1976d2]",
           iconClass: "bg-[#1976d2] text-white",
-          trend: "+5% from last week",
+          trend: null,
           statType: "today_visits",
         },
         {
           title: "Patient in Pharmacy",
-          value: queueItems.filter((q) => q.current_stage === "pharmacy").length,
+          value: queueItems.filter((q) => q.current_stage === "pharmacy")
+            .length,
           icon: Link,
           borderColor: "border-t-[#f57c00]",
           iconClass: "bg-[#f57c00] text-white",
@@ -306,7 +304,9 @@ export default function ReceptionDashboard() {
             onClick={() => handleStatClick(stat.statType)}
             className="text-left"
           >
-            <Card className={`border-0 border-t-[6px] ${stat.borderColor} shadow-sm hover:shadow-md transition-shadow cursor-pointer`}>
+            <Card
+              className={`border-0 border-t-[6px] ${stat.borderColor} shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-4xl font-bold text-foreground">
@@ -335,7 +335,9 @@ export default function ReceptionDashboard() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-bold text-foreground mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-bold text-foreground mb-4">
+          Quick Actions
+        </h2>
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           {quickActions.map((action) => (
             <Card
@@ -355,7 +357,9 @@ export default function ReceptionDashboard() {
                 <p className="text-xs text-muted-foreground mb-4 flex-1">
                   {action.description}
                 </p>
-                <div className={`text-xs font-semibold flex items-center gap-1 ${action.iconColor}`}>
+                <div
+                  className={`text-xs font-semibold flex items-center gap-1 ${action.iconColor}`}
+                >
                   View <ArrowRight className="h-3 w-3" />
                 </div>
               </CardContent>
@@ -368,10 +372,19 @@ export default function ReceptionDashboard() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Recent Check Ins</h2>
-            <p className="text-sm text-muted-foreground">Patients checked in today</p>
+            <h2 className="text-lg font-bold text-foreground">
+              Recent Check Ins
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Patients checked in today
+            </p>
           </div>
-          <Button variant="outline" size="sm" className="bg-white font-medium shadow-sm" onClick={() => navigate("/reception/queue")}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-white font-medium shadow-sm"
+            onClick={() => navigate("/reception/queue")}
+          >
             View All
           </Button>
         </div>
@@ -397,7 +410,9 @@ export default function ReceptionDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-semibold text-foreground text-sm">{q.patient_name}</p>
+                            <p className="font-semibold text-foreground text-sm">
+                              {q.patient_name}
+                            </p>
                             {q.file_number && (
                               <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-primary bg-[#e0f2f1] px-1.5 py-0.5 rounded">
                                 <FileText className="h-3 w-3" />
@@ -562,7 +577,6 @@ export default function ReceptionDashboard() {
           </div>
         </SheetContent>
       </Sheet>
-
     </div>
   );
 }

@@ -89,7 +89,7 @@ type RegisterPatientTier1Payload = {
   sex: "male" | "female" | "other";
   fingerprint_template?: string;
   aadhaar_number?: string;
-  relative_phone: string;
+  relative_phone?: string;
   address_line1: string;
   city?: string;
   district?: string;
@@ -687,8 +687,16 @@ export async function deleteReceptionCheckinHistoryVisit(
 // semantics — see API_BLUEPRINT §5.5.
 type PatientListFilter = string | string[] | undefined;
 
+export type PatientSearchField =
+  | "file_number"
+  | "full_name"
+  | "phone_number"
+  | "aadhaar_number"
+  | "hdams_id";
+
 type GetPatientsListOpts = {
   q?: string;
+  search_fields?: PatientSearchField[];
   page?: number;
   pageSize?: number;
   district?: PatientListFilter;
@@ -721,6 +729,7 @@ export async function getPatientsList(
   const opts = typeof optsOrToken === "string" ? maybeOpts : optsOrToken;
   const params = new URLSearchParams();
   if (opts.q) params.set("q", opts.q);
+  _appendMulti(params, "search_fields", opts.search_fields);
   params.set("page", String(opts.page ?? 1));
   params.set("pageSize", String(opts.pageSize ?? 100));
   _appendMulti(params, "district", opts.district);

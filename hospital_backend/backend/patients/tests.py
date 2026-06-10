@@ -575,6 +575,156 @@ class ReceptionPatientListFilterTests(APITestCase):
         self.assertEqual(self._file_numbers(response), ["F-A1"])
 
 
+class ReceptionPatientListSearchFieldsTests(APITestCase):
+    """Field-scoped search semantics for ``GET /api/v1/receptionist/patients/``.
+
+    Contract: ``?search_fields=`` is repeated-key, allow-list validated. When
+    absent, ``?q=`` searches all legacy fields (file_number, full_name,
+    phone_number, aadhaar_number) so the check-in lookup and summary list
+    keep their existing behaviour. When present, ``?q=`` is OR-combined only
+    across the named fields and may additionally include ``hdams_id``.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            email="search-fields.reception@example.com",
+            password="test-password",
+            role="reception",
+            full_name="Search Fields Reception",
+        )
+        # The literal "777" appears in a different field on each row so a
+        # query for "777" with a single-field scope unambiguously points to
+        # exactly one patient.
+        cls.alpha = Patient.objects.create(
+            file_number="F-777-A",
+            patient_category="psychiatric",
+            full_name="Alpha Person",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000001",
+            aadhaar_number="111111111111",
+            hdams_id="HDAMS-001",
+            address_line1="addr",
+        )
+        cls.bravo = Patient.objects.create(
+            file_number="F-B1",
+            patient_category="deaddiction",
+            full_name="Bravo 777 Person",
+            date_of_birth=timezone.localdate(),
+            sex="female",
+            phone_number="9000000002",
+            aadhaar_number="222222222222",
+            hdams_id="HDAMS-002",
+            address_line1="addr",
+        )
+        cls.charlie = Patient.objects.create(
+            file_number="F-C1",
+            patient_category="psychiatric",
+            full_name="Charlie Person",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000777",
+            aadhaar_number="333333333333",
+            hdams_id="HDAMS-003",
+            address_line1="addr",
+        )
+        cls.delta = Patient.objects.create(
+            file_number="F-D1",
+            patient_category="psychiatric",
+            full_name="Delta Person",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000004",
+            aadhaar_number="444444444777",
+            hdams_id="HDAMS-004",
+            address_line1="addr",
+        )
+        cls.echo = Patient.objects.create(
+            file_number="F-E1",
+            patient_category="psychiatric",
+            full_name="Echo Person",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9000000005",
+            aadhaar_number="555555555555",
+            hdams_id="HDAMS-777",
+            address_line1="addr",
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user)
+
+    def _file_numbers(self, response):
+        return sorted(item["file_number"] for item in response.data["data"]["items"])
+
+    def test_legacy_q_without_search_fields_searches_default_fields(self):
+        # No search_fields → file_number, full_name, phone, aadhaar match
+        # but NOT hdams_id. Echo (HDAMS-777) must be excluded.
+        response = self.client.get("/api/v1/receptionist/patients/?q=777")
+        self.assertEqual(
+            self._file_numbers(response), ["F-777-A", "F-B1", "F-C1", "F-D1"]
+        )
+
+    def test_search_fields_file_number_only(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?q=777&search_fields=file_number"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-777-A"])
+
+    def test_search_fields_full_name_only(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?q=777&search_fields=full_name"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-B1"])
+
+    def test_search_fields_phone_number_only(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?q=777&search_fields=phone_number"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-C1"])
+
+    def test_search_fields_aadhaar_number_only(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?q=777&search_fields=aadhaar_number"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-D1"])
+
+    def test_search_fields_hdams_id_only(self):
+        # hdams_id is opt-in via search_fields — not covered by legacy default.
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?q=777&search_fields=hdams_id"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-E1"])
+
+    def test_search_fields_multiple_or_combines_within_scope(self):
+        response = self.client.get(
+            "/api/v1/receptionist/patients/"
+            "?q=777&search_fields=file_number&search_fields=hdams_id"
+        )
+        self.assertEqual(self._file_numbers(response), ["F-777-A", "F-E1"])
+
+    def test_unknown_search_field_falls_back_to_default(self):
+        # An unknown field name leaves the validated set empty → default
+        # behaviour kicks in so the user never gets a silently empty result.
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?q=777&search_fields=bogus_field"
+        )
+        self.assertEqual(
+            self._file_numbers(response), ["F-777-A", "F-B1", "F-C1", "F-D1"]
+        )
+
+    def test_search_fields_ignored_when_q_is_empty(self):
+        # Without a query, search_fields is a no-op — every patient is listed.
+        response = self.client.get(
+            "/api/v1/receptionist/patients/?search_fields=file_number"
+        )
+        self.assertEqual(
+            self._file_numbers(response),
+            ["F-777-A", "F-B1", "F-C1", "F-D1", "F-E1"],
+        )
+
+
 class PatientFilterOptionsEndpointTests(APITestCase):
     """Contract tests for the ``/filter-options/`` endpoint.
 

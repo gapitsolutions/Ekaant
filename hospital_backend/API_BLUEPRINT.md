@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-01 (IST)
+> **Last Updated:** 2026-06-10 (IST)
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -325,7 +325,19 @@ View: `ReceptionistPatientListView.get`
 
 Query params:
 
-- `q` — free-text search (file_number, full_name, phone, aadhaar).
+- `q` — free-text search. Without `search_fields` it OR-matches across the
+  legacy default set (`file_number`, `full_name`, `phone_number`,
+  `aadhaar_number`).
+- `search_fields` — optional **multi-value**, repeated-key. Allow-list:
+  `file_number`, `full_name`, `phone_number`, `aadhaar_number`, `hdams_id`.
+  When present, `q` is OR-matched only across the named fields (so the
+  caller can scope a search to e.g. file number only, or file number +
+  HDAMS). Unknown names are silently dropped; if the validated set is empty
+  the endpoint falls back to the legacy default so a malformed param never
+  produces a silently empty result. Ignored when `q` is empty. **Only this
+  endpoint reads `search_fields`** — `patients/lookup/` and
+  `receptionist/patients/summary/` share `patient_search_queryset` but call
+  it without `fields`, preserving their current "all fields" behaviour.
 - `page` (default 1), `pageSize` (default 100, clamped).
 - `state`, `district`, `addiction_type`, `patient_category` — **multi-value**.
   Repeat the key once per selected value:

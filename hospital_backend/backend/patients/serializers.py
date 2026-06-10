@@ -572,14 +572,44 @@ class PatientFollowUpDateUpdateSerializer(serializers.Serializer):
         return value
 
 
-def patient_search_queryset(query: str):
+PATIENT_SEARCH_FIELD_CHOICES = frozenset(
+    {"file_number", "full_name", "phone_number", "aadhaar_number", "hdams_id"}
+)
+
+
+def patient_search_queryset(query: str, fields: list[str] | None = None):
+    """OR-combined contains search across patient identity fields.
+
+    When ``fields`` is None the legacy default is applied: file_number,
+    full_name, phone_number, aadhaar_number. This default is shared with the
+    check-in lookup endpoint and the receptionist summary list, so changing
+    it would alter those flows — extend ``fields`` from the caller instead.
+
+    Unknown / disallowed field names are silently dropped; if nothing valid
+    remains the default field set is used so the caller never gets an empty
+    queryset purely because of a malformed param.
+    """
     digits = _digits_only(query)
     if not query:
         return Patient.objects.none()
 
-    return Patient.objects.filter(
-        Q(file_number__icontains=query)
-        | Q(full_name__icontains=query)
-        | Q(phone_number__icontains=digits or query)
-        | Q(aadhaar_number__icontains=digits or query)
-    )
+    if fields is None:
+        selected = {"file_number", "full_name", "phone_number", "aadhaar_number"}
+    else:
+        selected = {f for f in fields if f in PATIENT_SEARCH_FIELD_CHOICES}
+        if not selected:
+            selected = {"file_number", "full_name", "phone_number", "aadhaar_number"}
+
+    predicate = Q()
+    if "file_number" in selected:
+        predicate |= Q(file_number__icontains=query)
+    if "full_name" in selected:
+        predicate |= Q(full_name__icontains=query)
+    if "phone_number" in selected:
+        predicate |= Q(phone_number__icontains=digits or query)
+    if "aadhaar_number" in selected:
+        predicate |= Q(aadhaar_number__icontains=digits or query)
+    if "hdams_id" in selected:
+        predicate |= Q(hdams_id__icontains=query)
+
+    return Patient.objects.filter(predicate)

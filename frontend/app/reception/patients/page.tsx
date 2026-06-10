@@ -15,6 +15,7 @@ import {
   type PatientProfileUpdatePayload,
   type PatientDetailResponse,
   type PatientLookupResponse,
+  type PatientSearchField,
 } from "@/lib/hms-api";
 import {
   Card,
@@ -147,6 +148,9 @@ export default function PatientDataPage() {
     Record<string, Visit[]>
   >({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFields, setSearchFields] = useState<PatientSearchField[]>([
+    "file_number",
+  ]);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [isSavingPatient, setIsSavingPatient] = useState(false);
@@ -387,6 +391,7 @@ export default function PatientDataPage() {
     setListPage(1);
   }, [
     debouncedSearchQuery,
+    searchFields,
     listPageSize,
     filterDistrict,
     filterState,
@@ -405,6 +410,13 @@ export default function PatientDataPage() {
     setIsLoadingPatients(true);
     getPatientsList(accessToken, {
       q: debouncedSearchQuery || undefined,
+      // ``search_fields`` is only meaningful when ``q`` is present. Empty
+      // selection auto-falls-back to file_number at the UI level so the
+      // search input never silently matches nothing.
+      search_fields:
+        debouncedSearchQuery && searchFields.length > 0
+          ? searchFields
+          : undefined,
       page: listPage,
       pageSize: listPageSize,
       district: filterDistrict.length === 0 ? undefined : filterDistrict,
@@ -430,6 +442,7 @@ export default function PatientDataPage() {
     listPage,
     listPageSize,
     debouncedSearchQuery,
+    searchFields,
     filterDistrict,
     filterState,
     filterCategory,
@@ -511,6 +524,7 @@ export default function PatientDataPage() {
     setFilterDistrict([]);
     setFilterState([]);
     setSearchQuery("");
+    setSearchFields(["file_number"]);
   };
 
   // Country-state-city master list. Used by the patient *registration form*
@@ -2729,11 +2743,67 @@ export default function PatientDataPage() {
       {/* Search and Filter */}
       <Card className="border-none shadow-sm bg-white">
         <CardContent className="pt-6 space-y-4">
+          {/* Search-field scope: tick the fields the query should match. */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Search in
+            </span>
+            {(
+              [
+                { key: "file_number", label: "File No." },
+                { key: "full_name", label: "Name" },
+                { key: "aadhaar_number", label: "Aadhaar" },
+                { key: "hdams_id", label: "HDAMS ID" },
+                { key: "phone_number", label: "Phone" },
+              ] as { key: PatientSearchField; label: string }[]
+            ).map(({ key, label }) => {
+              const checked = searchFields.includes(key);
+              const isOnlySelection = checked && searchFields.length === 1;
+              return (
+                <label
+                  key={key}
+                  className={`flex items-center gap-2 text-sm cursor-pointer select-none ${
+                    isOnlySelection ? "opacity-90" : ""
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(value) => {
+                      const shouldCheck = value === true;
+                      setSearchFields((prev) => {
+                        if (shouldCheck) {
+                          return prev.includes(key) ? prev : [...prev, key];
+                        }
+                        // Never let the user untick the last field — keep
+                        // file_number as a sane fallback so the input never
+                        // silently matches nothing.
+                        const next = prev.filter((f) => f !== key);
+                        return next.length === 0 ? ["file_number"] : next;
+                      });
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by File No., HDAMS ID, Name, Phone, or Aadhaar..."
+                placeholder={
+                  searchFields.length === 1
+                    ? `Search by ${
+                        {
+                          file_number: "File Number",
+                          full_name: "Name",
+                          aadhaar_number: "Aadhaar",
+                          hdams_id: "HDAMS ID",
+                          phone_number: "Phone",
+                        }[searchFields[0]]
+                      }…`
+                    : `Search by ${searchFields.length} fields…`
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-[#f9fafb] border-slate-200 h-11"

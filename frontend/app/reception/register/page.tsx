@@ -87,12 +87,10 @@ export default function RegisterPatientPage() {
     date_of_birth: "",
     sex: "" as Gender | "",
     phone: "",
-    relative_phone: "",
     address: "",
     city: "",
     district: "",
     state: "",
-    pincode: "",
     fingerprint_template: "",
     photo: "",
   });
@@ -225,19 +223,6 @@ export default function RegisterPatientPage() {
       return;
     }
 
-    if (
-      instantFormData.relative_phone &&
-      !/^\d{10}$/.test(instantFormData.relative_phone)
-    ) {
-      toast.error("Relative mobile number must be exactly 10 digits.");
-      return;
-    }
-
-    // if (!instantFormData.relative_phone) {
-    //   toast.error("Relative mobile number is required");
-    //   return;
-    // }
-
     if (!instantFormData.address) {
       toast.error("Address is required");
       return;
@@ -306,12 +291,10 @@ export default function RegisterPatientPage() {
         sex: instantFormData.sex,
         fingerprint_template: instantFormData.fingerprint_template || undefined,
         aadhaar_number: aadhaarDigits || undefined,
-        relative_phone: instantFormData.relative_phone,
         address_line1: instantFormData.address,
         city: instantFormData.city || undefined,
         district: instantFormData.district || undefined,
         state: instantFormData.state || undefined,
-        pincode: instantFormData.pincode || undefined,
         photo_base64: parsedPhoto?.base64,
         photo_mime_type: parsedPhoto?.mimeType,
       });
@@ -349,12 +332,10 @@ export default function RegisterPatientPage() {
       date_of_birth: "",
       sex: "",
       phone: "",
-      relative_phone: "",
       address: "",
       city: "",
       district: "",
       state: "",
-      pincode: "",
       fingerprint_template: "",
       photo: "",
     });
@@ -695,57 +676,29 @@ export default function RegisterPatientPage() {
                     </select>
                   </div>
 
-                  {/* Mobile Numbers */}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <Label
-                        htmlFor="phone"
-                        className="flex items-center gap-2"
-                      >
-                        <Phone className="h-4 w-4 text-teal-600" />
-                        Mobile Number{" "}
-                        <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        value={instantFormData.phone}
-                        onChange={handlePhoneChange}
-                        placeholder="10-digit mobile"
-                        inputMode="numeric"
-                        pattern="\d{10}"
-                        maxLength={10}
-                        className="mt-1.5"
-                        required
-                      />
-                      <FieldError message={apiErrors.get("phone_number")} />
-                    </div>
-
-                    <div>
-                      <Label
-                        htmlFor="relative_phone"
-                        className="flex items-center gap-2"
-                      >
-                        <Phone className="h-4 w-4 text-teal-600" />
-                        Relative Mobile{" "}
-                        {/* <span className="text-destructive">*</span> */}
-                      </Label>
-                      <Input
-                        id="relative_phone"
-                        name="relative_phone"
-                        type="tel"
-                        value={instantFormData.relative_phone}
-                        onChange={handlePhoneChange}
-                        placeholder="10-digit mobile"
-                        inputMode="numeric"
-                        pattern="\d{10}"
-                        maxLength={10}
-                        className="mt-1.5"
-                        // required
-                      />
-                      {/* <FieldError message={apiErrors.get("relative_phone")} /> */}
-                    </div>
+                  {/* Mobile Number */}
+                  <div>
+                    <Label
+                      htmlFor="phone"
+                      className="flex items-center gap-2"
+                    >
+                      <Phone className="h-4 w-4 text-teal-600" />
+                      Mobile Number <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      value={instantFormData.phone}
+                      onChange={handlePhoneChange}
+                      placeholder="10-digit mobile"
+                      inputMode="numeric"
+                      pattern="\d{10}"
+                      maxLength={10}
+                      className="mt-1.5"
+                      required
+                    />
+                    <FieldError message={apiErrors.get("phone_number")} />
                   </div>
 
                   {/* Location Details */}
@@ -828,25 +781,6 @@ export default function RegisterPatientPage() {
                         />
                       </div>
 
-                      <div>
-                        <Label
-                          htmlFor="pincode"
-                          className="flex items-center gap-2"
-                        >
-                          <MapPin className="h-4 w-4 text-teal-600" />
-                          Pincode
-                        </Label>
-                        <Input
-                          id="pincode"
-                          name="pincode"
-                          value={instantFormData.pincode}
-                          onChange={handleInstantChange}
-                          placeholder="Enter pincode"
-                          inputMode="numeric"
-                          maxLength={6}
-                          className="mt-1.5"
-                        />
-                      </div>
                     </div>
 
                     {/* Address */}
@@ -1135,9 +1069,10 @@ export default function RegisterPatientPage() {
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Capture mandatory details first: Patient Category, Name,
-                      File Number, Date of Birth, Sex, Mobile Numbers, Address,
+                      File Number, Date of Birth, Sex, Mobile Number, Address,
                       and Fingerprint. This allows patients to be registered and
-                      checked in immediately.
+                      checked in immediately. Relative mobile, pincode and other
+                      details can be added later via Edit Profile.
                     </p>
                   </div>
                 </div>
