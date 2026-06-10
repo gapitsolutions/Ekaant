@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/multi-select";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -113,6 +114,7 @@ import {
   BLOOD_GROUP_OPTIONS,
   RELIGION_OPTIONS,
   NATIONALITY_OPTIONS,
+  PATIENT_CATEGORY_LABELS,
 } from "@/lib/types";
 import {
   PhotoCaptureDialog,
@@ -170,6 +172,7 @@ export default function PatientDataPage() {
     useState(false);
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
   const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false);
+  const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
   const [isExportFormatDialogOpen, setIsExportFormatDialogOpen] =
     useState(false);
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
@@ -1385,6 +1388,88 @@ export default function PatientDataPage() {
         />
 
         <Dialog
+          open={isPhotoPreviewOpen && Boolean(selectedPatient.photo_url)}
+          onOpenChange={setIsPhotoPreviewOpen}
+        >
+          {/* Photo lightbox.
+              - Dialog shrink-wraps to the photo's natural pixel size so
+                the user sees the image at 1:1.
+              - ``showCloseButton={false}`` hides the default light X
+                (designed for light dialogs; looks washed-out here). A
+                custom dark close button is rendered as an overlay below.
+              - Built-in ``DialogContent`` styles like padding, default
+                background and shadow are stripped via ``!p-0``/``!bg-*``
+                overrides so the frame can be designed bespoke. */}
+          <DialogContent
+            showCloseButton={false}
+            className="!p-0 !bg-transparent !border-0 !shadow-none w-auto h-auto max-w-[95vw] max-h-[95vh] sm:max-w-[95vw] !gap-0"
+          >
+            <DialogHeader className="sr-only">
+              <DialogTitle>Photo of {selectedPatient.full_name}</DialogTitle>
+              <DialogDescription>
+                Full-size photo preview. Click outside or press the X to close.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedPatient.photo_url && (
+              <div className="relative inline-block rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/20 bg-black">
+                <img
+                  src={selectedPatient.photo_url}
+                  alt={selectedPatient.full_name}
+                  className="block w-auto h-auto max-w-[95vw] max-h-[95vh] select-none"
+                  draggable={false}
+                />
+
+                {/* Floating close button — overlaid on the photo's top-
+                    right corner. Backdrop blur + dark fill so it stays
+                    legible regardless of photo content. */}
+                <DialogClose
+                  aria-label="Close photo preview"
+                  className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/55 hover:bg-black/75 text-white backdrop-blur-md flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-white/70"
+                >
+                  <X className="h-5 w-5" />
+                </DialogClose>
+
+                {/* Bottom caption — name + file no., overlaid on a
+                    bottom-to-top gradient so the text stays readable on
+                    photos of any brightness. */}
+                <div className="absolute inset-x-0 bottom-0 pointer-events-none">
+                  <div className="bg-gradient-to-t from-black/85 via-black/55 to-transparent px-5 pt-8 pb-4">
+                    <p className="text-white text-base font-semibold leading-tight drop-shadow">
+                      {selectedPatient.full_name}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-white/85">
+                      <span className="font-mono font-semibold">
+                        {selectedPatient.file_number}
+                      </span>
+                      {selectedPatient.hdams_id && (
+                        <>
+                          <span className="text-white/40">·</span>
+                          <span className="font-mono">
+                            HDAMS {selectedPatient.hdams_id}
+                          </span>
+                        </>
+                      )}
+                      {selectedPatient.patient_category && (
+                        <>
+                          <span className="text-white/40">·</span>
+                          <span>
+                            {
+                              PATIENT_CATEGORY_LABELS[
+                                selectedPatient.patient_category
+                              ]
+                            }
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
           open={isDeletePatientConfirmOpen}
           onOpenChange={setIsDeletePatientConfirmOpen}
         >
@@ -1437,13 +1522,23 @@ export default function PatientDataPage() {
               {/* Photo */}
               <div className="flex-shrink-0">
                 {selectedPatient.photo_url ? (
-                  <Image
-                    src={selectedPatient.photo_url}
-                    alt={selectedPatient.full_name}
-                    width={120}
-                    height={120}
-                    className="rounded-xl object-cover border-2 border-primary/30"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsPhotoPreviewOpen(true)}
+                    aria-label={`View larger photo of ${selectedPatient.full_name}`}
+                    className="group relative rounded-xl overflow-hidden border-2 border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <Image
+                      src={selectedPatient.photo_url}
+                      alt={selectedPatient.full_name}
+                      width={120}
+                      height={120}
+                      className="object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <Camera className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </button>
                 ) : (
                   <div className="w-[120px] h-[120px] rounded-xl bg-gradient-to-br from-primary/10 to-primary-accent/10 flex items-center justify-center border-2 border-primary/30">
                     <User className="h-12 w-12 text-primary" />
@@ -1473,6 +1568,27 @@ export default function PatientDataPage() {
                   <p className="font-mono font-medium">
                     {selectedPatient.hdams_id || "N/A"}
                   </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground">Category</p>
+                  {selectedPatient.patient_category ? (
+                    <Badge
+                      variant="outline"
+                      className={
+                        selectedPatient.patient_category === "psychiatric"
+                          ? "bg-purple-50 text-purple-700 border-purple-200"
+                          : "bg-amber-50 text-amber-700 border-amber-200"
+                      }
+                    >
+                      {
+                        PATIENT_CATEGORY_LABELS[
+                          selectedPatient.patient_category
+                        ]
+                      }
+                    </Badge>
+                  ) : (
+                    <p className="font-medium">N/A</p>
+                  )}
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Age / Gender</p>
@@ -2038,7 +2154,7 @@ export default function PatientDataPage() {
                   pincode: selectedPatient.pincode,
                   photo_url: selectedPatient.photo_url,
                   registration_date: selectedPatient.registration_date,
-                  blood_group: selectedPatient.blood_group,
+                  father_name: selectedPatient.father_name,
                 }}
               />
             )}
@@ -3071,7 +3187,7 @@ export default function PatientDataPage() {
                   <div className="flex-1 p-6 flex flex-col justify-between relative">
                     {/* Top Row: Name and ID Badges */}
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="text-xl font-bold text-slate-800">
                           {patient.full_name}
                         </h3>
@@ -3084,6 +3200,18 @@ export default function PatientDataPage() {
                         >
                           {patient.status}
                         </Badge>
+                        {patient.patient_category && (
+                          <Badge
+                            variant="outline"
+                            className={
+                              patient.patient_category === "psychiatric"
+                                ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-50"
+                                : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50"
+                            }
+                          >
+                            {PATIENT_CATEGORY_LABELS[patient.patient_category]}
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">

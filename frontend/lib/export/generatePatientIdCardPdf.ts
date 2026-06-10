@@ -40,7 +40,7 @@ export interface IdCardPatientData {
   pincode?: string;
   photo_url?: string;
   registration_date?: string;
-  blood_group?: string;
+  father_name?: string;
 }
 
 // ── Card geometry ──────────────────────────────────────────────────────────
@@ -220,9 +220,7 @@ async function resolveHeaderLogo(): Promise<
   return img;
 }
 
-function getHeaderLogo(): Promise<
-  HTMLImageElement | HTMLCanvasElement | null
-> {
+function getHeaderLogo(): Promise<HTMLImageElement | HTMLCanvasElement | null> {
   if (!logoPromise) {
     logoPromise = resolveHeaderLogo().then((result) => {
       // If the asset failed to load, clear the cache so a later attempt can
@@ -373,13 +371,9 @@ function wrapText(
   // Ellipsize the last line if content was truncated.
   if (lines.length === maxLines) {
     let last = lines[maxLines - 1];
-    const remainingWordsExist =
-      words.join(" ").length > lines.join(" ").length;
+    const remainingWordsExist = words.join(" ").length > lines.join(" ").length;
     if (remainingWordsExist) {
-      while (
-        last.length > 0 &&
-        ctx.measureText(`${last}…`).width > maxWidth
-      ) {
+      while (last.length > 0 && ctx.measureText(`${last}…`).width > maxWidth) {
         last = last.slice(0, -1);
       }
       lines[maxLines - 1] = `${last.trimEnd()}…`;
@@ -535,7 +529,12 @@ export async function renderIdCardCanvas(
   ctx.font = `700 15px 'Courier New', monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(patient.file_number || "—", photoX + photoW / 2, badgeY + badgeH / 2 + 1, photoW - 12);
+  ctx.fillText(
+    patient.file_number || "—",
+    photoX + photoW / 2,
+    badgeY + badgeH / 2 + 1,
+    photoW - 12,
+  );
 
   // ── Body: details column (top-aligned to photo top) ──
   const detailX = photoX + photoW + 28;
@@ -557,7 +556,7 @@ export async function renderIdCardCanvas(
   // Symmetric 2×2 info grid — identical column widths, equal row rhythm,
   // consistent label/value styling for all four fields.
   //   Row 1:  AGE / SEX     MOBILE
-  //   Row 2:  REG. DATE     BLOOD GROUP
+  //   Row 2:  REG. DATE     FATHER'S NAME
   const colGap = 18;
   const colW = (detailW - colGap) / 2;
   const col1X = detailX;
@@ -568,9 +567,9 @@ export async function renderIdCardCanvas(
   const ageSex = `${getAge(patient.date_of_birth)} / ${
     patient.gender ? patient.gender.charAt(0).toUpperCase() : "—"
   }`;
-  const bloodGroup =
-    patient.blood_group && patient.blood_group.trim()
-      ? patient.blood_group
+  const fatherName =
+    patient.father_name && patient.father_name.trim()
+      ? patient.father_name
       : "—";
 
   drawField(ctx, "Age / Sex", ageSex, col1X, gridRow1Top, { maxWidth: colW });
@@ -585,7 +584,7 @@ export async function renderIdCardCanvas(
     gridRow2Top,
     { maxWidth: colW },
   );
-  drawField(ctx, "Blood Group", bloodGroup, col2X, gridRow2Top, {
+  drawField(ctx, "Father's Name", fatherName, col2X, gridRow2Top, {
     maxWidth: colW,
   });
 

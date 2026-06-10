@@ -72,7 +72,7 @@ export function PatientIdCard({ patient }: PatientIdCardProps) {
     patient.gender,
     patient.phone,
     patient.registration_date,
-    patient.blood_group,
+    patient.father_name,
     patient.address,
     patient.city,
     patient.district,
@@ -162,10 +162,7 @@ export function PatientIdCard({ patient }: PatientIdCardProps) {
       </CardHeader>
 
       <CardContent className="flex justify-center bg-slate-50/50 py-10 rounded-b-lg">
-        <div
-          className="w-full max-w-[460px]"
-          style={{ aspectRatio: "5 / 3" }}
-        >
+        <div className="w-full max-w-[460px]" style={{ aspectRatio: "5 / 3" }}>
           {isRendering ? (
             <div className="h-full w-full flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-white text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
