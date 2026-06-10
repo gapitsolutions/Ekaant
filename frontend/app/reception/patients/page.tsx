@@ -122,6 +122,7 @@ import { PatientCallingHistory } from "@/components/patients/PatientCallingHisto
 import { PatientIdCard } from "@/components/patients/PatientIdCard";
 import { PatientInvoiceView } from "@/components/patients/PatientInvoiceView";
 import { generatePatientProfilePdf } from "@/lib/export/generatePatientProfilePdf";
+import { generatePatientProfileCsv } from "@/lib/export/generatePatientProfileCsv";
 
 export default function PatientDataPage() {
   const { accessToken } = useAuth();
@@ -169,6 +170,8 @@ export default function PatientDataPage() {
     useState(false);
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
   const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false);
+  const [isExportFormatDialogOpen, setIsExportFormatDialogOpen] =
+    useState(false);
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -1222,15 +1225,62 @@ export default function PatientDataPage() {
               variant="outline"
               size="sm"
               disabled={isLoadingPatientDetail}
-              onClick={() =>
-                generatePatientProfilePdf(selectedPatient, patientVisits)
-              }
+              onClick={() => setIsExportFormatDialogOpen(true)}
             >
               <Download className="h-4 w-4 mr-2" />
-              Export Patient Profile PDF
+              Export Patient Profile
             </Button>
           </div>
         </div>
+
+        <Dialog
+          open={isExportFormatDialogOpen}
+          onOpenChange={setIsExportFormatDialogOpen}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5 text-primary" />
+                Export Patient Profile
+              </DialogTitle>
+              <DialogDescription>
+                Choose a format. PDF is a printable report with visit history.
+                CSV contains tabular profile fields (no visit history or photo).
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <Button
+                className="h-24 flex-col gap-2 bg-gradient-to-r from-primary to-primary-accent"
+                onClick={() => {
+                  setIsExportFormatDialogOpen(false);
+                  generatePatientProfilePdf(selectedPatient, patientVisits);
+                }}
+              >
+                <FileText className="h-6 w-6" />
+                <span className="font-semibold">PDF</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-24 flex-col gap-2"
+                onClick={() => {
+                  setIsExportFormatDialogOpen(false);
+                  generatePatientProfileCsv(selectedPatient);
+                }}
+              >
+                <Receipt className="h-6 w-6" />
+                <span className="font-semibold">CSV</span>
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setIsExportFormatDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog
           open={isFingerprintConfirmOpen}
