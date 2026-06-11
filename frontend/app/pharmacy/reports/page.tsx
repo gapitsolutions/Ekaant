@@ -578,8 +578,13 @@ function RevenueReportTab({
                 </p>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-72 min-h-[18rem] w-full min-w-0">
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={288}
+                  >
                     <AreaChart data={chartData}>
                       <defs>
                         <linearGradient
@@ -872,8 +877,13 @@ function ConsumptionTrendChart({
         </p>
       </CardHeader>
       <CardContent className="p-6">
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-64 min-h-[16rem] w-full min-w-0">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minWidth={0}
+            minHeight={256}
+          >
             <BarChart data={chartData} barCategoryGap="30%">
               <CartesianGrid
                 strokeDasharray="3 3"
