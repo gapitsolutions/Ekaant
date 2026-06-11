@@ -1075,9 +1075,9 @@ Response:
     "items": [
       {
         "id": "uuid",
-        "dispense_date": "2026-05-20",
+        "dispense_time": "2026-05-20T11:24:17+05:30",
         "patient_name": "Rahul Sharma",
-        "patient_id": "uuid",
+        "file_number": "AGH123",
         "batch_number": "B-2024-01",
         "expiry_date": "2026-10-15",
         "quantity": 20,
@@ -1088,6 +1088,15 @@ Response:
   }
 }
 ```
+
+`dispense_time` is the full ISO datetime from
+`DispenseInvoice.dispense_time` — the per-invoice creation timestamp.
+The earlier `dispense_date` (a date-only string) caused every row to
+render the same midnight time on the frontend; the field was replaced.
+`file_number` is the human-facing patient identifier from
+`Patient.file_number`; it replaces the earlier `patient_id` UUID that
+leaked the internal PK into the inventory consumption table and CSV
+export.
 
 ### 7.12 `GET /api/v1/pharmacy/queue/`
 

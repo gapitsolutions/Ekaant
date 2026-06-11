@@ -94,19 +94,19 @@ export default function MedicineDetailPage() {
       "Date",
       "Time",
       "Patient Name",
-      "Patient UID",
+      "File Number",
       "Batch Number",
       "Expiry Date",
       "Quantity",
       "Total Price",
     ];
     const rows = items.map((it) => {
-      const dt = new Date(it.dispense_date);
+      const dt = new Date(it.dispense_time);
       return [
         dt.toLocaleDateString("en-IN"),
         dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
         it.patient_name,
-        it.patient_id,
+        it.file_number || "",
         it.batch_number,
         it.expiry_date,
         it.quantity,
@@ -284,7 +284,7 @@ export default function MedicineDetailPage() {
                 </TableRow>
               ) : (
                 items.map((it) => {
-                  const dt = new Date(it.dispense_date);
+                  const dt = new Date(it.dispense_time);
                   return (
                     <TableRow key={it.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell className="px-6 py-3">
@@ -298,7 +298,7 @@ export default function MedicineDetailPage() {
                       <TableCell>
                         <span className="font-bold text-slate-800 block text-sm">{it.patient_name}</span>
                         <span className="text-[10px] text-slate-500 font-mono tracking-tight uppercase">
-                          UID: {it.patient_id?.slice(0, 8) || "—"}
+                          FILE: {it.file_number || "—"}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">

@@ -1598,6 +1598,20 @@ function PurchaseInvoiceForm({
   const [items, setItems] = useState<InvoiceItemDraft[]>([]);
   const [selectDialogOpen, setSelectDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [medicineSearch, setMedicineSearch] = useState("");
+
+  // Substring match against name + salt — both are the natural identifiers
+  // a pharmacist scans for. Case-insensitive; no debouncing needed because
+  // the filter is purely client-side over the already-loaded list.
+  const filteredMedicines = useMemo(() => {
+    const q = medicineSearch.trim().toLowerCase();
+    if (!q) return medicines;
+    return medicines.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.salt.toLowerCase().includes(q),
+    );
+  }, [medicines, medicineSearch]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const apiErrors = useApiErrors();
 
@@ -2151,7 +2165,17 @@ function PurchaseInvoiceForm({
       </CardContent>
 
       {/* Medicine Selection Dialog */}
-      <Dialog open={selectDialogOpen} onOpenChange={setSelectDialogOpen}>
+      <Dialog
+        open={selectDialogOpen}
+        onOpenChange={(o) => {
+          // Reset the search whenever the dialog closes so a fresh open
+          // starts unfiltered. The id selection has its own reset paths
+          // (Cancel button + handleConfirmSelection) so we leave that
+          // alone here.
+          if (!o) setMedicineSearch("");
+          setSelectDialogOpen(o);
+        }}
+      >
         <DialogContent className="sm:max-w-[600px] bg-white rounded-2xl border-slate-100 p-0 overflow-hidden shadow-2xl">
           <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
             <DialogTitle className="text-lg font-black text-slate-800">
@@ -2160,15 +2184,40 @@ function PurchaseInvoiceForm({
             <DialogDescription className="text-xs font-semibold text-slate-500">
               Check all the items that are present on this invoice.
             </DialogDescription>
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                value={medicineSearch}
+                onChange={(e) => setMedicineSearch(e.target.value)}
+                placeholder="Search by name or salt…"
+                aria-label="Search medicines"
+                autoFocus
+                className="pl-9 h-10 rounded-xl bg-white border-slate-200 text-xs font-semibold text-slate-700"
+              />
+              {medicineSearch && (
+                <button
+                  type="button"
+                  onClick={() => setMedicineSearch("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </DialogHeader>
           <div className="p-2 max-h-[350px] overflow-y-auto bg-slate-50/30">
             {medicines.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs font-bold">
                 No medicines registered yet
               </div>
+            ) : filteredMedicines.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                No medicines match &ldquo;{medicineSearch}&rdquo;.
+              </div>
             ) : (
               <div className="space-y-1 px-4 py-2">
-                {medicines.map((m) => {
+                {filteredMedicines.map((m) => {
                   const checked = selectedIds.includes(m.id);
                   return (
                     <label

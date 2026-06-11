@@ -228,9 +228,15 @@ export async function auditStockRemoval(
 // ── Product Dispense History (per medicine) ──
 export interface ProductDispenseHistoryItem {
   id: string;
-  dispense_date: string;
+  // Full ISO datetime — derive both date and time from this. The earlier
+  // ``dispense_date`` (date-only) caused every row to render the same
+  // midnight time on the frontend; see API_BLUEPRINT §7.11.
+  dispense_time: string;
   patient_name: string;
-  patient_id: string;
+  // Human-facing patient identifier (e.g. "AGH123"). Replaces the
+  // previous ``patient_id`` UUID, which was meaningless in the row and
+  // CSV export.
+  file_number: string;
   batch_number: string;
   expiry_date: string;
   quantity: number;

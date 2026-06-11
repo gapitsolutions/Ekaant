@@ -476,9 +476,18 @@ class ProductDispenseHistoryView(APIView):
         items = [
             {
                 "id": str(item.id),
-                "dispense_date": item.dispense_invoice.dispense_date,
+                # ``dispense_time`` is the real per-invoice timestamp
+                # (``DispenseInvoice.dispense_time`` — ``auto_now_add``).
+                # The earlier ``dispense_date`` field was a pure ``date``
+                # which made every row render the same midnight time on
+                # the frontend. Callers needing the date alone can derive
+                # it from this datetime.
+                "dispense_time": item.dispense_invoice.dispense_time,
                 "patient_name": item.dispense_invoice.patient.full_name,
-                "patient_id": str(item.dispense_invoice.patient_id),
+                # Human-facing identifier; replaces the previous
+                # ``patient_id`` (UUID) which leaked the internal PK into
+                # the table view and CSV export.
+                "file_number": item.dispense_invoice.patient.file_number,
                 "batch_number": item.batch_number,
                 "expiry_date": item.expiry_date,
                 "quantity": item.quantity,
