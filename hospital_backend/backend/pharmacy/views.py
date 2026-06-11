@@ -748,11 +748,31 @@ class DispenseHistoryListView(APIView):
         except (TypeError, ValueError):
             page, page_size = 1, 50
 
+        # Aggregate KPIs for the three cards on the invoice history page.
+        # Computed over the same filtered queryset as the list, so the
+        # numbers describe the matched set — independent of pagination
+        # and consistent with what ``pagination.total`` would report.
+        # Cancelled invoices have ``net_payable = 0`` so they contribute
+        # zero to revenue regardless of whether the status filter
+        # includes them.
+        stats_agg = queryset.aggregate(
+            unique_patients=Count("patient_id", distinct=True),
+            total_revenue=Coalesce(Sum("net_payable"), Decimal("0")),
+            total_records=Count("id"),
+        )
+        stats = {
+            "unique_patients": stats_agg["unique_patients"] or 0,
+            "total_revenue": str(stats_agg["total_revenue"] or Decimal("0")),
+            "total_records": stats_agg["total_records"] or 0,
+        }
+
         paginated, pagination = paginate_queryset(queryset, page, page_size)
         items = [
             DispenseInvoiceListItemSerializer.from_invoice(inv) for inv in paginated
         ]
-        return success_response({"items": items, "pagination": pagination})
+        return success_response(
+            {"items": items, "pagination": pagination, "stats": stats}
+        )
 
 
 # ────────────────────────────────────────────────────────────

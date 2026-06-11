@@ -52,6 +52,7 @@ import {
   getDispenseInvoiceBySession,
   getInventoryMedicines,
   type DispenseHistoryItem,
+  type DispenseHistoryStats,
   type DispenseInvoiceDetail,
   type DispenseLineItemPayload,
   type DispenseStatus,
@@ -95,9 +96,22 @@ export default function InvoiceHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | DispenseStatus>(
     "all",
   );
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [todayOnly, setTodayOnly] = useState(false);
+  // Default the range to today so the page opens scoped to today's
+  // dispenses; the three header cards describe today by default and
+  // update as the user widens / clears the range. ``toLocaleDateString``
+  // with the ``en-CA`` locale yields a stable ISO ``YYYY-MM-DD`` in the
+  // user's local timezone.
+  const todayIso = new Date().toLocaleDateString("en-CA");
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(todayIso);
+  // ``stats`` is the backend's range-scoped aggregate (unique patients,
+  // total revenue, total records) — independent of pagination. See
+  // API_BLUEPRINT §7.15.
+  const [stats, setStats] = useState<DispenseHistoryStats>({
+    unique_patients: 0,
+    total_revenue: "0",
+    total_records: 0,
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
@@ -134,7 +148,6 @@ export default function InvoiceHistoryPage() {
       status: statusFilter === "all" ? undefined : statusFilter,
       start_date: startDate || undefined,
       end_date: endDate || undefined,
-      today_only: todayOnly,
     })
       .then((data) => {
         setItems(data.items || []);
@@ -145,6 +158,9 @@ export default function InvoiceHistoryPage() {
             total: data.items?.length || 0,
           },
         );
+        if (data.stats) {
+          setStats(data.stats);
+        }
       })
       .catch((error: unknown) => {
         setErrorMessage(
@@ -154,19 +170,23 @@ export default function InvoiceHistoryPage() {
         );
       })
       .finally(() => setIsLoading(false));
-  }, [debouncedSearch, page, pageSize, statusFilter, startDate, endDate, todayOnly]);
+  }, [debouncedSearch, page, pageSize, statusFilter, startDate, endDate]);
 
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
 
-  const totalRevenue = useMemo(() => {
-    return items.reduce((sum, it) => sum + (parseFloat(it.amount) || 0), 0);
-  }, [items]);
-
-  const uniquePatients = useMemo(() => {
-    return new Set(items.map((it) => it.patient_id)).size;
-  }, [items]);
+  // Range label for the small caption under each card. Falls through
+  // a short ladder: today → all-time → single date → from/to.
+  const rangeLabel = useMemo(() => {
+    if (!startDate && !endDate) return "All time";
+    if (startDate && endDate && startDate === endDate) {
+      return startDate === todayIso ? "Today" : startDate;
+    }
+    if (startDate && endDate) return `${startDate} → ${endDate}`;
+    if (startDate) return `From ${startDate}`;
+    return `Until ${endDate}`;
+  }, [startDate, endDate, todayIso]);
 
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / pageSize));
 
@@ -364,6 +384,10 @@ export default function InvoiceHistoryPage() {
           }
         />
 
+        {/* Three cards \u2014 values come from the backend ``stats`` aggregate,
+            independent of pagination. See API_BLUEPRINT \u00A77.15. The small
+            label under each number reflects the active filter range so
+            the user always sees what scope they're looking at. */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white">
             <CardContent className="p-6 flex items-center gap-4">
@@ -372,11 +396,14 @@ export default function InvoiceHistoryPage() {
               </div>
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                  Unique Patients (page)
+                  Unique Patients
                 </p>
                 <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-0.5">
-                  {uniquePatients}
+                  {stats.unique_patients}
                 </h3>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {rangeLabel}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -389,12 +416,18 @@ export default function InvoiceHistoryPage() {
               </div>
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                  Total Revenue (page)
+                  Total Revenue
                 </p>
                 <h3 className="text-2xl font-black text-primary tracking-tight mt-0.5">
                   {"\u20B9"}
-                  {totalRevenue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  {(parseFloat(stats.total_revenue) || 0).toLocaleString(
+                    "en-IN",
+                    { maximumFractionDigits: 0 },
+                  )}
                 </h3>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {rangeLabel}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -408,8 +441,11 @@ export default function InvoiceHistoryPage() {
                   Total Records
                 </p>
                 <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-0.5">
-                  {pagination.total}
+                  {stats.total_records}
                 </h3>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {rangeLabel}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -422,7 +458,9 @@ export default function InvoiceHistoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 p-6">
-            <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_160px_160px_140px]">
+            {/* "Today Only" dropdown removed — redundant with the date
+                range below, which now defaults to today. */}
+            <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_160px_140px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -446,21 +484,6 @@ export default function InvoiceHistoryPage() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="success">Success</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={todayOnly ? "today" : "any"}
-                onValueChange={(v) => {
-                  setPage(1);
-                  setTodayOnly(v === "today");
-                }}
-              >
-                <SelectTrigger className="h-10 bg-slate-50 border-slate-200 rounded-xl text-sm font-medium">
-                  <SelectValue placeholder="Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any Day</SelectItem>
-                  <SelectItem value="today">Today Only</SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -512,7 +535,6 @@ export default function InvoiceHistoryPage() {
                   setStatusFilter("all");
                   setStartDate("");
                   setEndDate("");
-                  setTodayOnly(false);
                 }}
               >
                 Clear Filters

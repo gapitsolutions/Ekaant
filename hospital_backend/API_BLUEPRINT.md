@@ -1456,6 +1456,27 @@ Response item shape:
 
 Plus `pagination: {page, pageSize, total}`.
 
+Plus `stats`: range-scoped KPI summary used by the three cards on the
+pharmacy invoice history page (Unique Patients, Total Revenue, Total
+Records). Shape:
+
+```
+stats: {
+  unique_patients: number,
+  total_revenue: string,   // Decimal serialised as string
+  total_records: number,
+}
+```
+
+Scope: `stats` is computed over the post-filter queryset (same `q`,
+`start_date`, `end_date`, `status`, `today_only`, `current_stage`
+filters as the list) but **before** pagination. So the three cards
+describe the matched set independent of which page is being viewed.
+`stats.total_records` equals `pagination.total` by construction — both
+numbers describe the same queryset. Cancelled invoices have
+`net_payable = 0`, so they contribute zero to `total_revenue`
+regardless of whether the `status` filter includes them.
+
 Notes:
 
 - `session_id` is included so clients can call `GET /api/v1/pharmacy/dispense/<session_id>/` for detailed invoice view or PDF generation flows.

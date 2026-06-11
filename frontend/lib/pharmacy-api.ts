@@ -390,9 +390,20 @@ export interface DispenseHistoryItem {
   is_amended: boolean;
 }
 
+// Range-scoped KPI summary for the three cards on the invoice history
+// page. Scoped by all list filters; ignores pagination. See
+// API_BLUEPRINT §7.15. ``total_revenue`` is serialised as a string
+// because it's a Decimal — parse with ``parseFloat`` for display.
+export interface DispenseHistoryStats {
+  unique_patients: number;
+  total_revenue: string;
+  total_records: number;
+}
+
 export interface DispenseHistoryResponse {
   items: DispenseHistoryItem[];
   pagination: { page: number; pageSize: number; total: number };
+  stats: DispenseHistoryStats;
 }
 
 export async function getDispenseHistory(options?: {
