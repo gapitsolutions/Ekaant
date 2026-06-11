@@ -65,15 +65,59 @@ import {
   type MedicineCategory,
 } from "@/lib/pharmacy-api";
 import { BRANDING } from "@/lib/branding";
+import { generateRevenueReportPdf } from "@/lib/export/generateRevenueReportPdf";
+import { generateConsumptionReportPdf } from "@/lib/export/generateConsumptionReportPdf";
+import { generateLowStockReportPdf } from "@/lib/export/generateLowStockReportPdf";
+import { generateExpiryReportPdf } from "@/lib/export/generateExpiryReportPdf";
+import { toast } from "sonner";
+
+// Each tab registers a closure that generates a PDF over its current
+// data. The parent stores the latest registration and dispatches the
+// global Export Report button to whichever tab is active. ``null``
+// disables the button (loading / no data).
+type PdfExporter = (() => Promise<void>) | null;
 
 type ReportTab = "revenue" | "consumption" | "low-stock" | "expiry";
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("revenue");
+  // The currently-mounted tab registers its export closure here. When
+  // the user switches tabs, the new tab's effect overwrites the
+  // previous one. Set to null when the tab has no data to export
+  // (initial load / fetch error), which disables the button.
+  const [pdfExporter, setPdfExporter] = useState<PdfExporter>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const registerPdfExporter = useCallback((exporter: PdfExporter) => {
+    setPdfExporter(() => exporter);
+  }, []);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!pdfExporter || isExporting) return;
+    setIsExporting(true);
+    try {
+      await pdfExporter();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to export report.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }, [pdfExporter, isExporting]);
+
+  // Reset the registered exporter when the user switches tabs so the
+  // button is disabled briefly until the new tab finishes loading and
+  // re-registers. Without this, clicking Export Report right after a
+  // tab switch could fire the previous tab's stale closure.
+  const handleTabChange = useCallback((next: string) => {
+    setPdfExporter(null);
+    setTab(next as ReportTab);
+  }, []);
 
   return (
     <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as ReportTab)}>
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <div className="flex flex-col gap-6">
           <PageHeader
             title="Pharmacy Reports"
@@ -81,10 +125,15 @@ export default function ReportsPage() {
             actions={
               <Button
                 variant="outline"
-                onClick={() => window.print()}
-                className="border-slate-200 text-slate-700 font-medium rounded-md px-4 h-9 shadow-sm hover:bg-slate-50"
+                onClick={() => void handleExportPdf()}
+                disabled={!pdfExporter || isExporting}
+                className="border-slate-200 text-slate-700 font-medium rounded-md px-4 h-9 shadow-sm hover:bg-slate-50 disabled:opacity-50"
               >
-                <Download className="h-4 w-4 mr-2" />
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
                 Export Report
               </Button>
             }
@@ -119,16 +168,16 @@ export default function ReportsPage() {
         </div>
 
         <TabsContent value="revenue" className="mt-6">
-          <RevenueReportTab />
+          <RevenueReportTab onRegisterExport={registerPdfExporter} />
         </TabsContent>
         <TabsContent value="consumption" className="mt-6">
-          <ConsumptionReportTab />
+          <ConsumptionReportTab onRegisterExport={registerPdfExporter} />
         </TabsContent>
         <TabsContent value="low-stock" className="mt-6">
-          <LowStockReportTab />
+          <LowStockReportTab onRegisterExport={registerPdfExporter} />
         </TabsContent>
         <TabsContent value="expiry" className="mt-6">
-          <ExpiryReportTab />
+          <ExpiryReportTab onRegisterExport={registerPdfExporter} />
         </TabsContent>
       </Tabs>
     </div>
@@ -257,7 +306,11 @@ function rangeToOptions(state: RangeFilterState) {
 
 // ────────── Revenue Report ──────────
 
-function RevenueReportTab() {
+function RevenueReportTab({
+  onRegisterExport,
+}: {
+  onRegisterExport: (fn: PdfExporter) => void;
+}) {
   const [filter, setFilter] = useState<RangeFilterState>(defaultRangeState());
   const [data, setData] = useState<RevenueReportResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -280,6 +333,17 @@ function RevenueReportTab() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Register the export closure with the parent whenever fresh data
+  // lands. ``null`` while loading / on error so the global button is
+  // disabled until the report can actually be produced.
+  useEffect(() => {
+    if (!data) {
+      onRegisterExport(null);
+      return;
+    }
+    onRegisterExport(() => generateRevenueReportPdf(data));
+  }, [data, onRegisterExport]);
 
   const chartData = useMemo(() => {
     return (data?.breakdown || []).map((row) => ({
@@ -351,10 +415,20 @@ function RevenueReportTab() {
                 Download CSV
               </Button>
               <Button
-                onClick={() => window.print()}
+                onClick={() => {
+                  if (!data) return;
+                  void generateRevenueReportPdf(data).catch((error) => {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to export PDF.",
+                    );
+                  });
+                }}
                 size="sm"
                 variant="outline"
-                className="border-slate-200 text-slate-700 bg-white hover:bg-slate-50 shadow-sm"
+                disabled={!data}
+                className="border-slate-200 text-slate-700 bg-white hover:bg-slate-50 shadow-sm disabled:opacity-50"
               >
                 <Download className="h-4 w-4 mr-2 text-rose-400" />
                 Download PDF
@@ -486,7 +560,11 @@ function RevenueReportTab() {
             </CardContent>
           </Card>
 
-          {chartData.length > 0 ? (
+          {/* Trend chart is meaningless for the daily range — a single
+              data point renders as a vertical line. Show it only for
+              monthly and custom range where there are multiple days to
+              compare. */}
+          {chartData.length > 0 && filter.range !== "daily" ? (
             <Card className="border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
               <CardHeader className="border-b border-slate-50 p-6">
                 <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -610,7 +688,11 @@ function KpiCard({
 
 // ────────── Consumption Report ──────────
 
-function ConsumptionReportTab() {
+function ConsumptionReportTab({
+  onRegisterExport,
+}: {
+  onRegisterExport: (fn: PdfExporter) => void;
+}) {
   const [filter, setFilter] = useState<RangeFilterState>(defaultRangeState());
   const [category, setCategory] = useState<"All" | MedicineCategory>("All");
   const [data, setData] = useState<ConsumptionReportResponse | null>(null);
@@ -639,6 +721,14 @@ function ConsumptionReportTab() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!data) {
+      onRegisterExport(null);
+      return;
+    }
+    onRegisterExport(() => generateConsumptionReportPdf(data, category));
+  }, [data, category, onRegisterExport]);
 
   const groupedBup = useMemo(() => {
     if (category !== "BUP" || !data) return null;
@@ -941,16 +1031,24 @@ function MedicineBreakdownTable({
 
 // ────────── Low Stock Report ──────────
 
-function LowStockReportTab() {
+function LowStockReportTab({
+  onRegisterExport,
+}: {
+  onRegisterExport: (fn: PdfExporter) => void;
+}) {
   const [items, setItems] = useState<LowStockReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     setIsLoading(true);
     setErrorMessage("");
     getLowStockReport()
-      .then((data) => setItems(data.items || []))
+      .then((data) => {
+        setItems(data.items || []);
+        setHasLoaded(true);
+      })
       .catch((error: unknown) => {
         setErrorMessage(
           error instanceof Error
@@ -960,6 +1058,16 @@ function LowStockReportTab() {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Allow export even when there are zero items so the user can produce
+  // an "all clear" report. ``hasLoaded`` is the gate, not ``items.length``.
+  useEffect(() => {
+    if (!hasLoaded) {
+      onRegisterExport(null);
+      return;
+    }
+    onRegisterExport(() => generateLowStockReportPdf(items));
+  }, [items, hasLoaded, onRegisterExport]);
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
@@ -1067,7 +1175,11 @@ function LowStockReportTab() {
 
 // ────────── Expiry Report ──────────
 
-function ExpiryReportTab() {
+function ExpiryReportTab({
+  onRegisterExport,
+}: {
+  onRegisterExport: (fn: PdfExporter) => void;
+}) {
   const [data, setData] = useState<ExpiryReportResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -1087,6 +1199,14 @@ function ExpiryReportTab() {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!data) {
+      onRegisterExport(null);
+      return;
+    }
+    onRegisterExport(() => generateExpiryReportPdf(data));
+  }, [data, onRegisterExport]);
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
