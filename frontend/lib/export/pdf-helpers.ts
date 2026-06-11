@@ -26,6 +26,66 @@ export async function loadLogoBase64(): Promise<string | null> {
 }
 
 /**
+ * Fetch an auth-protected image (typically a patient photo) and return it
+ * as a base64 data URL suitable for jsPDF's ``addImage``. The fetch goes
+ * through the same ``credentials: "include"`` channel the rest of the app
+ * uses, so the session cookie is honoured and the response is not
+ * cross-origin-tainted. Returns ``{ dataUrl, format, width, height }`` —
+ * natural pixel dimensions are decoded via ``<img>`` so callers can size
+ * the layout box to the photo's aspect ratio instead of forcing a square
+ * (which squeezes portrait/landscape photos). Returns null on any failure.
+ */
+export async function fetchAuthedImageAsDataUrl(
+  url: string | undefined,
+): Promise<{
+  dataUrl: string;
+  format: "JPEG" | "PNG";
+  width: number;
+  height: number;
+} | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    // Default to JPEG (covers most camera uploads); only PNG needs a
+    // different hint because jsPDF rejects mismatched format strings.
+    const format = blob.type === "image/png" ? "PNG" : "JPEG";
+    const dataUrl = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+    if (!dataUrl) return null;
+
+    // Decode the image to read its natural width/height. We don't draw
+    // the <img>; it exists only so the browser can populate naturalWidth
+    // / naturalHeight from the encoded bytes.
+    const dims = await new Promise<{ width: number; height: number } | null>(
+      (resolve) => {
+        const img = new Image();
+        img.onload = () =>
+          resolve({
+            width: img.naturalWidth || img.width || 0,
+            height: img.naturalHeight || img.height || 0,
+          });
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+      },
+    );
+    if (!dims || dims.width <= 0 || dims.height <= 0) return null;
+
+    return { dataUrl, format, width: dims.width, height: dims.height };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Add a standard hospital header to a jsPDF document.
  * Returns the Y coordinate after the header for subsequent content.
  */

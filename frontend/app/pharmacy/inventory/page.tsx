@@ -1078,9 +1078,7 @@ function MedicineFormDialog({
       setSellingPrice(editTarget.selling_price);
       setReorderLevel(String(editTarget.reorder_level));
       setTabletsPerStrip(String(editTarget.tablets_per_strip));
-      setSelectedSupplierIds(
-        (editTarget.suppliers || []).map((s) => s.id),
-      );
+      setSelectedSupplierIds((editTarget.suppliers || []).map((s) => s.id));
     } else {
       resetForm();
     }
@@ -1776,7 +1774,6 @@ function PurchaseInvoiceForm({
             <Input
               value={invoiceNo}
               onChange={(e) => setInvoiceNo(e.target.value)}
-              placeholder="SUP-2026-0042"
               className="h-11 rounded-xl bg-white border-slate-200 font-bold text-slate-700 text-xs uppercase"
             />
             <FieldError message={apiErrors.get("invoice_number")} />
