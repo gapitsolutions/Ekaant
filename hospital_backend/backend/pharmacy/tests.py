@@ -11,7 +11,10 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APIClient
 
 from pharmacy import services
 from pharmacy.models import (
@@ -333,3 +336,61 @@ class MedicineBulkImportTests(TestCase):
         self.assertFalse(Medicine.objects.filter(name="Bad").exists())
         failed_rows = {e["row_number"] for e in result["errors"]}
         self.assertEqual(failed_rows, {2, 3})
+
+
+class MedicineCreateDuplicateTests(TestCase):
+    """Single-create endpoint must surface a clean 409 (not an unhandled 500)
+    when the conditional unique constraint (name, category, bup_category) is
+    violated among active medicines — matching API_BLUEPRINT §7.4."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            email="rx@example.com", password="x", role="pharmacist"
+        )
+        self.client.force_authenticate(self.user)
+        self.url = reverse("pharmacy-medicine-list-create")
+
+    def _payload(self, **over):
+        base = {
+            "name": "Amoxicillin 250",
+            "salt": "Amoxicillin",
+            "category": "Rx",
+            "bup_category": None,
+            "manufacturer": "Cipla",
+            "reorder_level": 50,
+            "tablets_per_strip": 10,
+            "mrp": "30.00",
+            "selling_price": "25.00",
+        }
+        base.update(over)
+        return base
+
+    def test_create_succeeds_then_duplicate_returns_409(self):
+        first = self.client.post(self.url, self._payload(), format="json")
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        dup = self.client.post(self.url, self._payload(), format="json")
+        self.assertEqual(dup.status_code, status.HTTP_409_CONFLICT)
+        # Only the original row persisted; the duplicate was rejected.
+        self.assertEqual(
+            Medicine.objects.filter(name="Amoxicillin 250").count(), 1
+        )
+
+    def test_same_name_different_category_is_allowed(self):
+        """The unique key includes category, so the same name under a
+        different category is NOT a duplicate."""
+        self.assertEqual(
+            self.client.post(
+                self.url, self._payload(name="Combo"), format="json"
+            ).status_code,
+            status.HTTP_201_CREATED,
+        )
+        self.assertEqual(
+            self.client.post(
+                self.url,
+                self._payload(name="Combo", category="NRx"),
+                format="json",
+            ).status_code,
+            status.HTTP_201_CREATED,
+        )

@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-14 (IST)
+> **Last Updated:** 2026-06-14 (IST) — single medicine create now returns 409 (not 500) on duplicates, enforced at app level for all categories
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -835,7 +835,12 @@ Validation:
 
 - `selling_price ≤ mrp`
 - `category=BUP` requires non-null `bup_category`; non-BUP must have null `bup_category`
-- Conditional unique constraint: `(name, category, bup_category)` must be unique among active medicines
+- Uniqueness on `(name, category, bup_category)` among active medicines.
+  Enforced at the application level by `services.active_medicine_exists`
+  (raises 409 before insert), backed by a partial `UniqueConstraint` on the
+  DB. Note: the DB constraint alone is insufficient because PostgreSQL treats
+  `NULL` as distinct, so it never fires for non-BUP rows (`bup_category IS
+  NULL`) — the application check is what guarantees Rx/NRx uniqueness.
 - `supplier_ids` (optional): list of Supplier UUIDs. Each id is checked
   against the Supplier table; unknown ids return 400 with
   `{"supplier_ids": [...]}`. Empty list is an explicit clear; omitting
@@ -843,7 +848,7 @@ Validation:
 
 Response (201): full medicine read payload.
 
-Errors: 400 validation, 409 duplicate active medicine.
+Errors: 400 validation, 409 duplicate active medicine (any category).
 
 ### 7.4.1 `POST /api/v1/pharmacy/inventory/medicines/bulk-import/`
 

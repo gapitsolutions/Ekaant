@@ -237,7 +237,29 @@ class MedicineListCreateView(APIView):
     def post(self, request):
         serializer = MedicineWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        medicine = serializer.save(created_by=request.user, updated_by=request.user)
+        data = serializer.validated_data
+        duplicate_message = (
+            "A medicine with this name, category and strength already exists."
+        )
+        # Application-level uniqueness guard. Required (not just a nicety):
+        # the DB UniqueConstraint is partial and NULL-distinct, so for non-BUP
+        # medicines (bup_category IS NULL) it never fires — without this check
+        # Rx/NRx duplicates would be created silently. See
+        # ``services.active_medicine_exists``.
+        if services.active_medicine_exists(
+            name=data["name"],
+            category=data["category"],
+            bup_category=data.get("bup_category"),
+        ):
+            raise ConflictError(duplicate_message)
+        try:
+            medicine = serializer.save(
+                created_by=request.user, updated_by=request.user
+            )
+        except IntegrityError as exc:
+            # Safety net for the BUP case, where the partial unique index IS
+            # enforced: a concurrent insert could slip past the check above.
+            raise ConflictError(duplicate_message) from exc
         return success_response(
             MedicineReadSerializer(medicine).data,
             status_code=status.HTTP_201_CREATED,

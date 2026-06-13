@@ -223,6 +223,31 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
 # ────────────────────────────────────────────────────────────
 
 
+def active_medicine_exists(
+    *, name: str, category: str, bup_category, exclude_pk=None
+) -> bool:
+    """Return True if an *active* medicine already matches the uniqueness key
+    ``(name, category, bup_category)``.
+
+    This is the application-level guard relied on by both single-create and
+    bulk-import. It is necessary (not just a convenience) because the DB
+    ``UniqueConstraint`` is a **partial** index and PostgreSQL treats NULLs as
+    distinct — so for non-BUP medicines (``bup_category IS NULL``) the DB
+    constraint never fires and would otherwise allow silent duplicates. The
+    ORM ``bup_category=None`` lookup compiles to ``IS NULL`` and matches
+    correctly. ``exclude_pk`` lets callers ignore the row being updated.
+    """
+    qs = Medicine.objects.filter(
+        is_active=True,
+        name=name,
+        category=category,
+        bup_category=bup_category,
+    )
+    if exclude_pk is not None:
+        qs = qs.exclude(pk=exclude_pk)
+    return qs.exists()
+
+
 def _flatten_serializer_errors(errors) -> list[str]:
     """Flatten DRF ``serializer.errors`` into ``"field: message"`` strings so
     the frontend review grid can show readable, row-level reasons."""
@@ -286,12 +311,9 @@ def bulk_create_medicines(*, rows: list[dict], user) -> dict:
         category = data["category"]
         bup_category = data.get("bup_category")
 
-        if Medicine.objects.filter(
-            is_active=True,
-            name=name,
-            category=category,
-            bup_category=bup_category,
-        ).exists():
+        if active_medicine_exists(
+            name=name, category=category, bup_category=bup_category
+        ):
             skipped.append(
                 {
                     "row_number": row_number,
