@@ -43,6 +43,7 @@ from .serializers import (
     DispenseCancelSerializer,
     DispenseCreateSerializer,
     DispenseInvoiceListItemSerializer,
+    MedicineBulkImportSerializer,
     MedicineDeleteSerializer,
     MedicineReadSerializer,
     MedicineWriteSerializer,
@@ -241,6 +242,26 @@ class MedicineListCreateView(APIView):
             MedicineReadSerializer(medicine).data,
             status_code=status.HTTP_201_CREATED,
         )
+
+
+class MedicineBulkImportView(APIView):
+    """Bulk-create medicines from a parsed CSV (Inventory → Import Medicines).
+
+    Validation/business rules are reused per row from ``MedicineWriteSerializer``
+    via the service. Returns a per-row report (created / skipped / failed)
+    rather than a single resource, so it responds 200 with the report body
+    regardless of the mix of outcomes.
+    """
+
+    permission_classes = [IsPharmacistOrAdmin]
+
+    def post(self, request):
+        serializer = MedicineBulkImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = services.bulk_create_medicines(
+            rows=serializer.validated_data["items"], user=request.user
+        )
+        return success_response(result)
 
 
 class MedicineDetailView(APIView):

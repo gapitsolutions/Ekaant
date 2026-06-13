@@ -22,6 +22,11 @@ urlpatterns = [
         name="pharmacy-medicine-list-create",
     ),
     path(
+        "pharmacy/inventory/medicines/bulk-import/",
+        views.MedicineBulkImportView.as_view(),
+        name="pharmacy-medicine-bulk-import",
+    ),
+    path(
         "pharmacy/inventory/medicines/<uuid:pk>/",
         views.MedicineDetailView.as_view(),
         name="pharmacy-medicine-detail",

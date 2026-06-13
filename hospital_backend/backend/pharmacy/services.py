@@ -219,6 +219,128 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
 
 
 # ────────────────────────────────────────────────────────────
+# Medicine bulk import (CSV)
+# ────────────────────────────────────────────────────────────
+
+
+def _flatten_serializer_errors(errors) -> list[str]:
+    """Flatten DRF ``serializer.errors`` into ``"field: message"`` strings so
+    the frontend review grid can show readable, row-level reasons."""
+    messages: list[str] = []
+    if isinstance(errors, dict):
+        for field, errs in errors.items():
+            prefix = "" if field == "non_field_errors" else f"{field}: "
+            if isinstance(errs, (list, tuple)):
+                messages.extend(f"{prefix}{err}" for err in errs)
+            else:
+                messages.append(f"{prefix}{errs}")
+    elif isinstance(errors, (list, tuple)):
+        messages.extend(str(err) for err in errors)
+    else:
+        messages.append(str(errors))
+    return messages
+
+
+def bulk_create_medicines(*, rows: list[dict], user) -> dict:
+    """Create medicines in bulk, returning per-row outcomes.
+
+    Reuses :class:`MedicineWriteSerializer` for per-row validation and
+    business rules (BUP↔strength, selling_price ≤ mrp, …) so bulk import is
+    consistent with single-medicine creation — no duplicated logic.
+
+    Product behaviour (confirmed with the client):
+
+    * **Duplicates** — a row matching an existing *active* medicine on
+      ``(name, category, bup_category)`` (the model's unique key) is
+      **skipped** (never modified) and reported.
+    * **Partial success** — valid, non-duplicate rows are committed even when
+      sibling rows fail; failures come back with row-level reasons. Each row
+      is saved inside its own savepoint, so one failure can't roll back the
+      successful rows.
+    """
+    # Local import avoids any import-order coupling at module load.
+    from .serializers import MedicineWriteSerializer
+
+    created: list[dict] = []
+    skipped: list[dict] = []
+    errors: list[dict] = []
+
+    for idx, raw in enumerate(rows):
+        # 1-based row number that matches the CSV data row shown in the review
+        # grid. The frontend forwards it; fall back to positional index.
+        row_number = raw.get("row_number") or (idx + 1)
+        payload = {k: v for k, v in raw.items() if k != "row_number"}
+
+        serializer = MedicineWriteSerializer(data=payload)
+        if not serializer.is_valid():
+            errors.append(
+                {
+                    "row_number": row_number,
+                    "errors": _flatten_serializer_errors(serializer.errors),
+                }
+            )
+            continue
+
+        data = serializer.validated_data
+        name = data["name"]
+        category = data["category"]
+        bup_category = data.get("bup_category")
+
+        if Medicine.objects.filter(
+            is_active=True,
+            name=name,
+            category=category,
+            bup_category=bup_category,
+        ).exists():
+            skipped.append(
+                {
+                    "row_number": row_number,
+                    "name": name,
+                    "reason": "Already exists — an active medicine with the same name, category and strength is registered.",
+                }
+            )
+            continue
+
+        try:
+            with transaction.atomic():
+                medicine = serializer.save(created_by=user, updated_by=user)
+        except IntegrityError:
+            # Lost a race to a concurrent insert of the same unique key.
+            skipped.append(
+                {
+                    "row_number": row_number,
+                    "name": name,
+                    "reason": "Already exists (created concurrently).",
+                }
+            )
+            continue
+
+        created.append(
+            {"row_number": row_number, "id": str(medicine.id), "name": medicine.name}
+        )
+
+    logger.info(
+        "MEDICINE_BULK_IMPORT: created=%d skipped=%d failed=%d (by %s)",
+        len(created),
+        len(skipped),
+        len(errors),
+        getattr(user, "email", user),
+    )
+
+    return {
+        "created": created,
+        "skipped": skipped,
+        "errors": errors,
+        "summary": {
+            "total": len(rows),
+            "created": len(created),
+            "skipped": len(skipped),
+            "failed": len(errors),
+        },
+    }
+
+
+# ────────────────────────────────────────────────────────────
 # Audit Removal
 # ────────────────────────────────────────────────────────────
 

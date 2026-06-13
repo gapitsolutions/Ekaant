@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-11 (IST)
+> **Last Updated:** 2026-06-14 (IST)
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -844,6 +844,71 @@ Validation:
 Response (201): full medicine read payload.
 
 Errors: 400 validation, 409 duplicate active medicine.
+
+### 7.4.1 `POST /api/v1/pharmacy/inventory/medicines/bulk-import/`
+
+View: `MedicineBulkImportView`
+Serializer: `MedicineBulkImportSerializer` (request envelope); per-row validation reuses `MedicineWriteSerializer`
+Service: `services.bulk_create_medicines`
+Permission: `IsPharmacistOrAdmin`
+
+**Use case:** Bulk-register medicines from a parsed CSV (Inventory → Import
+Medicines). The frontend parses/validates the CSV and lets the user fix rows
+in a review grid before submitting; only then is this endpoint called.
+
+Request body:
+
+```json
+{
+  "items": [
+    {
+      "row_number": 1,
+      "name": "Paracetamol 500mg",
+      "salt": "Paracetamol",
+      "category": "NRx",
+      "bup_category": null,
+      "manufacturer": "Cipla",
+      "reorder_level": 50,
+      "tablets_per_strip": 10,
+      "mrp": "20.00",
+      "selling_price": "18.00"
+    }
+  ]
+}
+```
+
+- `items`: 1–2000 rows. Each row carries the same fields as the single
+  `POST` body **except `supplier_ids`** — the relational Medicine↔Supplier
+  link is intentionally excluded from CSV (UUIDs aren't human-authorable; no
+  name-mapping mechanism exists). Suppliers are attached later via Edit Medicine.
+- `row_number` (optional): 1-based CSV data row, echoed back in the report so
+  the UI can map outcomes to grid rows. Falls back to positional index.
+
+Per-row validation is identical to single creation (`selling_price ≤ mrp`;
+BUP↔strength rules).
+
+**Behaviour (product decisions):**
+
+- **Duplicates** — a row matching an existing *active* medicine on
+  `(name, category, bup_category)` is **skipped** (never modified) and reported.
+- **Partial success** — valid, non-duplicate rows are committed even when
+  sibling rows fail; each row is saved in its own savepoint. Failures are
+  returned with row-level messages.
+
+Response (200): per-row report (note: 200, not 201 — this is a batch report,
+not a single resource):
+
+```json
+{
+  "created": [{ "row_number": 1, "id": "uuid", "name": "Paracetamol 500mg" }],
+  "skipped": [{ "row_number": 4, "name": "Aspirin", "reason": "Already exists — ..." }],
+  "errors": [{ "row_number": 7, "errors": ["selling_price: Selling price cannot exceed MRP."] }],
+  "summary": { "total": 7, "created": 1, "skipped": 1, "failed": 2 }
+}
+```
+
+Errors: 400 if `items` is missing/empty or exceeds 2000 rows (envelope-level).
+Row-level problems never fail the request — they appear under `errors`.
 
 ### 7.5 `GET /api/v1/pharmacy/inventory/medicines/<id>/`
 
@@ -1949,6 +2014,7 @@ Stock movement type reference:
 - `DELETE /api/v1/pharmacy/suppliers/<supplier_id>/` (soft-delete)
 - `GET    /api/v1/pharmacy/inventory/medicines/`
 - `POST   /api/v1/pharmacy/inventory/medicines/`
+- `POST   /api/v1/pharmacy/inventory/medicines/bulk-import/`
 - `GET    /api/v1/pharmacy/inventory/medicines/<id>/`
 - `PATCH  /api/v1/pharmacy/inventory/medicines/<id>/`
 - `DELETE /api/v1/pharmacy/inventory/medicines/<id>/`

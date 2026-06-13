@@ -65,6 +65,7 @@ import {
   Archive,
   FileSpreadsheet,
   FileImage,
+  FileInput,
   TrendingDown,
   Pencil,
   Eye,
@@ -98,6 +99,7 @@ import {
   type LowStockReportItem,
   type ExpiryReportRow,
 } from "@/lib/pharmacy-api";
+import { ImportMedicinesDialog } from "@/components/pharmacy/import-medicines-dialog";
 
 type TabValue = "list" | "invoice" | "audit";
 type CategoryFilter = "all" | MedicineCategory;
@@ -111,6 +113,7 @@ export default function InventoryWorkstationPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [bupFilter, setBupFilter] = useState<BupStrength | "all">("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Medicine | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
@@ -253,6 +256,14 @@ export default function InventoryWorkstationPage() {
               <Calendar className="h-4 w-4 text-primary" />
               <span>{medicines.length} Predefined Formulations</span>
             </div>
+            <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(true)}
+              className="bg-white text-primary border-primary/30 hover:bg-teal-50 font-extrabold rounded-xl h-10 px-4 shadow-sm flex items-center gap-2"
+            >
+              <FileInput className="h-4 w-4" />
+              Import CSV
+            </Button>
             <Button
               onClick={() => setAddDialogOpen(true)}
               className="bg-primary hover:bg-primary-dark text-white font-extrabold rounded-xl h-10 px-4 shadow-md shadow-teal-900/10 flex items-center gap-2 hover:scale-[1.01] transition-transform"
@@ -859,6 +870,12 @@ export default function InventoryWorkstationPage() {
         onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
       />
 
+      <ImportMedicinesDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onSuccess={() => loadMedicines()}
+      />
+
       <MedicineFormDialog
         open={!!editTarget}
         onOpenChange={(open) => {
@@ -1199,8 +1216,8 @@ function MedicineFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] rounded-2xl p-6 bg-white border border-slate-100">
-        <DialogHeader className="pb-3 border-b border-slate-50">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden rounded-2xl bg-white border border-slate-100">
+        <DialogHeader className="p-6 pb-3 border-b border-slate-50 flex-shrink-0">
           <DialogTitle className="text-base font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Pill className="h-5 w-5 text-primary" />
             {isEdit ? "Edit Medicine" : "Register New Medicine"}
@@ -1212,7 +1229,7 @@ function MedicineFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 py-4">
+        <div className="grid grid-cols-2 gap-4 px-6 py-4 flex-1 overflow-y-auto">
           <div className="space-y-1.5">
             <Label className="text-xs font-bold text-slate-500">
               Formulation Category
@@ -1493,7 +1510,7 @@ function MedicineFormDialog({
           </div>
         </div>
 
-        <DialogFooter className="pt-2 border-t border-slate-50">
+        <DialogFooter className="p-6 pt-3 border-t border-slate-50 flex-shrink-0 bg-white">
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
@@ -1829,9 +1846,14 @@ function PurchaseInvoiceForm({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
-        {/* Invoice Metadata Header */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-          <div className="space-y-1.5">
+        {/* Invoice Metadata Header.
+            Responsive: 1 col (mobile) → 2 cols (sm) → single 12-col row (xl).
+            Column spans give the Supplier field more room than the dates so a
+            long company name has space, and each cell carries ``min-w-0`` so a
+            long value truncates inside its own track instead of overflowing
+            into the neighbouring control. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+          <div className="space-y-1.5 min-w-0 xl:col-span-2">
             <Label className="text-xs font-bold text-slate-500">
               Invoice / Challan No.
             </Label>
@@ -1842,16 +1864,22 @@ function PurchaseInvoiceForm({
             />
             <FieldError message={apiErrors.get("invoice_number")} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0 xl:col-span-4">
             <Label className="text-xs font-bold text-slate-500">
               Supplier Company
             </Label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 min-w-0">
               <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger className="flex-1 h-11 rounded-xl bg-white border-slate-200 font-bold text-xs text-slate-700">
+                <SelectTrigger
+                  title={
+                    suppliers.find((s) => s.id === supplierId)?.company_name ||
+                    undefined
+                  }
+                  className="flex-1 min-w-0 h-11 rounded-xl bg-white border-slate-200 font-bold text-xs text-slate-700"
+                >
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-slate-200 text-xs">
+                <SelectContent className="rounded-xl border-slate-200 text-xs min-w-[16rem] max-w-[min(22rem,90vw)]">
                   {suppliers.length === 0 ? (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
                       No active suppliers yet.
@@ -1890,7 +1918,7 @@ function PurchaseInvoiceForm({
             />
             <FieldError message={apiErrors.get("supplier_id")} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0 xl:col-span-2">
             <Label className="text-xs font-bold text-slate-500">
               Order Date
             </Label>
@@ -1902,7 +1930,7 @@ function PurchaseInvoiceForm({
             />
             <FieldError message={apiErrors.get("order_date")} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0 xl:col-span-2">
             <Label className="text-xs font-bold text-slate-500">
               Invoice Date
             </Label>
@@ -1914,7 +1942,7 @@ function PurchaseInvoiceForm({
             />
             <FieldError message={apiErrors.get("invoice_date")} />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0 xl:col-span-2">
             <Label className="text-xs font-bold text-slate-500">
               Delivery Date
             </Label>

@@ -195,6 +195,24 @@ class MedicineDeleteSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class MedicineBulkImportSerializer(serializers.Serializer):
+    """Request body for the CSV bulk-import endpoint.
+
+    Intentionally thin: each item is a free-form dict whose per-row validation
+    and business rules are delegated to ``MedicineWriteSerializer`` inside
+    ``services.bulk_create_medicines`` — so bulk import enforces exactly the
+    same rules as single-medicine creation, with no duplicated logic.
+    ``max_length`` bounds the payload to keep one request from creating an
+    unbounded number of rows.
+    """
+
+    items = serializers.ListField(
+        child=serializers.DictField(),
+        allow_empty=False,
+        max_length=2000,
+    )
+
+
 # ────────────────────────────────────────────────────────────
 # Supplier
 # ────────────────────────────────────────────────────────────

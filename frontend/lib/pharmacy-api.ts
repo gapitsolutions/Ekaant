@@ -100,6 +100,36 @@ export async function addInventoryMedicine(
   });
 }
 
+// ── Bulk CSV import ──
+export interface MedicineBulkImportResult {
+  created: { row_number: number; id: string; name: string }[];
+  skipped: { row_number: number; name: string; reason: string }[];
+  errors: { row_number: number; errors: string[] }[];
+  summary: {
+    total: number;
+    created: number;
+    skipped: number;
+    failed: number;
+  };
+}
+
+/**
+ * Bulk-create medicines from parsed CSV rows. The backend reuses the same
+ * per-row validation as single creation, skips duplicates, and returns a
+ * per-row report (created / skipped / failed). See API_BLUEPRINT §7.x.
+ */
+export async function importMedicinesBulk(
+  items: Record<string, unknown>[],
+): Promise<MedicineBulkImportResult> {
+  return apiRequest<MedicineBulkImportResult>(
+    "/api/v1/pharmacy/inventory/medicines/bulk-import/",
+    {
+      method: "POST",
+      body: { items },
+    },
+  );
+}
+
 export async function updateInventoryMedicine(
   medicineId: string,
   payload: MedicineUpdatePayload,

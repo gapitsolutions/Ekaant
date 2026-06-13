@@ -241,3 +241,95 @@ class DispensePayloadCompatibilityTests(TestCase):
         """Documents WHY the frontend sends days=1: days has min_value=1."""
         serializer = DispenseCreateSerializer(data=self._payload(days=0))
         self.assertFalse(serializer.is_valid())
+
+
+class MedicineBulkImportTests(TestCase):
+    """Bulk CSV import: reuses MedicineWriteSerializer per row, skips
+    duplicates on (name, category, bup_category), and supports partial
+    success (valid rows commit even when siblings fail)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="rx@example.com", password="x", role="pharmacist"
+        )
+
+    def _row(self, **over):
+        base = {
+            "row_number": 1,
+            "name": "Amoxicillin 250",
+            "salt": "Amoxicillin",
+            "category": "Rx",
+            "bup_category": None,
+            "manufacturer": "Cipla",
+            "reorder_level": 50,
+            "tablets_per_strip": 10,
+            "mrp": "30.00",
+            "selling_price": "25.00",
+        }
+        base.update(over)
+        return base
+
+    def test_creates_multiple_valid_rows(self):
+        result = services.bulk_create_medicines(
+            rows=[
+                self._row(row_number=1, name="Med A"),
+                self._row(row_number=2, name="Med B"),
+            ],
+            user=self.user,
+        )
+        self.assertEqual(result["summary"]["created"], 2)
+        self.assertEqual(result["summary"]["skipped"], 0)
+        self.assertEqual(result["summary"]["failed"], 0)
+        self.assertEqual(Medicine.objects.filter(is_active=True).count(), 2)
+
+    def test_skips_existing_active_duplicate(self):
+        Medicine.objects.create(
+            name="Med A",
+            salt="x",
+            category=MedicineCategory.RX,
+            manufacturer="m",
+            mrp=Decimal("10.00"),
+            selling_price=Decimal("9.00"),
+        )
+        result = services.bulk_create_medicines(
+            rows=[self._row(name="Med A")], user=self.user
+        )
+        self.assertEqual(result["summary"]["created"], 0)
+        self.assertEqual(result["summary"]["skipped"], 1)
+        self.assertEqual(Medicine.objects.filter(name="Med A").count(), 1)
+
+    def test_in_file_duplicate_first_created_second_skipped(self):
+        result = services.bulk_create_medicines(
+            rows=[
+                self._row(row_number=1, name="Dup"),
+                self._row(row_number=2, name="Dup"),
+            ],
+            user=self.user,
+        )
+        self.assertEqual(result["summary"]["created"], 1)
+        self.assertEqual(result["summary"]["skipped"], 1)
+
+    def test_partial_success_valid_rows_commit_invalid_reported(self):
+        result = services.bulk_create_medicines(
+            rows=[
+                self._row(row_number=1, name="Good"),
+                # selling_price > mrp → fails MedicineWriteSerializer.validate
+                self._row(row_number=2, name="Bad", selling_price="999.00"),
+                # BUP without a strength → fails validate
+                self._row(
+                    row_number=3,
+                    name="BupNoStrength",
+                    category="BUP",
+                    bup_category=None,
+                ),
+            ],
+            user=self.user,
+        )
+        self.assertEqual(result["summary"]["created"], 1)
+        self.assertEqual(result["summary"]["failed"], 2)
+        self.assertTrue(
+            Medicine.objects.filter(name="Good", is_active=True).exists()
+        )
+        self.assertFalse(Medicine.objects.filter(name="Bad").exists())
+        failed_rows = {e["row_number"] for e in result["errors"]}
+        self.assertEqual(failed_rows, {2, 3})
