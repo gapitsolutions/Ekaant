@@ -53,7 +53,6 @@ import {
   getPharmacyQueue,
   createDispense,
   cancelDispense,
-  parseDoseToNumeric,
   BUP_STRENGTHS,
   type Medicine,
   type MedicineBatch,
@@ -71,14 +70,20 @@ interface LineItem {
   category: MedicineCategory;
   batchNumber: string;
   expiryDate: string;
-  dose: string;
-  days: number;
   qty: number;
   unitPrice: number;
   total: number;
 }
 
 const DEFAULT_BUP_STRENGTH: BupStrength = "2.0mg + 0.5mg";
+
+// Dose pattern and number-of-days are no longer captured during dispensing —
+// the pharmacist enters the total quantity directly and the amount is
+// qty × unit price. The backend DispenseLineItem serializer/model still
+// require these descriptive fields, so we persist safe, neutral defaults to
+// preserve backward compatibility (they have no effect on any calculation).
+const DEFAULT_DISPENSE_DOSE = "-";
+const DEFAULT_DISPENSE_DAYS = 1;
 
 export default function DispenseWorkstationPage() {
   const params = useParams();
@@ -97,8 +102,6 @@ export default function DispenseWorkstationPage() {
     useState<BupStrength>(DEFAULT_BUP_STRENGTH);
   const [formMedicineId, setFormMedicineId] = useState("");
   const [formBatchNumber, setFormBatchNumber] = useState("");
-  const [formDose, setFormDose] = useState("1-0-1");
-  const [formDays, setFormDays] = useState(7);
   const [formQty, setFormQty] = useState(0);
   const [formPrice, setFormPrice] = useState(0);
 
@@ -222,13 +225,6 @@ export default function DispenseWorkstationPage() {
     }
   };
 
-  // Auto-calc qty from dose × days
-  useEffect(() => {
-    const daily = parseDoseToNumeric(formDose);
-    const calc = Math.ceil(daily * (formDays || 0));
-    setFormQty(calc || 0);
-  }, [formDose, formDays]);
-
   // ── Add to list ──
   const handleAddToList = () => {
     if (!selectedMedicine) {
@@ -269,7 +265,6 @@ export default function DispenseWorkstationPage() {
       updated[existingIdx] = {
         ...existing,
         qty: newQty,
-        days: existing.days + formDays,
         total: newQty * existing.unitPrice,
       };
       setLineItems(updated);
@@ -282,8 +277,6 @@ export default function DispenseWorkstationPage() {
         category: selectedMedicine.category,
         batchNumber: currentBatch.batch_number,
         expiryDate: currentBatch.expiry_date,
-        dose: formDose,
-        days: formDays,
         qty: formQty,
         unitPrice: formPrice,
         total: formQty * formPrice,
@@ -383,8 +376,10 @@ export default function DispenseWorkstationPage() {
         line_items: lineItems.map((li) => ({
           medicine_id: li.medicineId,
           batch_number: li.batchNumber,
-          dose: li.dose,
-          days: li.days,
+          // Dose/days are no longer entered; send neutral defaults the
+          // backend still requires (descriptive only, not used in pricing).
+          dose: DEFAULT_DISPENSE_DOSE,
+          days: DEFAULT_DISPENSE_DAYS,
           qty: li.qty,
           unit_price: li.unitPrice,
         })),
@@ -557,7 +552,7 @@ export default function DispenseWorkstationPage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-            <Layers className="h-4 w-4 text-primary" /> Formulation &amp; Dose Configuration
+            <Layers className="h-4 w-4 text-primary" /> Formulation &amp; Quantity
           </h3>
         </div>
 
@@ -638,7 +633,7 @@ export default function DispenseWorkstationPage() {
             </div>
           </div>
 
-          {/* ROW 2: Batch / Dose / Days / Qty / Price */}
+          {/* ROW 2: Batch / Expiry / Total Quantity / Price */}
           <div className="grid grid-cols-2 md:grid-cols-12 gap-4 items-end">
             <div className="md:col-span-3 space-y-1.5">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Batch No.</Label>
@@ -668,7 +663,7 @@ export default function DispenseWorkstationPage() {
               </Select>
             </div>
 
-            <div className="md:col-span-2 space-y-1.5">
+            <div className="md:col-span-3 space-y-1.5">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expiry Date</Label>
               <div className="h-10 flex items-center px-2">
                 {currentBatch ? (
@@ -681,32 +676,8 @@ export default function DispenseWorkstationPage() {
               </div>
             </div>
 
-            <div className="md:col-span-2 space-y-1.5">
-              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dose Pattern</Label>
-              <Input
-                value={formDose}
-                onChange={(e) => setFormDose(e.target.value)}
-                placeholder="e.g. 1-0-1"
-                className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs text-center"
-              />
-            </div>
-
-            <div className="md:col-span-1 space-y-1.5">
-              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Days</Label>
-              <Input
-                type="number"
-                min={1}
-                value={formDays}
-                onChange={(e) =>
-                  setFormDays(Math.max(1, parseInt(e.target.value) || 0))
-                }
-                onWheel={(e) => e.currentTarget.blur()}
-                className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-700 text-xs text-center"
-              />
-            </div>
-
-            <div className="md:col-span-2 space-y-1.5">
-              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Tabs</Label>
+            <div className="md:col-span-3 space-y-1.5">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Quantity (Tablets)</Label>
               <Input
                 type="number"
                 min={0}
@@ -715,11 +686,12 @@ export default function DispenseWorkstationPage() {
                   setFormQty(Math.max(0, parseInt(e.target.value) || 0))
                 }
                 onWheel={(e) => e.currentTarget.blur()}
+                placeholder="e.g. 15"
                 className="h-10 rounded-xl bg-teal-50/30 border-teal-200 font-bold text-primary text-xs text-center focus:ring-1 focus:ring-primary"
               />
             </div>
 
-            <div className="md:col-span-2 space-y-1.5">
+            <div className="md:col-span-3 space-y-1.5">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price/Tab</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
@@ -766,7 +738,7 @@ export default function DispenseWorkstationPage() {
           <div className="py-16 text-center">
             <Package className="h-12 w-12 text-slate-200 mx-auto mb-3" />
             <p className="text-sm text-slate-400 font-semibold">Prescription dispensing list is currently empty.</p>
-            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">Select a predefined medicine, configure dose above, and add to populate list.</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">Select a predefined medicine, enter the total quantity above, and add to populate list.</p>
           </div>
         ) : (
           <div>
@@ -774,7 +746,7 @@ export default function DispenseWorkstationPage() {
             <div className="grid grid-cols-12 gap-2 px-5 py-3 bg-slate-50/50 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100">
               <div className="col-span-5">Medicine &amp; Salt Detail</div>
               <div className="col-span-2 text-center">Batch / Exp</div>
-              <div className="col-span-2 text-center">Dose (Days)</div>
+              <div className="col-span-2 text-center">Quantity</div>
               <div className="col-span-2 text-right">Amount</div>
               <div className="col-span-1" />
             </div>
@@ -798,7 +770,6 @@ export default function DispenseWorkstationPage() {
                   </div>
                   <div className="col-span-2 text-center">
                     <p className="text-xs font-extrabold text-slate-800">{li.qty} Tabs</p>
-                    <p className="text-[10px] text-slate-400">{li.dose} daily for {li.days}d</p>
                   </div>
                   <div className="col-span-2 text-right">
                     <p className="font-extrabold text-slate-800">₹{li.total.toLocaleString("en-IN")}</p>

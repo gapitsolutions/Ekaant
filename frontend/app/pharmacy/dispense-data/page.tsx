@@ -781,6 +781,13 @@ export default function InvoiceHistoryPage() {
 // reason. The backend reverts-then-reapplies stock and snapshots the
 // previous state into the amendment audit table.
 
+// Dose pattern and number-of-days are no longer entered during dispensing.
+// Existing lines keep whatever dose/days were stored (no data loss); newly
+// added lines and the submitted payload use these neutral defaults, which the
+// backend still requires but never uses in any calculation.
+const DEFAULT_DISPENSE_DOSE = "-";
+const DEFAULT_DISPENSE_DAYS = 1;
+
 interface AmendLineDraft {
   key: string;
   medicine_id: string;
@@ -906,8 +913,8 @@ function AmendInvoiceDialog({
         medicine_id: med.id,
         medicine_name: med.name,
         batch_number: firstBatch,
-        dose: "",
-        days: "1",
+        dose: DEFAULT_DISPENSE_DOSE,
+        days: String(DEFAULT_DISPENSE_DAYS),
         qty: "1",
         unit_price: med.selling_price,
       },
@@ -932,13 +939,9 @@ function AmendInvoiceDialog({
         toast.error(`Select a batch for ${line.medicine_name}.`);
         return;
       }
-      if (!line.dose.trim()) {
-        toast.error(`Enter a dose for ${line.medicine_name}.`);
-        return;
-      }
-      if ((parseInt(line.days) || 0) < 1 || (parseInt(line.qty) || 0) < 1) {
+      if ((parseInt(line.qty) || 0) < 1) {
         toast.error(
-          `Days and quantity must be at least 1 for ${line.medicine_name}.`,
+          `Quantity must be at least 1 for ${line.medicine_name}.`,
         );
         return;
       }
@@ -959,8 +962,10 @@ function AmendInvoiceDialog({
     const lineItems: DispenseLineItemPayload[] = lines.map((line) => ({
       medicine_id: line.medicine_id,
       batch_number: line.batch_number,
-      dose: line.dose.trim(),
-      days: parseInt(line.days),
+      // Dose/days are no longer editable; preserve any stored value, else
+      // fall back to the neutral defaults the backend still requires.
+      dose: line.dose.trim() || DEFAULT_DISPENSE_DOSE,
+      days: parseInt(line.days) || DEFAULT_DISPENSE_DAYS,
       qty: parseInt(line.qty),
       unit_price: (parseFloat(line.unit_price) || 0).toFixed(2),
     }));
@@ -1034,7 +1039,7 @@ function AmendInvoiceDialog({
                     key={line.key}
                     className="grid grid-cols-12 gap-2 items-end rounded-xl border border-slate-200 bg-slate-50/50 p-3"
                   >
-                    <div className="col-span-12 sm:col-span-4">
+                    <div className="col-span-12 sm:col-span-5">
                       <p className="text-xs font-bold text-slate-700 truncate">
                         {line.medicine_name}
                       </p>
@@ -1056,31 +1061,10 @@ function AmendInvoiceDialog({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <Label className="text-[10px] text-slate-400">Dose</Label>
-                      <Input
-                        value={line.dose}
-                        onChange={(e) =>
-                          updateLine(line.key, { dose: e.target.value })
-                        }
-                        placeholder="5mg"
-                        className="h-9 text-xs bg-white"
-                      />
-                    </div>
-                    <div className="col-span-3 sm:col-span-1">
-                      <Label className="text-[10px] text-slate-400">Days</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={line.days}
-                        onChange={(e) =>
-                          updateLine(line.key, { days: e.target.value })
-                        }
-                        className="h-9 text-xs bg-white text-center"
-                      />
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <Label className="text-[10px] text-slate-400">Qty</Label>
+                    <div className="col-span-5 sm:col-span-3">
+                      <Label className="text-[10px] text-slate-400">
+                        Quantity
+                      </Label>
                       <Input
                         type="number"
                         min={1}
@@ -1091,7 +1075,7 @@ function AmendInvoiceDialog({
                         className="h-9 text-xs bg-white text-center"
                       />
                     </div>
-                    <div className="col-span-2 sm:col-span-2">
+                    <div className="col-span-5 sm:col-span-3">
                       <Label className="text-[10px] text-slate-400">
                         Price (₹)
                       </Label>

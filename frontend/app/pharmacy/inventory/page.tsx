@@ -1615,27 +1615,60 @@ function PurchaseInvoiceForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const apiErrors = useApiErrors();
 
+  // A purchase invoice can carry several batches of the SAME medicine, each
+  // with its own batch number / expiry / price (see backend uniqueness key
+  // `(medicine, batch_number)` — MedicineBatch + PurchaseInvoiceItem). Drafts
+  // are therefore keyed by a standalone unique id, never by medicineId, so a
+  // medicine may legitimately appear on multiple rows.
+  const makeDraftId = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const createDraft = (med: Medicine): InvoiceItemDraft => ({
+    id: makeDraftId(),
+    medicineId: med.id,
+    medicineName: med.name,
+    category: med.category,
+    subcategory: med.bup_category || null,
+    batchNumber: "",
+    expiryDate: "",
+    quantity: 0,
+    purchasePrice: 0,
+    gstPercentage: 12,
+  });
+
   const handleConfirmSelection = () => {
+    // No medicine-level dedup: re-selecting a medicine that is already on the
+    // invoice adds another (blank) batch row for it.
     const newDrafts: InvoiceItemDraft[] = selectedIds
-      .filter((id) => !items.some((i) => i.medicineId === id))
-      .map((id) => {
-        const med = medicines.find((m) => m.id === id);
-        return {
-          id: `${id}-${Date.now()}`,
-          medicineId: id,
-          medicineName: med?.name || "",
-          category: med?.category || "Rx",
-          subcategory: med?.bup_category || null,
-          batchNumber: "",
-          expiryDate: "",
-          quantity: 0,
-          purchasePrice: 0,
-          gstPercentage: 12,
-        };
-      });
+      .map((id) => medicines.find((m) => m.id === id))
+      .filter((m): m is Medicine => Boolean(m))
+      .map(createDraft);
     setItems((prev) => [...prev, ...newDrafts]);
     setSelectedIds([]);
     setSelectDialogOpen(false);
+  };
+
+  // Clone an existing row's medicine identity into a fresh blank batch row,
+  // inserted directly beneath the source so batches of one medicine stay
+  // grouped. The primary, discoverable path for adding multiple batches.
+  const handleAddBatch = (sourceId: string) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.id === sourceId);
+      if (idx === -1) return prev;
+      const source = prev[idx];
+      const clone: InvoiceItemDraft = {
+        ...source,
+        id: makeDraftId(),
+        batchNumber: "",
+        expiryDate: "",
+        quantity: 0,
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
   };
 
   const handleRemove = (id: string) => {
@@ -1680,7 +1713,8 @@ function PurchaseInvoiceForm({
   };
 
   const summary = useMemo(() => {
-    const formCount = items.length;
+    const batchLines = items.length;
+    const formulations = new Set(items.map((i) => i.medicineId)).size;
     const totalQty = items.reduce((s, i) => s + i.quantity, 0);
     const gstTotal = items.reduce(
       (s, i) => s + (i.quantity * i.purchasePrice * i.gstPercentage) / 100,
@@ -1691,7 +1725,8 @@ function PurchaseInvoiceForm({
       0,
     );
     return {
-      formulations: formCount,
+      formulations,
+      batchLines,
       totalQty,
       gstTotal,
       grandTotal: subtotal + gstTotal,
@@ -1728,6 +1763,21 @@ function PurchaseInvoiceForm({
         toast.error(`Check qty, price, GST for ${i.medicineName}`);
         return;
       }
+    }
+    // Uniqueness is (medicine + batch number), matching the backend batch
+    // identity. Different batches of the same medicine are fine; the SAME
+    // batch number listed twice for one medicine is rejected here (the
+    // backend rejects it too) since both rows map to one physical batch.
+    const seenBatchKeys = new Set<string>();
+    for (const i of items) {
+      const key = `${i.medicineId}::${i.batchNumber.trim().toUpperCase()}`;
+      if (seenBatchKeys.has(key)) {
+        toast.error(
+          `Batch "${i.batchNumber.trim().toUpperCase()}" is listed more than once for ${i.medicineName}. Use a different batch number or combine the quantities into one row.`,
+        );
+        return;
+      }
+      seenBatchKeys.add(key);
     }
 
     apiErrors.clear();
@@ -2089,14 +2139,24 @@ function PurchaseInvoiceForm({
                       />
                     </TableCell>
                     <TableCell>
-                      <button
-                        type="button"
-                        className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
-                        onClick={() => handleRemove(i.id)}
-                        title="Remove item"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:text-primary hover:bg-teal-50 hover:border-teal-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
+                          onClick={() => handleAddBatch(i.id)}
+                          title={`Add another batch of ${i.medicineName}`}
+                        >
+                          <Layers className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm opacity-0 group-hover:opacity-100"
+                          onClick={() => handleRemove(i.id)}
+                          title="Remove item"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -2110,10 +2170,11 @@ function PurchaseInvoiceForm({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto">
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
-                Unique Formulations
+                Formulations / Batches
               </span>
               <strong className="text-xs text-slate-800 block mt-1">
-                {summary.formulations} Items
+                {summary.formulations} med · {summary.batchLines} batch
+                {summary.batchLines === 1 ? "" : "es"}
               </strong>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
@@ -2182,7 +2243,9 @@ function PurchaseInvoiceForm({
               Select Medicines for Invoice
             </DialogTitle>
             <DialogDescription className="text-xs font-semibold text-slate-500">
-              Check all the items that are present on this invoice.
+              Check all the items that are present on this invoice. Re-select a
+              medicine (or use the layers icon on a row) to add another batch of
+              it.
             </DialogDescription>
             <div className="relative mt-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -2219,6 +2282,9 @@ function PurchaseInvoiceForm({
               <div className="space-y-1 px-4 py-2">
                 {filteredMedicines.map((m) => {
                   const checked = selectedIds.includes(m.id);
+                  const addedCount = items.filter(
+                    (i) => i.medicineId === m.id,
+                  ).length;
                   return (
                     <label
                       key={m.id}
@@ -2238,8 +2304,14 @@ function PurchaseInvoiceForm({
                         className="mt-0.5 rounded-md border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-black text-slate-800 truncate">
+                        <div className="text-sm font-black text-slate-800 truncate flex items-center gap-1.5">
                           {m.name}
+                          {addedCount > 0 ? (
+                            <span className="text-[9px] font-bold text-primary bg-teal-50 border border-teal-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                              {addedCount} batch{addedCount === 1 ? "" : "es"}{" "}
+                              added
+                            </span>
+                          ) : null}
                         </div>
                         <div className="text-xs text-slate-500 truncate">
                           {m.salt} · {m.category}
