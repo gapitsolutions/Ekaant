@@ -575,7 +575,10 @@ class PharmacyQueueView(APIView):
                 "status": s.status,
                 "checked_in_at": s.checkin_time,
                 "checked_in_by_name": s.checked_in_by.full_name,
-                "outstanding_debt": s.outstanding_debt_at_checkin,
+                # Live patient balance from the ledger cache (the true prior
+                # due the dispense screen recovers against), not the stale
+                # check-in snapshot.
+                "outstanding_debt": s.patient.outstanding_debt,
                 "patient": {
                     "file_number": s.file_number,
                     "phone": s.patient.phone_number,
@@ -610,9 +613,13 @@ class DispenseCreateView(APIView):
                 "patient_id": str(invoice.patient_id),
                 "patient_name": invoice.patient.full_name,
                 "subtotal": invoice.subtotal,
+                "consultation_fee": invoice.consultation_fee,
                 "discount_percentage": invoice.discount_percentage,
                 "discount_amount": invoice.discount_amount,
                 "net_payable": invoice.net_payable,
+                "amount_paid": invoice.amount_paid,
+                "invoice_outstanding": invoice.invoice_outstanding,
+                "patient_outstanding": invoice.patient.outstanding_debt,
                 "payment_method": invoice.payment_method,
                 "cash_amount": invoice.cash_amount,
                 "online_amount": invoice.online_amount,
@@ -663,9 +670,15 @@ def _dispense_invoice_detail_payload(invoice: DispenseInvoice) -> dict:
         "dispense_date": invoice.dispense_date,
         "dispense_time": invoice.dispense_time,
         "subtotal": str(invoice.subtotal),
+        "consultation_fee": str(invoice.consultation_fee),
         "discount_percentage": str(invoice.discount_percentage),
         "discount_amount": str(invoice.discount_amount),
         "net_payable": str(invoice.net_payable),
+        "amount_paid": str(invoice.amount_paid),
+        "invoice_outstanding": str(invoice.invoice_outstanding),
+        "patient_outstanding": str(
+            invoice.patient.outstanding_debt if invoice.patient_id else "0"
+        ),
         "payment_method": invoice.payment_method,
         "cash_amount": str(invoice.cash_amount),
         "online_amount": str(invoice.online_amount),
@@ -801,11 +814,16 @@ class DispenseHistoryListView(APIView):
         stats_agg = queryset.aggregate(
             unique_patients=Count("patient_id", distinct=True),
             total_revenue=Coalesce(Sum("net_payable"), Decimal("0")),
+            total_collected=Coalesce(Sum("amount_paid"), Decimal("0")),
             total_records=Count("id"),
         )
+        total_revenue = stats_agg["total_revenue"] or Decimal("0")
+        total_collected = stats_agg["total_collected"] or Decimal("0")
         stats = {
             "unique_patients": stats_agg["unique_patients"] or 0,
-            "total_revenue": str(stats_agg["total_revenue"] or Decimal("0")),
+            "total_revenue": str(total_revenue),
+            "total_collected": str(total_collected),
+            "total_outstanding": str(total_revenue - total_collected),
             "total_records": stats_agg["total_records"] or 0,
         }
 
@@ -885,17 +903,27 @@ class RevenueReportView(APIView):
             dispense_date__lte=end,
         )
 
+        # ``total_revenue`` = amount BILLED (net_payable). ``total_collected``
+        # = amount actually received (cash+online = amount_paid). They differ
+        # once partial payment is allowed; ``total_outstanding`` is the credit
+        # extended in the period (billed − collected).
         summary = qs.aggregate(
             total_revenue=Coalesce(Sum("net_payable"), Decimal("0")),
+            total_collected=Coalesce(Sum("amount_paid"), Decimal("0")),
             total_cash=Coalesce(Sum("cash_amount"), Decimal("0")),
             total_online=Coalesce(Sum("online_amount"), Decimal("0")),
+            total_consultation=Coalesce(Sum("consultation_fee"), Decimal("0")),
             total_transactions=Count("id"),
+        )
+        summary["total_outstanding"] = (
+            summary["total_revenue"] - summary["total_collected"]
         )
 
         daily = (
             qs.values("dispense_date")
             .annotate(
                 revenue=Coalesce(Sum("net_payable"), Decimal("0")),
+                collected=Coalesce(Sum("amount_paid"), Decimal("0")),
                 cash=Coalesce(Sum("cash_amount"), Decimal("0")),
                 online=Coalesce(Sum("online_amount"), Decimal("0")),
                 transactions=Count("id"),

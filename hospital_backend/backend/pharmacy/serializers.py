@@ -536,6 +536,11 @@ class DispenseCreateSerializer(serializers.Serializer):
     session_id = serializers.UUIDField()
     line_items = DispenseLineItemWriteSerializer(many=True, min_length=1)
     payment = PaymentWriteSerializer()
+    # Optional: explicit consultation fee for this invoice. Omit/null → the
+    # configured hospital default is applied server-side. Send 0 to waive it.
+    consultation_fee = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=0, required=False, allow_null=True
+    )
     next_followup_date = serializers.DateField(required=False, allow_null=True)
 
     def validate_next_followup_date(self, value):
@@ -558,6 +563,10 @@ class DispenseAmendSerializer(serializers.Serializer):
     amend_reason = serializers.CharField(max_length=255)
     line_items = DispenseLineItemWriteSerializer(many=True, min_length=1)
     payment = PaymentWriteSerializer()
+    # Optional: omit/null preserves the invoice's existing consultation fee.
+    consultation_fee = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=0, required=False, allow_null=True
+    )
     next_followup_date = serializers.DateField(required=False, allow_null=True)
 
     def validate_amend_reason(self, value):
@@ -617,6 +626,9 @@ class DispenseInvoiceListItemSerializer(serializers.Serializer):
             if invoice.visit_session_id
             else "",
             "amount": invoice.net_payable,
+            "consultation_fee": invoice.consultation_fee,
+            "amount_paid": invoice.amount_paid,
+            "outstanding": invoice.invoice_outstanding,
             "date": invoice.dispense_date,
             "time": invoice.dispense_time.strftime("%I:%M %p"),
             "pharmacist": invoice.dispensed_by.full_name

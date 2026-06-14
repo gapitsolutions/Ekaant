@@ -110,6 +110,8 @@ export default function InvoiceHistoryPage() {
   const [stats, setStats] = useState<DispenseHistoryStats>({
     unique_patients: 0,
     total_revenue: "0",
+    total_collected: "0",
+    total_outstanding: "0",
     total_records: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -203,7 +205,9 @@ export default function InvoiceHistoryPage() {
       "File No.",
       "Date",
       "Time",
-      "Amount",
+      "Bill Amount",
+      "Amount Paid",
+      "Outstanding",
       "Payment",
       "Status",
       "Pharmacist",
@@ -215,6 +219,8 @@ export default function InvoiceHistoryPage() {
       it.date,
       it.time,
       it.amount,
+      it.amount_paid,
+      it.outstanding,
       it.payment_method,
       it.status,
       it.pharmacist,
@@ -416,17 +422,19 @@ export default function InvoiceHistoryPage() {
               </div>
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                  Total Revenue
+                  Total Collected
                 </p>
                 <h3 className="text-2xl font-black text-primary tracking-tight mt-0.5">
                   {"\u20B9"}
-                  {(parseFloat(stats.total_revenue) || 0).toLocaleString(
+                  {(parseFloat(stats.total_collected) || 0).toLocaleString(
                     "en-IN",
                     { maximumFractionDigits: 0 },
                   )}
                 </h3>
                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                  {rangeLabel}
+                  {parseFloat(stats.total_outstanding) > 0
+                    ? `${rangeLabel} \u00B7 \u20B9${(parseFloat(stats.total_outstanding) || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })} outstanding`
+                    : rangeLabel}
                 </p>
               </div>
             </CardContent>
@@ -575,7 +583,7 @@ export default function InvoiceHistoryPage() {
                           Fulfillment
                         </TableHead>
                         <TableHead className="h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500">
-                          Total Amount
+                          Amount Paid
                         </TableHead>
                         <TableHead className="h-10 text-right font-bold uppercase text-[10px] tracking-wider text-slate-500 px-6">
                           Action
@@ -630,9 +638,17 @@ export default function InvoiceHistoryPage() {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 text-right align-top">
-                            <span className="text-lg font-semibold text-slate-800 tracking-tight">
-                              {formatAmount(it.amount)}
+                            <span className="text-lg font-bold text-slate-800 tracking-tight block">
+                              {formatAmount(it.amount_paid)}
                             </span>
+                            <span className="text-[11px] font-medium text-slate-400 block mt-0.5">
+                              Bill: {formatAmount(it.amount)}
+                            </span>
+                            {parseFloat(it.outstanding) > 0 && (
+                              <span className="text-[11px] font-bold text-rose-600 block mt-0.5">
+                                Due: {formatAmount(it.outstanding)}
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="px-6 py-4 text-right align-top">
                             {renderActions(it)}
@@ -687,9 +703,19 @@ export default function InvoiceHistoryPage() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-3 pt-1">
-                        <span className="text-base font-semibold text-slate-800">
-                          {formatAmount(it.amount)}
-                        </span>
+                        <div>
+                          <span className="text-base font-bold text-slate-800 block">
+                            {formatAmount(it.amount_paid)}
+                          </span>
+                          <span className="text-[11px] font-medium text-slate-400 block">
+                            Bill: {formatAmount(it.amount)}
+                          </span>
+                          {parseFloat(it.outstanding) > 0 && (
+                            <span className="text-[11px] font-bold text-rose-600 block">
+                              Due: {formatAmount(it.outstanding)}
+                            </span>
+                          )}
+                        </div>
                         {renderActions(it)}
                       </div>
                     </div>
@@ -820,6 +846,7 @@ function AmendInvoiceDialog({
   const [cashAmount, setCashAmount] = useState("");
   const [onlineAmount, setOnlineAmount] = useState("");
   const [discount, setDiscount] = useState("0");
+  const [consultationFee, setConsultationFee] = useState("0");
   const [notes, setNotes] = useState("");
   const [reason, setReason] = useState("");
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -857,6 +884,7 @@ function AmendInvoiceDialog({
         setCashAmount(detail.cash_amount);
         setOnlineAmount(detail.online_amount);
         setDiscount(detail.discount_amount);
+        setConsultationFee(detail.consultation_fee ?? "0");
         setNotes(detail.notes);
         setMedicines(meds.items || []);
       })
@@ -880,7 +908,9 @@ function AmendInvoiceDialog({
       ),
     [lines],
   );
-  const netPayable = Math.max(0, subtotal - (parseFloat(discount) || 0));
+  const consultationFeeNum = Math.max(0, parseFloat(consultationFee) || 0);
+  const netPayable =
+    Math.max(0, subtotal - (parseFloat(discount) || 0)) + consultationFeeNum;
 
   const updateLine = (key: string, patch: Partial<AmendLineDraft>) => {
     setLines((prev) =>
@@ -950,11 +980,13 @@ function AmendInvoiceDialog({
         return;
       }
     }
+    // Partial payment is allowed; the only invalid case is paying MORE than
+    // the amended net payable (which would create an unexpected credit).
     if (paymentMethod === "Split") {
       const split =
         (parseFloat(cashAmount) || 0) + (parseFloat(onlineAmount) || 0);
-      if (Math.abs(split - netPayable) > 0.01) {
-        toast.error("Cash + Online must equal the net payable for Split.");
+      if (split - netPayable > 0.01) {
+        toast.error("Cash + Online cannot exceed the net payable.");
         return;
       }
     }
@@ -975,16 +1007,24 @@ function AmendInvoiceDialog({
       const detail = await amendDispense(sessionId, {
         amend_reason: reason.trim(),
         line_items: lineItems,
+        consultation_fee: consultationFeeNum.toFixed(2),
         payment: {
           payment_method: paymentMethod,
+          // Actual tendered amounts. For single-mode Cash/Online the full
+          // net payable is recorded as paid (no partial-amend UI); Split
+          // sends the entered legs (which may total less → outstanding).
           cash_amount:
-            paymentMethod === "Split"
-              ? (parseFloat(cashAmount) || 0).toFixed(2)
-              : 0,
+            paymentMethod === "Cash"
+              ? netPayable.toFixed(2)
+              : paymentMethod === "Split"
+                ? (parseFloat(cashAmount) || 0).toFixed(2)
+                : 0,
           online_amount:
-            paymentMethod === "Split"
-              ? (parseFloat(onlineAmount) || 0).toFixed(2)
-              : 0,
+            paymentMethod === "Online"
+              ? netPayable.toFixed(2)
+              : paymentMethod === "Split"
+                ? (parseFloat(onlineAmount) || 0).toFixed(2)
+                : 0,
           discount: (parseFloat(discount) || 0).toFixed(2),
           notes,
         },
@@ -1163,6 +1203,19 @@ function AmendInvoiceDialog({
                   step="0.01"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
+                  className="h-10 mt-1 bg-white text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-slate-500">
+                  Consultation Fee (₹)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={consultationFee}
+                  onChange={(e) => setConsultationFee(e.target.value)}
                   className="h-10 mt-1 bg-white text-xs"
                 />
               </div>

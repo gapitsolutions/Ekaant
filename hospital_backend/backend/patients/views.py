@@ -222,11 +222,15 @@ class PatientLookupView(APIView):
     def get(self, request):
         query = request.query_params.get("q", "").strip()
         file_number = request.query_params.get("file_number", "").strip()
+        # Optional repeated-key param scoping ``q`` to specific patient identity
+        # fields (file_number / full_name / aadhaar_number / hdams_id /
+        # phone_number) — same contract as the receptionist patient list.
+        search_fields = _multi_values(request, "search_fields")
 
         if file_number:
             queryset = Patient.objects.filter(file_number__iexact=file_number)
         elif query:
-            queryset = patient_search_queryset(query)
+            queryset = patient_search_queryset(query, fields=search_fields or None)
         else:
             return success_response({"items": [], "total": 0})
 

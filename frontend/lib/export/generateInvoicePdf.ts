@@ -171,12 +171,15 @@ export async function generateInvoicePdf(
   const subtotal = parseFloat(invoice.subtotal) || 0;
   const discountAmt = parseFloat(invoice.discount_amount) || 0;
   const discountPct = parseFloat(invoice.discount_percentage) || 0;
+  const consultationFee = parseFloat(invoice.consultation_fee) || 0;
   const netPayable = parseFloat(invoice.net_payable) || 0;
+  const amountPaid = parseFloat(invoice.amount_paid) || 0;
+  const invoiceOutstanding = parseFloat(invoice.invoice_outstanding) || 0;
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor("#64748b");
-  doc.text("Subtotal", 14, y);
+  doc.text("Subtotal (Medicines)", 14, y);
   doc.setFont("helvetica", "bold");
   doc.setTextColor("#1e293b");
   doc.text(rupees(subtotal), pageWidth - 14, y, { align: "right" });
@@ -191,6 +194,18 @@ export async function generateInvoicePdf(
       y,
     );
     doc.text(`-${rupees(discountAmt)}`, pageWidth - 14, y, {
+      align: "right",
+    });
+    y += 6;
+  }
+
+  if (consultationFee > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor("#64748b");
+    doc.text("Consultation Fee", 14, y);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor("#1e293b");
+    doc.text(`+${rupees(consultationFee)}`, pageWidth - 14, y, {
       align: "right",
     });
     y += 6;
@@ -213,6 +228,28 @@ export async function generateInvoicePdf(
   doc.setTextColor(HOSPITAL_PRIMARY_COLOR);
   doc.text(rupees(netPayable), pageWidth - 18, y + 6, { align: "right" });
   y += 18;
+
+  // ── Amount paid + outstanding (only meaningful for successful invoices) ──
+  if (invoice.status === "success") {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor("#64748b");
+    doc.text("Amount Paid", 14, y);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor("#1e293b");
+    doc.text(rupees(amountPaid), pageWidth - 14, y, { align: "right" });
+    y += 6;
+
+    if (invoiceOutstanding > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor("#dc2626");
+      doc.text("Outstanding (This Invoice)", 14, y);
+      doc.text(rupees(invoiceOutstanding), pageWidth - 14, y, {
+        align: "right",
+      });
+      y += 6;
+    }
+  }
 
   // ── Pharmacist ──
   if (invoice.pharmacist) {

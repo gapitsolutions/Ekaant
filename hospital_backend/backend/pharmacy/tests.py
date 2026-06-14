@@ -31,6 +31,11 @@ from pharmacy.serializers import (
     PurchaseInvoiceCreateSerializer,
 )
 
+from billing import services as billing_services
+from billing.models import BillingSettings, PatientLedgerEntry
+from patients.models import Patient
+from visits.models import VisitSession, VisitStage, VisitStatus
+
 User = get_user_model()
 
 
@@ -285,6 +290,49 @@ class MedicineBulkImportTests(TestCase):
         self.assertEqual(result["summary"]["failed"], 0)
         self.assertEqual(Medicine.objects.filter(is_active=True).count(), 2)
 
+    def test_bulk_import_persists_row_level_supplier_ids(self):
+        """Row-level supplier assignment in the import review grid persists via
+        the same ``supplier_ids`` M2M as single-medicine creation."""
+        s1 = Supplier.objects.create(company_name="Supplier One")
+        s2 = Supplier.objects.create(company_name="Supplier Two")
+        result = services.bulk_create_medicines(
+            rows=[
+                self._row(
+                    row_number=1,
+                    name="With Suppliers",
+                    supplier_ids=[str(s1.id), str(s2.id)],
+                ),
+                self._row(row_number=2, name="No Suppliers"),
+            ],
+            user=self.user,
+        )
+        self.assertEqual(result["summary"]["created"], 2)
+        med1 = Medicine.objects.get(name="With Suppliers")
+        med2 = Medicine.objects.get(name="No Suppliers")
+        self.assertEqual(
+            set(med1.suppliers.values_list("id", flat=True)), {s1.id, s2.id}
+        )
+        self.assertEqual(med2.suppliers.count(), 0)
+
+    def test_bulk_import_unknown_supplier_id_fails_only_that_row(self):
+        """An invalid supplier UUID is a row-level validation error (partial
+        success preserved), matching single-create behaviour."""
+        result = services.bulk_create_medicines(
+            rows=[
+                self._row(row_number=1, name="Good Row"),
+                self._row(
+                    row_number=2,
+                    name="Bad Supplier",
+                    supplier_ids=["00000000-0000-0000-0000-000000000000"],
+                ),
+            ],
+            user=self.user,
+        )
+        self.assertEqual(result["summary"]["created"], 1)
+        self.assertEqual(result["summary"]["failed"], 1)
+        self.assertTrue(Medicine.objects.filter(name="Good Row").exists())
+        self.assertFalse(Medicine.objects.filter(name="Bad Supplier").exists())
+
     def test_skips_existing_active_duplicate(self):
         Medicine.objects.create(
             name="Med A",
@@ -394,3 +442,154 @@ class MedicineCreateDuplicateTests(TestCase):
             ).status_code,
             status.HTTP_201_CREATED,
         )
+
+
+class DispenseFinancialTests(TestCase):
+    """Consultation fee + partial payment + patient ledger (outstanding &
+    recovery) across the dispense workflow."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="rx@example.com", password="x", role="pharmacist"
+        )
+        self.patient = Patient.objects.create(
+            patient_category="deaddiction",
+            full_name="Ledger Patient",
+            date_of_birth=timezone.localdate().replace(year=1990, month=1, day=1),
+            sex="male",
+            phone_number="9999999999",
+            address_line1="Somewhere",
+        )
+        self.medicine = Medicine.objects.create(
+            name="Paracetamol 500mg",
+            salt="Paracetamol",
+            category=MedicineCategory.NRX,
+            manufacturer="Cipla",
+            mrp=Decimal("60.00"),
+            selling_price=Decimal("50.00"),
+        )
+        self.batch = MedicineBatch.objects.create(
+            medicine=self.medicine,
+            batch_number="P001",
+            expiry_date=timezone.localdate() + timedelta(days=400),
+            quantity=200,
+            initial_quantity=200,
+            purchase_price=Decimal("30.00"),
+        )
+        BillingSettings.load()  # default fee 0 unless a test sets it
+
+    def _session(self):
+        return VisitSession.objects.create(
+            visit_uid=VisitSession.generate_visit_uid(),
+            patient=self.patient,
+            checked_in_by=self.user,
+            current_stage=VisitStage.PHARMACY,
+            status=VisitStatus.IN_PROGRESS,
+        )
+
+    def _dispense(self, *, qty, unit_price, cash=0, online=0, method="Cash",
+                  consultation_fee=None, discount="0"):
+        data = {
+            "session_id": self._session().id,
+            "line_items": [
+                {
+                    "medicine_id": self.medicine.id,
+                    "batch_number": "P001",
+                    "dose": "-",
+                    "days": 1,
+                    "qty": qty,
+                    "unit_price": Decimal(unit_price),
+                }
+            ],
+            "payment": {
+                "payment_method": method,
+                "cash_amount": Decimal(cash),
+                "online_amount": Decimal(online),
+                "discount": Decimal(discount),
+                "notes": "",
+            },
+        }
+        if consultation_fee is not None:
+            data["consultation_fee"] = Decimal(consultation_fee)
+        return services.process_dispense(data=data, user=self.user)
+
+    def _balance(self):
+        return PatientLedgerEntry.balance_for(self.patient.id)
+
+    def test_full_payment_with_consultation_fee_zero_outstanding(self):
+        billing_settings = BillingSettings.load()
+        billing_settings.default_consultation_fee = Decimal("200.00")
+        billing_settings.save()
+
+        inv = self._dispense(qty=10, unit_price="50.00", cash="700.00")
+        self.assertEqual(inv.subtotal, Decimal("500.00"))
+        self.assertEqual(inv.consultation_fee, Decimal("200.00"))
+        self.assertEqual(inv.net_payable, Decimal("700.00"))
+        self.assertEqual(inv.amount_paid, Decimal("700.00"))
+        self.assertEqual(inv.invoice_outstanding, Decimal("0.00"))
+        self.assertEqual(self._balance(), Decimal("0.00"))
+
+    def test_partial_payment_creates_outstanding(self):
+        inv = self._dispense(
+            qty=10, unit_price="50.00", cash="400.00", consultation_fee="200.00"
+        )
+        self.assertEqual(inv.net_payable, Decimal("700.00"))
+        self.assertEqual(inv.amount_paid, Decimal("400.00"))
+        self.assertEqual(inv.invoice_outstanding, Decimal("300.00"))
+        self.assertEqual(self._balance(), Decimal("300.00"))
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.outstanding_debt, Decimal("300.00"))
+
+    def test_recovery_of_previous_due_in_next_invoice(self):
+        # First visit leaves ₹300 outstanding.
+        self._dispense(
+            qty=10, unit_price="50.00", cash="400.00", consultation_fee="200.00"
+        )
+        self.assertEqual(self._balance(), Decimal("300.00"))
+
+        # Second visit: new invoice ₹300, patient pays ₹600 (current + prior).
+        inv2 = self._dispense(
+            qty=6, unit_price="50.00", cash="600.00", consultation_fee="0"
+        )
+        self.assertEqual(inv2.net_payable, Decimal("300.00"))
+        self.assertEqual(inv2.amount_paid, Decimal("600.00"))
+        # 300 prior + 300 new − 600 paid = 0
+        self.assertEqual(self._balance(), Decimal("0.00"))
+
+    def test_overpayment_beyond_total_payable_rejected(self):
+        from rest_framework import serializers as drf_serializers
+
+        with self.assertRaises(drf_serializers.ValidationError):
+            self._dispense(
+                qty=6, unit_price="50.00", cash="500.00", consultation_fee="0"
+            )  # net 300, no prior due, paying 500 > 300
+
+    def test_split_partial_payment(self):
+        inv = self._dispense(
+            qty=20,
+            unit_price="50.00",
+            method="Split",
+            cash="200.00",
+            online="300.00",
+            consultation_fee="0",
+        )
+        self.assertEqual(inv.net_payable, Decimal("1000.00"))
+        self.assertEqual(inv.amount_paid, Decimal("500.00"))
+        self.assertEqual(inv.cash_amount, Decimal("200.00"))
+        self.assertEqual(inv.online_amount, Decimal("300.00"))
+        self.assertEqual(self._balance(), Decimal("500.00"))
+
+    def test_cancel_reverses_ledger(self):
+        inv = self._dispense(
+            qty=10, unit_price="50.00", cash="400.00", consultation_fee="200.00"
+        )
+        self.assertEqual(self._balance(), Decimal("300.00"))
+
+        services.cancel_dispense_for_session(
+            session_id=inv.visit_session_id, reason="patient left", user=self.user
+        )
+        inv.refresh_from_db()
+        self.assertEqual(inv.net_payable, Decimal("0.00"))
+        self.assertEqual(inv.amount_paid, Decimal("0.00"))
+        # Ledger nets back to zero (charge + payment + reversal adjustment).
+        self.assertEqual(self._balance(), Decimal("0.00"))

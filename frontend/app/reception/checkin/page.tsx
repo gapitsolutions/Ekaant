@@ -23,7 +23,12 @@ import {
   checkinPatient,
   getPatientFingerprintTemplate,
   lookupPatient,
+  type PatientSearchField,
 } from "@/lib/hms-api";
+import {
+  PatientSearchFields,
+  patientSearchPlaceholder,
+} from "@/components/patient-search-fields";
 import type { PatientStatus } from "@/lib/types";
 import {
   captureFingerprint,
@@ -146,6 +151,9 @@ export default function CheckinPage() {
   const [rdService, setRdService] = useState<RDServiceInfo | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFields, setSearchFields] = useState<PatientSearchField[]>([
+    "file_number",
+  ]);
   const [searchResults, setSearchResults] = useState<LookupPatient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<LookupPatient | null>(
     null,
@@ -211,7 +219,10 @@ export default function CheckinPage() {
       return;
     }
 
-    lookupPatient(accessToken, { q: searchQuery.trim() })
+    lookupPatient(accessToken, {
+      q: searchQuery.trim(),
+      search_fields: searchFields,
+    })
       .then((result) => {
         const mapped: LookupPatient[] = (result.items || []).map((patient) => {
           const photoUrl =
@@ -485,7 +496,7 @@ export default function CheckinPage() {
               Search Patient
             </CardTitle>
             <CardDescription>
-              Search by File Number, Name, Phone, or Aadhaar
+              Tick the fields to search in, then enter your query
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
@@ -536,6 +547,12 @@ export default function CheckinPage() {
                 </Alert>
               )}
 
+            {/* Search-field scope — same control as Reception → Patient Data. */}
+            <PatientSearchFields
+              value={searchFields}
+              onChange={setSearchFields}
+            />
+
             {/* Search Input */}
             <div className="flex gap-2">
               <div className="flex-1">
@@ -544,7 +561,7 @@ export default function CheckinPage() {
                 </Label>
                 <Input
                   id="search"
-                  placeholder="Enter File No., Name, Phone, or Aadhaar..."
+                  placeholder={patientSearchPlaceholder(searchFields)}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}

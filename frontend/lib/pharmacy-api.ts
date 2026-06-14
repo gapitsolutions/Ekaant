@@ -348,6 +348,8 @@ export interface DispenseCreatePayload {
   session_id: string;
   line_items: DispenseLineItemPayload[];
   payment: DispensePaymentPayload;
+  // Optional: omit/null → hospital default applied server-side; 0 waives it.
+  consultation_fee?: string | number | null;
   next_followup_date?: string | null;
 }
 
@@ -358,9 +360,13 @@ export interface DispenseCreateResponse {
   patient_id: string;
   patient_name: string;
   subtotal: string;
+  consultation_fee: string;
   discount_percentage: string;
   discount_amount: string;
   net_payable: string;
+  amount_paid: string;
+  invoice_outstanding: string;
+  patient_outstanding: string;
   payment_method: PaymentMethod;
   cash_amount: string;
   online_amount: string;
@@ -411,7 +417,12 @@ export interface DispenseHistoryItem {
   patient: string;
   patient_id: string;
   file_number?: string | null;
+  // ``amount`` = invoice total (net_payable, BILLED). ``amount_paid`` = money
+  // actually received; ``outstanding`` = unpaid portion of this invoice.
   amount: string;
+  consultation_fee: string;
+  amount_paid: string;
+  outstanding: string;
   date: string;
   time: string;
   pharmacist: string;
@@ -426,7 +437,11 @@ export interface DispenseHistoryItem {
 // because it's a Decimal — parse with ``parseFloat`` for display.
 export interface DispenseHistoryStats {
   unique_patients: number;
+  // ``total_revenue`` = Σ billed (net_payable). ``total_collected`` = Σ money
+  // received (amount_paid). ``total_outstanding`` = billed − collected.
   total_revenue: string;
+  total_collected: string;
+  total_outstanding: string;
   total_records: number;
 }
 
@@ -493,9 +508,13 @@ export interface DispenseInvoiceDetail {
   dispense_date: string;
   dispense_time: string;
   subtotal: string;
+  consultation_fee: string;
   discount_percentage: string;
   discount_amount: string;
   net_payable: string;
+  amount_paid: string;
+  invoice_outstanding: string;
+  patient_outstanding: string;
   payment_method: PaymentMethod | string;
   cash_amount: string;
   online_amount: string;
@@ -521,7 +540,27 @@ export interface DispenseAmendPayload {
   amend_reason: string;
   line_items: DispenseLineItemPayload[];
   payment: DispensePaymentPayload;
+  consultation_fee?: string | number | null;
   next_followup_date?: string | null;
+}
+
+// ── Billing settings (hospital-wide consultation fee default) ──
+export interface BillingSettings {
+  default_consultation_fee: string;
+  updated_at?: string;
+}
+
+export async function getBillingSettings(): Promise<BillingSettings> {
+  return apiRequest<BillingSettings>("/api/v1/billing/settings/", {});
+}
+
+export async function updateBillingSettings(
+  payload: { default_consultation_fee: number | string },
+): Promise<BillingSettings> {
+  return apiRequest<BillingSettings>("/api/v1/billing/settings/", {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 // PATCH /pharmacy/dispense/<session_id>/ — revert-then-reapply correction.
@@ -564,9 +603,15 @@ export interface RevenueBreakdownRow {
 export interface RevenueReportResponse {
   period: string;
   summary: {
+    // ``total_revenue`` = amount BILLED (Σ net_payable). ``total_collected`` =
+    // amount actually received (Σ amount_paid = cash + online). They differ
+    // once partial payment / outstanding exists. See API_BLUEPRINT §7.16.
     total_revenue: string;
+    total_collected: string;
+    total_outstanding: string;
     total_cash: string;
     total_online: string;
+    total_consultation: string;
     total_transactions: number;
   };
   breakdown: RevenueBreakdownRow[];

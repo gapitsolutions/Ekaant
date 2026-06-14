@@ -725,6 +725,66 @@ class ReceptionPatientListSearchFieldsTests(APITestCase):
         )
 
 
+class PatientLookupSearchFieldsTests(APITestCase):
+    """Field-scoped search on ``GET /api/v1/patients/lookup/`` — powers the
+    reception Check-In page advanced search. Same contract as the patient list
+    (§5.5): ``search_fields`` scopes ``q``; absent → legacy default fields."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            email="lookup.reception@example.com",
+            password="test-password",
+            role="reception",
+            full_name="Lookup Reception",
+        )
+        cls.alpha = Patient.objects.create(
+            file_number="L-777-A",
+            patient_category="psychiatric",
+            full_name="Alpha Lookup",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9100000001",
+            aadhaar_number="111111111111",
+            hdams_id="LHD-001",
+            address_line1="addr",
+        )
+        cls.echo = Patient.objects.create(
+            file_number="L-E1",
+            patient_category="psychiatric",
+            full_name="Echo Lookup",
+            date_of_birth=timezone.localdate(),
+            sex="male",
+            phone_number="9100000005",
+            aadhaar_number="555555555555",
+            hdams_id="LHD-777",
+            address_line1="addr",
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user)
+
+    def _file_numbers(self, response):
+        return sorted(item["file_number"] for item in response.data["data"]["items"])
+
+    def test_legacy_default_excludes_hdams(self):
+        # No search_fields → default fields; HDAMS-only match (echo) excluded.
+        response = self.client.get("/api/v1/patients/lookup/?q=777")
+        self.assertEqual(self._file_numbers(response), ["L-777-A"])
+
+    def test_hdams_scope_is_searchable(self):
+        response = self.client.get(
+            "/api/v1/patients/lookup/?q=777&search_fields=hdams_id"
+        )
+        self.assertEqual(self._file_numbers(response), ["L-E1"])
+
+    def test_file_number_scope_only(self):
+        response = self.client.get(
+            "/api/v1/patients/lookup/?q=777&search_fields=file_number"
+        )
+        self.assertEqual(self._file_numbers(response), ["L-777-A"])
+
+
 class PatientFilterOptionsEndpointTests(APITestCase):
     """Contract tests for the ``/filter-options/`` endpoint.
 

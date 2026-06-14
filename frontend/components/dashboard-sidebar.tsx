@@ -18,6 +18,7 @@ import {
   Package,
   FileText,
   Building2,
+  Wallet,
   Menu,
   X,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
   admin: [
     { title: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
     { title: "Suppliers", href: "/admin/suppliers", icon: Building2 },
+    { title: "Billing Settings", href: "/admin/billing", icon: Wallet },
   ],
   reception: [
     {

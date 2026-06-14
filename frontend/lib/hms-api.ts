@@ -323,14 +323,24 @@ export async function registerPatientTier1(
 }
 
 export async function lookupPatient(
-  queryOrToken: { q?: string; file_number?: string } | string,
-  maybeQuery?: { q?: string; file_number?: string },
+  queryOrToken:
+    | { q?: string; file_number?: string; search_fields?: PatientSearchField[] }
+    | string,
+  maybeQuery?: {
+    q?: string;
+    file_number?: string;
+    search_fields?: PatientSearchField[];
+  },
 ): Promise<PatientLookupListResponse> {
   const query =
     typeof queryOrToken === "string" ? (maybeQuery ?? {}) : queryOrToken;
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
   if (query.file_number) params.set("file_number", query.file_number);
+  // ``search_fields`` scopes ``q`` to the ticked patient identity fields —
+  // same contract as the receptionist patient list. Repeated-key param;
+  // only meaningful alongside ``q``.
+  if (query.q) _appendMulti(params, "search_fields", query.search_fields);
   return apiRequest<PatientLookupListResponse>(
     `/api/v1/patients/lookup/?${params.toString()}`,
     {},

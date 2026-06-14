@@ -40,11 +40,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Plus,
@@ -72,8 +67,6 @@ import {
   Upload,
   X,
   Building2,
-  Check,
-  ChevronDown,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { FieldError } from "@/components/ui/field-error";
@@ -85,7 +78,6 @@ import {
   submitPurchaseInvoice,
   auditStockRemoval,
   listSuppliers,
-  createSupplier,
   getLowStockReport,
   getExpiryReport,
   BUP_STRENGTHS,
@@ -95,11 +87,12 @@ import {
   type BupStrength,
   type RemovalReason,
   type Supplier,
-  type SupplierCategory,
   type LowStockReportItem,
   type ExpiryReportRow,
 } from "@/lib/pharmacy-api";
 import { ImportMedicinesDialog } from "@/components/pharmacy/import-medicines-dialog";
+import { SupplierCreateDialog } from "@/components/pharmacy/supplier-create-dialog";
+import { SupplierMultiSelect } from "@/components/pharmacy/supplier-multi-select";
 
 type TabValue = "list" | "invoice" | "audit";
 type CategoryFilter = "all" | MedicineCategory;
@@ -874,6 +867,8 @@ export default function InventoryWorkstationPage() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onSuccess={() => loadMedicines()}
+        suppliers={suppliers}
+        onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
       />
 
       <MedicineFormDialog
@@ -1079,8 +1074,6 @@ function MedicineFormDialog({
   const [reorderLevel, setReorderLevel] = useState("50");
   const [tabletsPerStrip, setTabletsPerStrip] = useState("10");
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
-  const [supplierPickerOpen, setSupplierPickerOpen] = useState(false);
-  const [supplierCreateOpen, setSupplierCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pre-fill form when editing
@@ -1140,25 +1133,6 @@ function MedicineFormDialog({
       a.company_name.localeCompare(b.company_name),
     );
   }, [suppliers, editTarget]);
-
-  const selectedSuppliers = useMemo(() => {
-    return supplierOptions.filter((s) => selectedSupplierIds.includes(s.id));
-  }, [supplierOptions, selectedSupplierIds]);
-
-  const toggleSupplier = (supplierId: string) => {
-    setSelectedSupplierIds((prev) =>
-      prev.includes(supplierId)
-        ? prev.filter((id) => id !== supplierId)
-        : [...prev, supplierId],
-    );
-  };
-
-  // Category mismatch hint: when a supplier's ``categories`` list doesn't
-  // include the medicine's current category, the row is rendered with a
-  // muted "Doesn't supply X" chip. The supplier is still selectable —
-  // pharmacist judgment trumps stored metadata.
-  const isCategoryMismatch = (s: MedicineSupplierRef): boolean =>
-    s.categories.length > 0 && !s.categories.includes(category);
 
   const handleSubmit = async () => {
     if (!name.trim() || !salt.trim() || !manufacturer.trim()) {
@@ -1368,11 +1342,9 @@ function MedicineFormDialog({
             />
           </div>
 
-          {/* Suppliers picker — optional. Multi-select + inline add. The
-              "+" button opens the same SupplierCreateDialog used by the
-              invoice tab; the new supplier auto-ticks here on success
-              and bubbles up to the parent's ``suppliers`` state via the
-              shared ``onSupplierCreated`` callback. */}
+          {/* Suppliers picker — optional. Shared multi-select (popover +
+              checkbox list + inline "Add supplier"). Same component used in the
+              CSV import review grid. */}
           <div className="space-y-1.5 col-span-2">
             <Label className="text-xs font-bold text-slate-500 flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5 text-slate-400" />
@@ -1381,131 +1353,12 @@ function MedicineFormDialog({
                 (optional — for tracking)
               </span>
             </Label>
-            <div className="flex gap-2">
-              <Popover
-                open={supplierPickerOpen}
-                onOpenChange={setSupplierPickerOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 h-11 rounded-xl bg-slate-50 border-slate-200 font-semibold text-slate-700 text-xs justify-between hover:bg-slate-100"
-                  >
-                    <span className="truncate">
-                      {selectedSuppliers.length === 0
-                        ? "Select suppliers"
-                        : `${selectedSuppliers.length} selected`}
-                    </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="start"
-                  className="w-[var(--radix-popover-trigger-width)] p-0 rounded-xl border-slate-200"
-                >
-                  <div className="max-h-64 overflow-y-auto p-1">
-                    {supplierOptions.length === 0 ? (
-                      <p className="px-3 py-6 text-center text-xs text-slate-400">
-                        No suppliers yet. Click + to add one.
-                      </p>
-                    ) : (
-                      supplierOptions.map((s) => {
-                        const checked = selectedSupplierIds.includes(s.id);
-                        const mismatch = isCategoryMismatch(s);
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => toggleSupplier(s.id)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 text-left"
-                          >
-                            <div
-                              className={`h-4 w-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                                checked
-                                  ? "bg-primary border-primary"
-                                  : "border-slate-300 bg-white"
-                              }`}
-                            >
-                              {checked && (
-                                <Check className="h-3 w-3 text-white" />
-                              )}
-                            </div>
-                            <span
-                              className={`text-xs font-semibold truncate ${
-                                mismatch ? "text-slate-500" : "text-slate-700"
-                              }`}
-                            >
-                              {s.company_name}
-                            </span>
-                            {!s.is_active && (
-                              <Badge
-                                variant="outline"
-                                className="text-[9px] uppercase font-bold px-1 py-0 border-slate-300 text-slate-500 bg-slate-50 flex-shrink-0"
-                              >
-                                Inactive
-                              </Badge>
-                            )}
-                            {mismatch && (
-                              <Badge
-                                variant="outline"
-                                className="text-[9px] font-bold px-1 py-0 border-amber-200 text-amber-700 bg-amber-50 flex-shrink-0"
-                                title={`Supplier categories: ${s.categories.join(", ") || "none"}`}
-                              >
-                                Not {category}
-                              </Badge>
-                            )}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setSupplierCreateOpen(true)}
-                title="Add new supplier"
-                className="h-11 w-11 rounded-xl border-slate-200 bg-white hover:bg-slate-50 flex-shrink-0"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {selectedSuppliers.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {selectedSuppliers.map((s) => (
-                  <span
-                    key={s.id}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full bg-primary/10 text-primary border border-primary/20 pl-2 pr-1 py-0.5"
-                  >
-                    {s.company_name}
-                    {!s.is_active && (
-                      <span className="text-[8px] uppercase text-slate-500">
-                        (inactive)
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleSupplier(s.id)}
-                      className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5"
-                      aria-label={`Remove ${s.company_name}`}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <SupplierCreateDialog
-              open={supplierCreateOpen}
-              onOpenChange={setSupplierCreateOpen}
-              onCreated={(s) => {
-                onSupplierCreated(s);
-                setSelectedSupplierIds((prev) => [...prev, s.id]);
-                setSupplierCreateOpen(false);
-              }}
+            <SupplierMultiSelect
+              suppliers={supplierOptions}
+              selectedIds={selectedSupplierIds}
+              onChange={setSelectedSupplierIds}
+              onSupplierCreated={onSupplierCreated}
+              category={category}
             />
           </div>
         </div>
@@ -2634,203 +2487,5 @@ function AuditRemovalView({
         </Card>
       </div>
     </div>
-  );
-}
-
-const SUPPLIER_CATEGORY_OPTIONS: SupplierCategory[] = ["BUP", "Rx", "NRx"];
-
-function SupplierCreateDialog({
-  open,
-  onOpenChange,
-  onCreated,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (supplier: Supplier) => void;
-}) {
-  const [companyName, setCompanyName] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [contactPerson, setContactPerson] = useState("");
-  const [email, setEmail] = useState("");
-  const [fullAddress, setFullAddress] = useState("");
-  const [gstNumber, setGstNumber] = useState("");
-  const [drugLicenseNumber, setDrugLicenseNumber] = useState("");
-  const [categories, setCategories] = useState<SupplierCategory[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const apiErrors = useApiErrors();
-
-  const reset = () => {
-    apiErrors.clear();
-    setCompanyName("");
-    setMobileNumber("");
-    setContactPerson("");
-    setEmail("");
-    setFullAddress("");
-    setGstNumber("");
-    setDrugLicenseNumber("");
-    setCategories([]);
-  };
-
-  const toggleCategory = (cat: SupplierCategory) => {
-    setCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    );
-  };
-
-  const handleSubmit = async () => {
-    if (!companyName.trim()) {
-      toast.error("Company name is required");
-      return;
-    }
-    if (!mobileNumber.trim()) {
-      toast.error("Mobile number is required");
-      return;
-    }
-    apiErrors.clear();
-    setIsSubmitting(true);
-    try {
-      const created = await createSupplier({
-        company_name: companyName.trim(),
-        mobile_number: mobileNumber.trim(),
-        contact_person: contactPerson.trim(),
-        email: email.trim() || null,
-        full_address: fullAddress.trim(),
-        gst_number: gstNumber.trim() || null,
-        drug_license_number: drugLicenseNumber.trim() || null,
-        categories,
-      });
-      toast.success(`Supplier "${created.company_name}" added.`);
-      reset();
-      onCreated(created);
-    } catch (error) {
-      apiErrors.setFromError(error);
-      toastApiError(error, "Failed to add supplier");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) reset();
-        onOpenChange(o);
-      }}
-    >
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add Supplier</DialogTitle>
-          <DialogDescription>
-            New suppliers become immediately available in the picker. Required:
-            company name & mobile number.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <Label>Company name *</Label>
-            <Input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="e.g. Abbott Healthcare Ltd"
-              className="mt-1"
-            />
-            <FieldError message={apiErrors.get("company_name")} />
-          </div>
-          <div>
-            <Label>Mobile number *</Label>
-            <Input
-              value={mobileNumber}
-              onChange={(e) => setMobileNumber(e.target.value)}
-              placeholder="10-digit mobile"
-              className="mt-1"
-            />
-            <FieldError message={apiErrors.get("mobile_number")} />
-          </div>
-          <div>
-            <Label>Contact person</Label>
-            <Input
-              value={contactPerson}
-              onChange={(e) => setContactPerson(e.target.value)}
-              className="mt-1"
-            />
-            <FieldError message={apiErrors.get("contact_person")} />
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1"
-            />
-            <FieldError message={apiErrors.get("email")} />
-          </div>
-          <div>
-            <Label>GST number</Label>
-            <Input
-              value={gstNumber}
-              onChange={(e) => setGstNumber(e.target.value)}
-              className="mt-1"
-            />
-            <FieldError message={apiErrors.get("gst_number")} />
-          </div>
-          <div>
-            <Label>Drug license number</Label>
-            <Input
-              value={drugLicenseNumber}
-              onChange={(e) => setDrugLicenseNumber(e.target.value)}
-              className="mt-1"
-            />
-            <FieldError message={apiErrors.get("drug_license_number")} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Full address</Label>
-            <Textarea
-              value={fullAddress}
-              onChange={(e) => setFullAddress(e.target.value)}
-              className="mt-1"
-              rows={2}
-            />
-            <FieldError message={apiErrors.get("full_address")} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Categories supplied</Label>
-            <div className="flex gap-3 mt-2">
-              {SUPPLIER_CATEGORY_OPTIONS.map((cat) => (
-                <label
-                  key={cat}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <Checkbox
-                    checked={categories.includes(cat)}
-                    onCheckedChange={() => toggleCategory(cat)}
-                  />
-                  {cat}
-                </label>
-              ))}
-            </div>
-            <FieldError message={apiErrors.get("categories")} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4 mr-2" />
-            )}
-            Add supplier
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

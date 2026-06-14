@@ -55,6 +55,9 @@ export interface MedicineCsvRow {
   tablets_per_strip: string;
   mrp: string;
   selling_price: string;
+  // Suppliers are NOT in the CSV (relational) — they are assigned per row in
+  // the review grid. Stored as Supplier UUIDs and sent as ``supplier_ids``.
+  supplier_ids: string[];
 }
 
 export interface ParsedMedicineCsv {
@@ -235,6 +238,7 @@ export function parseMedicineCsv(text: string): ParsedMedicineCsv {
     tablets_per_strip: cellAt(cells, "tablets_per_strip"),
     mrp: cellAt(cells, "mrp"),
     selling_price: cellAt(cells, "selling_price"),
+    supplier_ids: [],
   }));
 
   return { rows, headerErrors };
@@ -363,6 +367,11 @@ export function rowToPayload(row: MedicineCsvRow): Record<string, unknown> {
       : DEFAULT_TABLETS_PER_STRIP,
     mrp: Number(row.mrp).toFixed(2),
     selling_price: Number(row.selling_price).toFixed(2),
+    // Row-level supplier links — consumed by MedicineWriteSerializer's
+    // ``supplier_ids`` (M2M) during bulk creation. Omitted when none chosen.
+    ...(row.supplier_ids.length > 0
+      ? { supplier_ids: row.supplier_ids }
+      : {}),
   };
 }
 

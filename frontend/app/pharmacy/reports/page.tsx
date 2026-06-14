@@ -450,8 +450,8 @@ function RevenueReportTab({
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <KpiCard
-              label="Total Revenue"
-              value={`₹${parseFloat(data.summary.total_revenue).toLocaleString("en-IN")}`}
+              label="Total Collected"
+              value={`₹${parseFloat(data.summary.total_collected).toLocaleString("en-IN")}`}
               trend
               icon={<IndianRupee className="h-5 w-5 text-emerald-600" />}
               iconBg="bg-emerald-100"

@@ -123,6 +123,10 @@ import {
 import { PatientCallingHistory } from "@/components/patients/PatientCallingHistory";
 import { PatientIdCard } from "@/components/patients/PatientIdCard";
 import { PatientInvoiceView } from "@/components/patients/PatientInvoiceView";
+import {
+  PatientSearchFields,
+  patientSearchPlaceholder,
+} from "@/components/patient-search-fields";
 import { generatePatientProfilePdf } from "@/lib/export/generatePatientProfilePdf";
 import { generatePatientProfileCsv } from "@/lib/export/generatePatientProfileCsv";
 
@@ -2916,66 +2920,12 @@ export default function PatientDataPage() {
       <Card className="border-none shadow-sm bg-white">
         <CardContent className="pt-6 space-y-4">
           {/* Search-field scope: tick the fields the query should match. */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Search in
-            </span>
-            {(
-              [
-                { key: "file_number", label: "File No." },
-                { key: "full_name", label: "Name" },
-                { key: "aadhaar_number", label: "Aadhaar" },
-                { key: "hdams_id", label: "HDAMS ID" },
-                { key: "phone_number", label: "Phone" },
-              ] as { key: PatientSearchField; label: string }[]
-            ).map(({ key, label }) => {
-              const checked = searchFields.includes(key);
-              const isOnlySelection = checked && searchFields.length === 1;
-              return (
-                <label
-                  key={key}
-                  className={`flex items-center gap-2 text-sm cursor-pointer select-none ${
-                    isOnlySelection ? "opacity-90" : ""
-                  }`}
-                >
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={(value) => {
-                      const shouldCheck = value === true;
-                      setSearchFields((prev) => {
-                        if (shouldCheck) {
-                          return prev.includes(key) ? prev : [...prev, key];
-                        }
-                        // Never let the user untick the last field — keep
-                        // file_number as a sane fallback so the input never
-                        // silently matches nothing.
-                        const next = prev.filter((f) => f !== key);
-                        return next.length === 0 ? ["file_number"] : next;
-                      });
-                    }}
-                  />
-                  <span>{label}</span>
-                </label>
-              );
-            })}
-          </div>
+          <PatientSearchFields value={searchFields} onChange={setSearchFields} />
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={
-                  searchFields.length === 1
-                    ? `Search by ${
-                        {
-                          file_number: "File Number",
-                          full_name: "Name",
-                          aadhaar_number: "Aadhaar",
-                          hdams_id: "HDAMS ID",
-                          phone_number: "Phone",
-                        }[searchFields[0]]
-                      }…`
-                    : `Search by ${searchFields.length} fields…`
-                }
+                placeholder={patientSearchPlaceholder(searchFields)}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-[#f9fafb] border-slate-200 h-11"

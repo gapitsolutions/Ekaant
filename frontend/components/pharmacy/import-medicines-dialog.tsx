@@ -42,7 +42,9 @@ import {
   importMedicinesBulk,
   BUP_STRENGTHS,
   type MedicineBulkImportResult,
+  type Supplier,
 } from "@/lib/pharmacy-api";
+import { SupplierMultiSelect } from "@/components/pharmacy/supplier-multi-select";
 import {
   MEDICINE_CATEGORIES,
   normalizeCategory,
@@ -61,10 +63,14 @@ export function ImportMedicinesDialog({
   open,
   onOpenChange,
   onSuccess,
+  suppliers,
+  onSupplierCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  suppliers: Supplier[];
+  onSupplierCreated: (s: Supplier) => void;
 }) {
   const [phase, setPhase] = useState<Phase>("upload");
   const [rows, setRows] = useState<MedicineCsvRow[]>([]);
@@ -373,6 +379,9 @@ export function ImportMedicinesDialog({
                         <TableHead className="h-9 text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">
                           Selling
                         </TableHead>
+                        <TableHead className="h-9 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Suppliers
+                        </TableHead>
                         <TableHead className="h-9 text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">
                           Status
                         </TableHead>
@@ -533,6 +542,22 @@ export function ImportMedicinesDialog({
                                   className={`${inputClass(!!fe.selling_price)} w-20 text-center`}
                                 />
                               </TableCell>
+                              <TableCell className="py-2 min-w-[150px]">
+                                <SupplierMultiSelect
+                                  compact
+                                  suppliers={suppliers}
+                                  selectedIds={row.supplier_ids}
+                                  onChange={(ids) =>
+                                    updateRow(row.row_number, {
+                                      supplier_ids: ids,
+                                    })
+                                  }
+                                  onSupplierCreated={onSupplierCreated}
+                                  category={
+                                    normalizeCategory(row.category) ?? undefined
+                                  }
+                                />
+                              </TableCell>
                               <TableCell className="py-2 text-center">
                                 {v?.hasError ? (
                                   <Badge className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
@@ -560,7 +585,7 @@ export function ImportMedicinesDialog({
                               <TableRow className="border-slate-100 hover:bg-transparent">
                                 <TableCell />
                                 <TableCell
-                                  colSpan={11}
+                                  colSpan={12}
                                   className="py-1 pb-2"
                                 >
                                   <div className="text-[11px] text-rose-600 font-semibold space-y-0.5">

@@ -347,11 +347,22 @@ class DispenseInvoice(models.Model):
     dispense_date = models.DateField(default=timezone.localdate)
     dispense_time = models.DateTimeField(auto_now_add=True)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Consultation fee snapshotted at creation (default sourced from
+    # BillingSettings). Part of net_payable; editable/removable per invoice.
+    consultation_fee = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0
+    )
     discount_percentage = models.DecimalField(
         max_digits=5, decimal_places=2, default=0
     )
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # net_payable = subtotal - discount + consultation_fee (amount BILLED).
     net_payable = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Amount actually tendered at this settlement (cash + online). May be less
+    # than net_payable — the shortfall becomes patient outstanding (ledger).
+    # May exceed this invoice's net_payable when the patient also pays down
+    # previously outstanding dues in the same settlement (recovery).
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(
         max_length=10, choices=PaymentMethod.choices, default=PaymentMethod.CASH
     )
@@ -402,6 +413,15 @@ class DispenseInvoice(models.Model):
 
     def __str__(self):
         return self.invoice_number
+
+    @property
+    def invoice_outstanding(self) -> Decimal:
+        """Unpaid portion attributable to THIS invoice (clamped ≥ 0).
+
+        Patient-level outstanding (including prior dues) is the authoritative
+        figure and lives in the ledger — see ``PatientLedgerEntry``."""
+        diff = (self.net_payable or Decimal("0")) - (self.amount_paid or Decimal("0"))
+        return diff if diff > 0 else Decimal("0")
 
     @classmethod
     def generate_invoice_number(cls) -> str:

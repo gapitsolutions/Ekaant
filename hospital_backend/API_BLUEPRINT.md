@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-14 (IST) — single medicine create now returns 409 (not 500) on duplicates, enforced at app level for all categories
+> **Last Updated:** 2026-06-14 (IST) — medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -298,8 +298,15 @@ Query params:
 
 - `file_number` (exact match path)
 - `q` (broad search path)
+- `search_fields` (optional **multi-value**, repeated-key): scopes `q` to the
+  ticked patient identity fields. Allow-list: `file_number`, `full_name`,
+  `phone_number`, `aadhaar_number`, `hdams_id` — same contract as the
+  receptionist patient list (§5.5). Unknown names are dropped; an empty
+  validated set falls back to the legacy default. Ignored when `q` is empty.
+  Used by the **reception Check-In page** patient search.
 
-Searches by file_number, full_name, phone_number, aadhaar_number (digit-aware icontains).
+Without `search_fields`, searches by file_number, full_name, phone_number,
+aadhaar_number (digit-aware icontains).
 
 ### 5.3 `GET /api/v1/patients/<patient_id>/fingerprint-template/`
 
@@ -334,10 +341,11 @@ Query params:
   caller can scope a search to e.g. file number only, or file number +
   HDAMS). Unknown names are silently dropped; if the validated set is empty
   the endpoint falls back to the legacy default so a malformed param never
-  produces a silently empty result. Ignored when `q` is empty. **Only this
-  endpoint reads `search_fields`** — `patients/lookup/` and
-  `receptionist/patients/summary/` share `patient_search_queryset` but call
-  it without `fields`, preserving their current "all fields" behaviour.
+  produces a silently empty result. Ignored when `q` is empty. The
+  `patients/lookup/` endpoint (Check-In page) also accepts `search_fields`
+  with the same semantics (§5.2); `receptionist/patients/summary/` shares
+  `patient_search_queryset` but calls it without `fields`, preserving its
+  current "all fields" behaviour.
 - `page` (default 1), `pageSize` (default 100, clamped).
 - `state`, `district`, `addiction_type`, `patient_category` — **multi-value**.
   Repeat the key once per selected value:
@@ -883,9 +891,12 @@ Request body:
 ```
 
 - `items`: 1–2000 rows. Each row carries the same fields as the single
-  `POST` body **except `supplier_ids`** — the relational Medicine↔Supplier
-  link is intentionally excluded from CSV (UUIDs aren't human-authorable; no
-  name-mapping mechanism exists). Suppliers are attached later via Edit Medicine.
+  `POST` body. `supplier_ids` is **not** part of the CSV (the relational
+  Medicine↔Supplier link can't be expressed as free text), but it **may be
+  supplied per row** by the import **review grid**, where users pick suppliers
+  with the same multi-select used in Register Medicine. When present it is
+  validated and persisted by the reused `MedicineWriteSerializer` exactly like
+  single creation (unknown UUIDs fail that row only).
 - `row_number` (optional): 1-based CSV data row, echoed back in the report so
   the UI can map outcomes to grid rows. Falls back to positional index.
 
@@ -1241,14 +1252,15 @@ Validation:
 - Each line item references an active medicine; batch is active, belongs to medicine, and not expired
 - Per-batch aggregate requested quantity (same batch may appear in multiple line items) ≤ batch's current quantity (re-checked after lock)
 - `discount` is a **rupee amount** (2 dp), not a percentage. Must satisfy `0 ≤ discount ≤ subtotal`.
+- `consultation_fee` (optional, 2 dp ≥ 0): omit/null → the hospital default from `BillingSettings` is applied; send `0` to waive. Snapshotted onto the invoice.
 - Payment computation (server is the sole authority for money totals):
   - `subtotal = Σ(qty × round(unit_price, 2))`, then rounded to 2 dp
   - `discount_amount = round(discount, 2)`
-  - `net_payable = subtotal − discount_amount`
+  - `net_payable = subtotal − discount_amount + consultation_fee` (amount **billed**)
   - `discount_percentage = round(discount_amount / subtotal × 100, 2)` — **derived, storage/reporting only**
-  - `Cash`: server derives `cash_amount = net_payable`, `online_amount = 0` (client values ignored)
-  - `Online`: server derives `online_amount = net_payable`, `cash_amount = 0` (client values ignored)
-  - `Split`: client `cash_amount + online_amount` must reconcile to `net_payable` within ₹0.01; cash leg is then snapped so the parts sum exactly
+  - `cash_amount` / `online_amount` are the amounts **actually tendered** (no longer derived from net_payable). For `Cash` the online leg is zeroed; for `Online` the cash leg is zeroed; for `Split` both are taken as supplied.
+  - `amount_paid = cash_amount + online_amount`. **Partial payment is allowed** (`amount_paid < net_payable` → the shortfall becomes patient outstanding). `amount_paid` may also exceed this invoice's `net_payable` when the patient pays down **prior dues** in the same settlement (recovery).
+  - Upper bound: `amount_paid ≤ net_payable + previous_due` (previous_due = patient's current ledger balance), else 400. Paying more than owed (which would create credit) is rejected.
 - `next_followup_date` must be in the future if provided
 
 Side effects (in order, single transaction):
@@ -1264,6 +1276,7 @@ Side effects (in order, single transaction):
 6. Update `VisitSession.medicines_total = net_payable`
 7. Transition `VisitSession.current_stage = completed`, `status = completed`, `completed_time = now()`
 8. If `next_followup_date` provided, update `Patient.next_followup_date` directly inside the same transaction
+9. Post billing ledger rows: a `charge` (+net_payable) and a `payment` (−amount_paid) `PatientLedgerEntry`, then refresh the cached `Patient.outstanding_debt`. The dispense response adds `consultation_fee`, `amount_paid`, `invoice_outstanding` (net_payable − amount_paid, ≥0), and `patient_outstanding` (current ledger balance). Cancel posts a reversing `adjustment`; amend re-bases (reverse + re-post). See §7.21.
 
 Response (201):
 
@@ -1749,6 +1762,38 @@ Returns `{ deactivated: true, supplier_id, is_active: false }`.
 
 To reactivate, send `PATCH` with `{ "is_active": true }`.
 
+### 7.21 Billing (consultation fee + patient financial ledger)
+
+Module: `backend/billing/` (`models.py`, `services.py`, `views.py`).
+
+**Money model**
+
+- **Consultation fee** is configured hospital-wide in a `BillingSettings`
+  singleton and **snapshotted** onto each `DispenseInvoice` (`consultation_fee`)
+  at creation. Editable/removable per invoice; historical invoices keep their
+  original fee when the default changes.
+- **Outstanding/due** is tracked by an **append-only `PatientLedgerEntry`**
+  ledger — the single source of truth. Each row is signed:
+  `+amount` (`charge`) increases what the patient owes; `−amount` (`payment`)
+  decreases it; `adjustment` reverses on cancel/amend. A patient's balance =
+  `Σ(amount)`. `Patient.outstanding_debt` is a **cache recomputed from the
+  ledger** (never hand-incremented). Recovery of prior dues happens inside the
+  next dispense settlement (paying more than the current invoice's net_payable).
+- Reporting distinguishes **billed** (`Σ net_payable`) from **collected**
+  (`Σ amount_paid`); `total_outstanding = billed − collected`. The pharmacy
+  queue, dispense detail/history, and invoice PDF expose the new fields.
+
+#### `GET /api/v1/billing/settings/`
+
+View: `BillingSettingsView` · Permission: `IsReceptionAdminOrPharmacist`
+(broadly readable so the dispense screen can pre-fill the default).
+Returns `{ "default_consultation_fee": "200.00", "updated_at": ... }`.
+
+#### `PATCH /api/v1/billing/settings/`
+
+Permission: `IsAdminRole` (admin only). Body `{ "default_consultation_fee": <≥0> }`.
+Updates the singleton; returns the new settings.
+
 ---
 
 ## 8. Follow-Ups API Blueprint
@@ -2038,3 +2083,5 @@ Stock movement type reference:
 - `GET    /api/v1/pharmacy/reports/consumption/`
 - `GET    /api/v1/pharmacy/reports/low-stock/`
 - `GET    /api/v1/pharmacy/reports/expiry/`
+- `GET    /api/v1/billing/settings/`
+- `PATCH  /api/v1/billing/settings/` (admin only)

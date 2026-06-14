@@ -113,7 +113,11 @@ export function PatientInvoiceView({
   const subtotal = parseFloat(invoice.subtotal) || 0;
   const discountAmt = parseFloat(invoice.discount_amount) || 0;
   const discountPct = parseFloat(invoice.discount_percentage) || 0;
+  const consultationFee = parseFloat(invoice.consultation_fee) || 0;
   const netPayable = parseFloat(invoice.net_payable) || 0;
+  const amountPaid = parseFloat(invoice.amount_paid) || 0;
+  const invoiceOutstanding = parseFloat(invoice.invoice_outstanding) || 0;
+  const isSuccess = invoice.status === "success";
 
   const handlePrintInvoice = () => {
     generateInvoicePdf({
@@ -234,10 +238,10 @@ export function PatientInvoiceView({
 
         <Separator className="border-dashed border-slate-200 my-1" />
 
-        {/* Cost Summary */}
+        {/* Cost Summary — mirrors the printed invoice exactly */}
         <div className="space-y-1.5 text-xs">
           <div className="flex justify-between text-slate-500 font-medium">
-            <span>Subtotal</span>
+            <span>Subtotal (Medicines)</span>
             <span className="font-mono text-slate-700 font-bold">
               {"₹"}
               {subtotal.toFixed(2)}
@@ -255,6 +259,15 @@ export function PatientInvoiceView({
               </span>
             </div>
           )}
+          {consultationFee > 0 && (
+            <div className="flex justify-between text-slate-500 font-medium">
+              <span>Consultation Fee</span>
+              <span className="font-mono text-slate-700 font-bold">
+                +{"₹"}
+                {consultationFee.toFixed(2)}
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-between items-center bg-primary/5 p-3 rounded-xl border border-primary/10 mt-3 shadow-inner">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
@@ -265,6 +278,28 @@ export function PatientInvoiceView({
               {netPayable.toFixed(2)}
             </span>
           </div>
+
+          {/* Payment + outstanding (successful invoices only) */}
+          {isSuccess && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between text-slate-500 font-medium">
+                <span>Amount Paid</span>
+                <span className="font-mono text-slate-700 font-bold">
+                  {"₹"}
+                  {amountPaid.toFixed(2)}
+                </span>
+              </div>
+              {invoiceOutstanding > 0 && (
+                <div className="flex justify-between items-center bg-rose-50 text-rose-700 font-bold px-3 py-2 rounded-lg border border-rose-100">
+                  <span>Outstanding (This Invoice)</span>
+                  <span className="font-mono">
+                    {"₹"}
+                    {invoiceOutstanding.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Amendment history — newest first, matches API ordering */}

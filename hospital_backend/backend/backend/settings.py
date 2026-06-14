@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "followups",
     "visits",
     "pharmacy",  # NEW
+    "billing",  # NEW — consultation fee config + patient financial ledger
 ]
 
 MIDDLEWARE = [

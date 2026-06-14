@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +54,7 @@ import {
   getPharmacyQueue,
   createDispense,
   cancelDispense,
+  getBillingSettings,
   BUP_STRENGTHS,
   type Medicine,
   type MedicineBatch,
@@ -110,6 +112,10 @@ export default function DispenseWorkstationPage() {
 
   // Settlement
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
+  // Consultation fee is an admin-configured singleton; during dispensing it is
+  // add/remove only — the amount itself is never editable here.
+  const [configuredConsultationFee, setConfiguredConsultationFee] = useState(0);
+  const [includeConsultationFee, setIncludeConsultationFee] = useState(false);
   const [cashAmount, setCashAmount] = useState(0);
   const [onlineAmount, setOnlineAmount] = useState(0);
   const [discount, setDiscount] = useState(0); // percentage — DISPLAY ONLY (not sent)
@@ -135,13 +141,24 @@ export default function DispenseWorkstationPage() {
     setIsLoadingData(true);
     setErrorMessage("");
 
-    Promise.all([getPharmacyQueue(), getInventoryMedicines()])
-      .then(async ([queueData, medicineData]) => {
+    Promise.all([
+      getPharmacyQueue(),
+      getInventoryMedicines(),
+      getBillingSettings().catch(() => null),
+    ])
+      .then(async ([queueData, medicineData, billing]) => {
         if (isCancelledLoad) return;
         const found =
           queueData.items?.find((item) => item.session_id === sessionId) || null;
         setQueueItem(found);
         setMedicines(medicineData.items || []);
+        // Consultation fee comes from admin settings (read-only here). Default
+        // to "included" when a fee is configured; staff can remove it below.
+        if (billing) {
+          const fee = parseFloat(billing.default_consultation_fee) || 0;
+          setConfiguredConsultationFee(fee);
+          setIncludeConsultationFee(fee > 0);
+        }
         if (found?.patient_id) {
           try {
             const patientDetail = await getPatientById(found.patient_id);
@@ -295,9 +312,23 @@ export default function DispenseWorkstationPage() {
     () => lineItems.reduce((sum, li) => sum + li.total, 0),
     [lineItems],
   );
-  // discountRupees is the primary input; clamp it to subtotal
+  // discountRupees is the primary input; clamp it to the medicine subtotal
   const discountAmount = Math.min(discountRupees, subtotal);
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+  // Effective fee = the configured amount when included, else 0. The amount is
+  // never edited during dispensing — only included or removed.
+  const consultationFeeNum =
+    includeConsultationFee && configuredConsultationFee > 0
+      ? configuredConsultationFee
+      : 0;
+  // Current invoice = medicines − discount + consultation fee (BILLED).
+  const currentInvoice =
+    Math.max(0, subtotal - discountAmount) + consultationFeeNum;
+  // Prior balance the patient already owes (from the ledger, surfaced on the
+  // queue). Recovered within this settlement.
+  const previousDue = Math.max(0, Number(queueItem?.outstanding_debt ?? 0));
+  const totalPayable = currentInvoice + previousDue;
+  const amountPaid = (cashAmount || 0) + (onlineAmount || 0);
+  const newOutstanding = Math.max(0, totalPayable - amountPaid);
 
   // Auto-sync percentage from rupee amount (for backend submission)
   useEffect(() => {
@@ -309,26 +340,46 @@ export default function DispenseWorkstationPage() {
     }
   }, [discountRupees, subtotal]);
 
-  // Sync payment amounts with method/total
+  // Default the tendered amount to the FULL total payable (current + prior
+  // due) whenever the method or total changes. The pharmacist can lower it to
+  // record a partial payment — the shortfall becomes outstanding.
   useEffect(() => {
     if (paymentMethod === "Cash") {
-      setCashAmount(grandTotal);
+      setCashAmount(totalPayable);
       setOnlineAmount(0);
     } else if (paymentMethod === "Online") {
       setCashAmount(0);
-      setOnlineAmount(grandTotal);
+      setOnlineAmount(totalPayable);
     } else {
-      // Split: default 50/50
-      const half = Math.round(grandTotal / 2);
+      const half = Math.round(totalPayable / 2);
       setCashAmount(half);
-      setOnlineAmount(grandTotal - half);
+      setOnlineAmount(totalPayable - half);
     }
-  }, [paymentMethod, grandTotal]);
+  }, [paymentMethod, totalPayable]);
 
+  // For Cash/Online single-mode: one editable "amount received" field.
+  const handleSingleAmountChange = (val: number) => {
+    const clean = Math.max(0, Math.min(val, totalPayable));
+    if (paymentMethod === "Online") {
+      setOnlineAmount(clean);
+      setCashAmount(0);
+    } else {
+      setCashAmount(clean);
+      setOnlineAmount(0);
+    }
+  };
+
+  // Split: cash and online are independent (each clamped to total payable) so
+  // a partial split is possible; the sum is validated on save.
   const handleSplitCashChange = (val: number) => {
-    const clean = Math.max(0, Math.min(val, grandTotal));
-    setCashAmount(clean);
-    setOnlineAmount(Math.max(0, grandTotal - clean));
+    setCashAmount(Math.max(0, Math.min(val, totalPayable)));
+  };
+  const handleSplitOnlineChange = (val: number) => {
+    setOnlineAmount(Math.max(0, Math.min(val, totalPayable)));
+  };
+  const applySplitPreset = (cash: number, online: number) => {
+    setCashAmount(cash);
+    setOnlineAmount(online);
   };
 
   // ── Next visit scheduling ──
@@ -367,6 +418,12 @@ export default function DispenseWorkstationPage() {
       toast.error("Missing session ID");
       return;
     }
+    if (amountPaid > totalPayable + 0.01) {
+      toast.error(
+        "Amount received cannot exceed the total payable (current invoice + previous due).",
+      );
+      return;
+    }
 
     apiErrors.clear();
     setIsSaving(true);
@@ -383,13 +440,14 @@ export default function DispenseWorkstationPage() {
           qty: li.qty,
           unit_price: li.unitPrice,
         })),
+        // Consultation fee snapshotted onto the invoice (0 = waived).
+        consultation_fee: Math.round(consultationFeeNum * 100) / 100,
         payment: {
           payment_method: paymentMethod,
+          // Actual amounts tendered now (may be < total → outstanding).
           cash_amount: cashAmount,
           online_amount: onlineAmount,
-          // Send the discount as a rupee AMOUNT (2 dp). The backend is the
-          // authority for net payable and derives cash/online for Cash/Online,
-          // so no percentage round-trip is involved.
+          // Discount as a rupee AMOUNT (2 dp) against the medicine subtotal.
           discount: Math.round(discountAmount * 100) / 100,
           notes,
         },
@@ -794,6 +852,35 @@ export default function DispenseWorkstationPage() {
             </div>
           </div>
         )}
+
+        {/* Consultation Fee — admin-configured singleton; add/remove only.
+            The amount is fixed by settings and never editable here. Hidden
+            entirely when the hospital has no consultation fee configured. */}
+        {configuredConsultationFee > 0 && (
+          <label className="px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-3 cursor-pointer select-none">
+            <div className="flex items-center gap-2.5">
+              <Checkbox
+                checked={includeConsultationFee}
+                onCheckedChange={(v) => setIncludeConsultationFee(v === true)}
+              />
+              <span className="text-sm font-bold text-slate-700">
+                Include Consultation Fee
+              </span>
+              <Badge className="bg-teal-50 border border-teal-100 text-primary font-bold text-[10px] px-2 py-0.5 rounded">
+                ₹{configuredConsultationFee.toLocaleString("en-IN")}
+              </Badge>
+            </div>
+            <span
+              className={`text-sm font-extrabold ${
+                includeConsultationFee ? "text-slate-800" : "text-slate-300"
+              }`}
+            >
+              {includeConsultationFee
+                ? `+ ₹${configuredConsultationFee.toLocaleString("en-IN")}`
+                : "Not added"}
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Bottom Section: Next Visit & Billing side-by-side */}
@@ -917,15 +1004,15 @@ export default function DispenseWorkstationPage() {
             </Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Payment Mode */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement Method</Label>
               <Select
                 value={paymentMethod}
                 onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
               >
-                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-slate-50/50 font-medium">
+                <SelectTrigger className="h-11 w-full min-w-0 rounded-xl border-slate-200 bg-slate-50/50 font-medium">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -943,7 +1030,7 @@ export default function DispenseWorkstationPage() {
             </div>
 
             {/* Discount Amount (primary) + Percentage (auto-calc) */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount Amount (₹)</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
@@ -960,7 +1047,7 @@ export default function DispenseWorkstationPage() {
                   }
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0"
-                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50 pl-7 text-center font-bold text-slate-700"
+                  className="h-11 w-full rounded-xl border-slate-200 bg-slate-50/50 pl-7 text-center font-bold text-slate-700"
                 />
               </div>
               {discount > 0 && (
@@ -972,28 +1059,56 @@ export default function DispenseWorkstationPage() {
             </div>
           </div>
 
+          {/* Amount received — single field for Cash / Online. Defaults to the
+              full total payable; lower it to record a partial payment. */}
+          {paymentMethod !== "Split" ? (
+            <div className="space-y-1.5 min-w-0">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Amount Received ({paymentMethod}) (₹)
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={totalPayable}
+                  value={paymentMethod === "Online" ? onlineAmount : cashAmount}
+                  onChange={(e) =>
+                    handleSingleAmountChange(parseFloat(e.target.value) || 0)
+                  }
+                  onWheel={(e) => e.currentTarget.blur()}
+                  className="h-11 w-full rounded-xl border-slate-200 bg-slate-50/50 pl-7 text-center font-bold text-slate-700"
+                />
+              </div>
+            </div>
+          ) : null}
+
           {/* Split Details */}
           {paymentMethod === "Split" ? (
             <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-4 space-y-3">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+              <div className="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-200">
                 <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Activity className="h-3.5 w-3.5 text-primary" /> Split Payment Portions
                 </span>
                 <Badge className="bg-primary/10 text-primary font-black text-[10px] py-0.5 px-2 rounded-lg border-0 h-5 flex items-center">
-                  Total: ₹{grandTotal}
+                  Payable: ₹{totalPayable.toLocaleString("en-IN")}
                 </Badge>
               </div>
 
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {[
-                  { label: "50/50 Split", cash: Math.round(grandTotal / 2) },
-                  { label: "100% Cash", cash: grandTotal },
-                  { label: "100% Online", cash: 0 },
+                  {
+                    label: "50/50 Split",
+                    cash: Math.round(totalPayable / 2),
+                    online: totalPayable - Math.round(totalPayable / 2),
+                  },
+                  { label: "100% Cash", cash: totalPayable, online: 0 },
+                  { label: "100% Online", cash: 0, online: totalPayable },
                 ].map((preset) => (
                   <button
                     key={preset.label}
                     type="button"
-                    onClick={() => handleSplitCashChange(preset.cash)}
+                    onClick={() => applySplitPreset(preset.cash, preset.online)}
                     className="bg-white hover:bg-slate-100 text-slate-600 font-extrabold text-[10px] px-2.5 py-1 rounded border border-slate-200 transition-colors shadow-sm"
                   >
                     {preset.label}
@@ -1001,8 +1116,8 @@ export default function DispenseWorkstationPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-[10px] font-bold text-slate-400">Cash Portion (₹)</Label>
                   <Input
                     type="number"
@@ -1012,16 +1127,20 @@ export default function DispenseWorkstationPage() {
                       handleSplitCashChange(parseFloat(e.target.value) || 0)
                     }
                     onWheel={(e) => e.currentTarget.blur()}
-                    className="h-10 rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
+                    className="h-10 w-full rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-[10px] font-bold text-slate-400">Online Portion (₹)</Label>
                   <Input
                     type="number"
+                    min={0}
                     value={onlineAmount}
-                    readOnly
-                    className="h-10 rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
+                    onChange={(e) =>
+                      handleSplitOnlineChange(parseFloat(e.target.value) || 0)
+                    }
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="h-10 w-full rounded-lg border-slate-200 bg-white text-center font-bold text-slate-700"
                   />
                 </div>
               </div>
@@ -1032,7 +1151,7 @@ export default function DispenseWorkstationPage() {
           <div className="border-t border-slate-100 pt-4 space-y-2.5">
             <div className="flex justify-between text-sm font-semibold text-slate-500">
               <span>Formulation Subtotal</span>
-              <span>₹{subtotal.toLocaleString("en-IN")}.00</span>
+              <span>₹{subtotal.toLocaleString("en-IN")}</span>
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm font-bold text-emerald-600 bg-emerald-50/50 px-2.5 py-1 rounded-lg">
@@ -1040,9 +1159,39 @@ export default function DispenseWorkstationPage() {
                 <span>− ₹{discountAmount.toLocaleString("en-IN")}</span>
               </div>
             )}
+            {consultationFeeNum > 0 && (
+              <div className="flex justify-between text-sm font-semibold text-slate-500">
+                <span>Consultation Fee</span>
+                <span>+ ₹{consultationFeeNum.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm font-bold text-slate-700 border-t border-slate-100 pt-2">
+              <span>Current Invoice</span>
+              <span>₹{currentInvoice.toLocaleString("en-IN")}</span>
+            </div>
+            {previousDue > 0 && (
+              <div className="flex justify-between text-sm font-bold text-amber-700 bg-amber-50/60 px-2.5 py-1 rounded-lg">
+                <span>Previous Due</span>
+                <span>+ ₹{previousDue.toLocaleString("en-IN")}</span>
+              </div>
+            )}
             <div className="flex justify-between font-black text-lg text-slate-800 border-t border-slate-200 pt-3 mt-1 tracking-tight">
-              <span>Net Payable</span>
-              <span className="text-primary">₹{grandTotal.toLocaleString("en-IN")}.00</span>
+              <span>Total Payable</span>
+              <span className="text-primary">₹{totalPayable.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold text-slate-500">
+              <span>Amount Received</span>
+              <span>₹{amountPaid.toLocaleString("en-IN")}</span>
+            </div>
+            <div
+              className={`flex justify-between text-sm font-black px-2.5 py-1.5 rounded-lg ${
+                newOutstanding > 0
+                  ? "text-rose-700 bg-rose-50"
+                  : "text-emerald-700 bg-emerald-50"
+              }`}
+            >
+              <span>{newOutstanding > 0 ? "New Outstanding" : "Fully Settled"}</span>
+              <span>₹{newOutstanding.toLocaleString("en-IN")}</span>
             </div>
           </div>
 
@@ -1054,6 +1203,7 @@ export default function DispenseWorkstationPage() {
                   "payment.payment_method",
                   "payment.discount",
                   "payment.non_field_errors",
+                  "consultation_fee",
                   "next_followup_date",
                 ].includes(k),
             );

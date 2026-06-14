@@ -18,6 +18,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from billing import services as billing_services
 from core.exceptions import ConflictError
 from patients.models import Patient
 from visits.models import VisitSession, VisitStage, VisitStatus
@@ -450,19 +451,30 @@ def _resolve_visit_session(session_id) -> VisitSession:
     return session
 
 
-def _build_payment_totals(line_items: list[dict], payment: dict) -> dict:
+def _build_payment_totals(
+    line_items: list[dict],
+    payment: dict,
+    consultation_fee: Decimal = Decimal("0"),
+) -> dict:
     """Compute authoritative invoice totals on the server.
 
     Money policy:
-    - ``discount`` arrives as a rupee AMOUNT (2 dp). The server is the sole
-      authority for ``net_payable``; the frontend's displayed total is never
-      trusted for persistence.
-    - For Cash / Online, the tendered amount is fully determined by
-      ``net_payable`` and is derived here (the client value is ignored). This
-      removes the entire class of "cash != net payable" rounding mismatches.
-    - For Split, the client must supply how the payment was divided; we only
-      validate that the two parts reconcile to ``net_payable`` within 1 paise
-      of floating-point dust, then snap them to exact 2 dp.
+    - ``discount`` arrives as a rupee AMOUNT (2 dp) against the medicine
+      subtotal. The server is the sole authority for ``net_payable``; the
+      frontend's displayed total is never trusted for persistence.
+    - ``consultation_fee`` is added on top:
+      ``net_payable = subtotal − discount + consultation_fee`` (the BILLED
+      amount).
+    - ``cash_amount`` / ``online_amount`` are the amounts ACTUALLY TENDERED at
+      this settlement (not derived from net_payable). Their sum, ``amount_paid``,
+      may be **less** than net_payable — the shortfall becomes patient
+      outstanding — or **more**, when the patient also pays down previously
+      outstanding dues in the same settlement (recovery). The
+      "cash + online must equal net payable" rule is intentionally gone.
+    - For Cash, the online leg is zeroed; for Online, the cash leg is zeroed;
+      for Split, both are taken as supplied. The upper bound (can't pay more
+      than total owed) is enforced by the caller, which knows the patient's
+      prior due.
     - ``discount_percentage`` is DERIVED from the amount purely for
       storage/reporting; it never drives the math.
     """
@@ -481,7 +493,11 @@ def _build_payment_totals(line_items: list[dict], payment: dict) -> dict:
     if discount_amount > subtotal:
         raise serializers.ValidationError("Discount cannot exceed the subtotal.")
 
-    net_payable = _q2(subtotal - discount_amount)
+    consultation_fee = _q2(consultation_fee or 0)
+    if consultation_fee < Decimal("0"):
+        raise serializers.ValidationError("Consultation fee cannot be negative.")
+
+    net_payable = _q2(subtotal - discount_amount + consultation_fee)
 
     # Derived percentage (storage/reporting only). Bounded 0–100 by the
     # discount<=subtotal check above, satisfying the model check constraint.
@@ -492,33 +508,28 @@ def _build_payment_totals(line_items: list[dict], payment: dict) -> dict:
     )
 
     method = payment["payment_method"]
-
+    cash = _q2(payment.get("cash_amount", 0) or 0)
+    online = _q2(payment.get("online_amount", 0) or 0)
     if method == PaymentMethod.CASH:
-        cash = net_payable
         online = Decimal("0")
     elif method == PaymentMethod.ONLINE:
         cash = Decimal("0")
-        online = net_payable
-    elif method == PaymentMethod.SPLIT:
-        cash = _q2(payment.get("cash_amount", 0) or 0)
-        online = _q2(payment.get("online_amount", 0) or 0)
-        if abs((cash + online) - net_payable) > Decimal("0.01"):
-            raise serializers.ValidationError(
-                "Cash + Online must equal the net payable for Split payments."
-            )
-        # Absorb sub-paise dust into the cash leg so the parts sum exactly.
-        cash = _q2(net_payable - online)
-    else:
-        cash = Decimal("0")
-        online = Decimal("0")
+    # SPLIT: both legs taken as supplied.
+
+    if cash < Decimal("0") or online < Decimal("0"):
+        raise serializers.ValidationError("Payment amounts cannot be negative.")
+
+    amount_paid = _q2(cash + online)
 
     return {
         "subtotal": subtotal,
+        "consultation_fee": consultation_fee,
         "discount_percentage": discount_pct,
         "discount_amount": discount_amount,
         "net_payable": net_payable,
         "cash_amount": _q2(cash),
         "online_amount": _q2(online),
+        "amount_paid": amount_paid,
     }
 
 
@@ -595,7 +606,27 @@ def process_dispense(*, data: dict, user) -> DispenseInvoice:
                 f"Available: {locked.quantity}, Requested: {total_qty}"
             )
 
-    totals = _build_payment_totals(line_items, payment)
+    # Consultation fee: explicit value from the client, else the configured
+    # hospital default. Snapshotted onto the invoice so later config changes
+    # never rewrite this invoice.
+    consultation_fee = data.get("consultation_fee")
+    if consultation_fee is None:
+        consultation_fee = billing_services.get_default_consultation_fee()
+
+    totals = _build_payment_totals(line_items, payment, consultation_fee)
+
+    # Underpayment is allowed (shortfall → outstanding), and the patient may
+    # also pay down PRIOR dues here (recovery). What's not allowed is paying
+    # more than the grand total owed (current invoice + prior balance), which
+    # would create an unexpected credit.
+    previous_due = billing_services.current_outstanding(session.patient_id)
+    prior_owed = previous_due if previous_due > Decimal("0") else Decimal("0")
+    total_payable = _q2(totals["net_payable"] + prior_owed)
+    if totals["amount_paid"] > total_payable + Decimal("0.01"):
+        raise serializers.ValidationError(
+            "Amount paid cannot exceed the total payable "
+            f"(current ₹{totals['net_payable']} + previous due ₹{prior_owed})."
+        )
 
     try:
         invoice = DispenseInvoice.objects.create(
@@ -605,9 +636,11 @@ def process_dispense(*, data: dict, user) -> DispenseInvoice:
             dispensed_by=user,
             dispense_date=timezone.localdate(),
             subtotal=totals["subtotal"],
+            consultation_fee=totals["consultation_fee"],
             discount_percentage=totals["discount_percentage"],
             discount_amount=totals["discount_amount"],
             net_payable=totals["net_payable"],
+            amount_paid=totals["amount_paid"],
             payment_method=payment["payment_method"],
             cash_amount=totals["cash_amount"],
             online_amount=totals["online_amount"],
@@ -686,6 +719,13 @@ def process_dispense(*, data: dict, user) -> DispenseInvoice:
             next_followup_date=next_followup
         )
 
+    # Post the financial ledger: charge (+net_payable) and payment
+    # (-amount_paid). Any shortfall raises the patient's outstanding; any
+    # excess pays down prior dues. Refreshes the cached Patient.outstanding_debt.
+    billing_services.post_invoice_charge_and_payment(
+        invoice=invoice, amount_paid=totals["amount_paid"], user=user
+    )
+
     logger.info(
         "DISPENSE: %s | patient=%s | amount=%s | items=%d | by=%s",
         invoice.invoice_number,
@@ -761,6 +801,8 @@ def cancel_dispense_for_session(*, session_id, reason: str, user) -> DispenseInv
 
         existing.status = DispenseStatus.CANCELLED
         existing.net_payable = Decimal("0")
+        existing.consultation_fee = Decimal("0")
+        existing.amount_paid = Decimal("0")
         existing.cash_amount = Decimal("0")
         existing.online_amount = Decimal("0")
         existing.cancelled_at = now
@@ -770,6 +812,8 @@ def cancel_dispense_for_session(*, session_id, reason: str, user) -> DispenseInv
             update_fields=[
                 "status",
                 "net_payable",
+                "consultation_fee",
+                "amount_paid",
                 "cash_amount",
                 "online_amount",
                 "cancelled_at",
@@ -777,6 +821,11 @@ def cancel_dispense_for_session(*, session_id, reason: str, user) -> DispenseInv
                 "cancel_reason",
                 "updated_at",
             ]
+        )
+        # Reverse this invoice's entire ledger impact so the patient is no
+        # longer charged for a voided dispense (append-only adjustment row).
+        billing_services.reverse_invoice_entries(
+            invoice=existing, user=user, reason=f"Cancelled: {reason[:200]}"
         )
         invoice = existing
     else:
@@ -853,9 +902,11 @@ def _amendment_snapshot(invoice: DispenseInvoice, old_items) -> dict:
             for item in old_items
         ],
         "subtotal": str(invoice.subtotal),
+        "consultation_fee": str(invoice.consultation_fee),
         "discount_percentage": str(invoice.discount_percentage),
         "discount_amount": str(invoice.discount_amount),
         "net_payable": str(invoice.net_payable),
+        "amount_paid": str(invoice.amount_paid),
         "payment_method": invoice.payment_method,
         "cash_amount": str(invoice.cash_amount),
         "online_amount": str(invoice.online_amount),
@@ -1014,7 +1065,28 @@ def amend_dispense_for_session(*, session_id, data: dict, user) -> DispenseInvoi
                 f"Available: {batch.quantity}, Requested: {total_qty}"
             )
 
-    totals = _build_payment_totals(line_items, payment)
+    # Preserve the invoice's existing consultation fee unless the client
+    # explicitly supplies a new value in the amendment.
+    consultation_fee = data.get("consultation_fee")
+    if consultation_fee is None:
+        consultation_fee = invoice.consultation_fee
+    totals = _build_payment_totals(line_items, payment, consultation_fee)
+
+    # Re-base the ledger: reverse this invoice's prior charge/payment impact,
+    # then validate the new tendered amount against the patient's remaining
+    # (prior) due + the amended net. Both happen inside the atomic block, so a
+    # validation failure rolls the reversal back too.
+    billing_services.reverse_invoice_entries(
+        invoice=invoice, user=user, reason=f"Amend re-base: {reason[:180]}"
+    )
+    previous_due = billing_services.current_outstanding(session.patient_id)
+    prior_owed = previous_due if previous_due > Decimal("0") else Decimal("0")
+    total_payable = _q2(totals["net_payable"] + prior_owed)
+    if totals["amount_paid"] > total_payable + Decimal("0.01"):
+        raise serializers.ValidationError(
+            "Amount paid cannot exceed the total payable "
+            f"(amended ₹{totals['net_payable']} + previous due ₹{prior_owed})."
+        )
 
     # ── Reapply: create new items, deduct stock, log dispense rows ──
     for entry in resolved:
@@ -1065,9 +1137,11 @@ def amend_dispense_for_session(*, session_id, data: dict, user) -> DispenseInvoi
 
     # ── Update invoice money fields + metadata ──
     invoice.subtotal = totals["subtotal"]
+    invoice.consultation_fee = totals["consultation_fee"]
     invoice.discount_percentage = totals["discount_percentage"]
     invoice.discount_amount = totals["discount_amount"]
     invoice.net_payable = totals["net_payable"]
+    invoice.amount_paid = totals["amount_paid"]
     invoice.payment_method = payment["payment_method"]
     invoice.cash_amount = totals["cash_amount"]
     invoice.online_amount = totals["online_amount"]
@@ -1077,9 +1151,11 @@ def amend_dispense_for_session(*, session_id, data: dict, user) -> DispenseInvoi
     invoice.save(
         update_fields=[
             "subtotal",
+            "consultation_fee",
             "discount_percentage",
             "discount_amount",
             "net_payable",
+            "amount_paid",
             "payment_method",
             "cash_amount",
             "online_amount",
@@ -1087,6 +1163,11 @@ def amend_dispense_for_session(*, session_id, data: dict, user) -> DispenseInvoi
             "next_followup_date",
             "updated_at",
         ]
+    )
+
+    # Post the amended charge/payment to the ledger and refresh the cache.
+    billing_services.post_invoice_charge_and_payment(
+        invoice=invoice, amount_paid=totals["amount_paid"], user=user
     )
 
     # Keep the visit's denormalised total in sync (drives reception
