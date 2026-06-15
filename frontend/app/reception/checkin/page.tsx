@@ -39,9 +39,17 @@ import {
 import {
   ENABLE_FINGERPRINT,
   ENABLE_CAMERA,
-  HAS_ANY_VERIFICATION_METHOD,
+  FINGERPRINT_REQUIRED,
+  CAMERA_REQUIRED,
   DEFAULT_CHECKIN_VERIFICATION_METHOD,
 } from "@/lib/feature-flags";
+
+// Manual check-in is offered only when NEITHER verification method is
+// mandatory. With both *_REQUIRED flags false, reception may complete a
+// check-in by visual confirmation alone — even when scanners/cameras are
+// enabled (they stay available as optional tabs). If either method is
+// required, manual is withheld so verification can't be bypassed.
+const ALLOW_MANUAL_CHECKIN = !FINGERPRINT_REQUIRED && !CAMERA_REQUIRED;
 import type { VerificationMethod } from "@/lib/verification-methods";
 import { navigate } from "@/lib/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -886,20 +894,22 @@ export default function CheckinPage() {
                             ? "default"
                             : "outline"
                         }
-                        className={
+                        className={`min-w-0 ${
                           verificationMethod === "fingerprint"
                             ? "bg-primary hover:bg-primary-dark"
                             : ""
-                        }
+                        }`}
                         onClick={() =>
                           handleVerificationMethodChange("fingerprint")
                         }
                       >
-                        <Fingerprint className="h-4 w-4 mr-2" />
-                        Fingerprint
-                        {ENABLE_FINGERPRINT && !ENABLE_CAMERA
-                          ? ""
-                          : " (Recommended)"}
+                        <Fingerprint className="h-4 w-4 mr-2 shrink-0" />
+                        <span className="truncate">
+                          Fingerprint
+                          {ENABLE_FINGERPRINT && !ENABLE_CAMERA
+                            ? ""
+                            : " (Recommended)"}
+                        </span>
                       </Button>
                     )}
                     {ENABLE_CAMERA && (
@@ -908,26 +918,34 @@ export default function CheckinPage() {
                         variant={
                           verificationMethod === "photo" ? "default" : "outline"
                         }
-                        className={
+                        className={`min-w-0 ${
                           verificationMethod === "photo"
                             ? "bg-primary-accent hover:bg-primary-accent-dark"
                             : ""
-                        }
+                        }`}
                         onClick={() => handleVerificationMethodChange("photo")}
                       >
-                        <Camera className="h-4 w-4 mr-2" />
-                        Photo with Timestamp
+                        <Camera className="h-4 w-4 mr-2 shrink-0" />
+                        <span className="truncate">Photo with Timestamp</span>
                       </Button>
                     )}
-                    {!HAS_ANY_VERIFICATION_METHOD && (
+                    {ALLOW_MANUAL_CHECKIN && (
                       <Button
                         type="button"
-                        variant="default"
-                        className="bg-slate-600 hover:bg-slate-700"
-                        disabled
+                        variant={
+                          verificationMethod === "manual"
+                            ? "default"
+                            : "outline"
+                        }
+                        className={`min-w-0 ${
+                          verificationMethod === "manual"
+                            ? "bg-slate-600 hover:bg-slate-700"
+                            : ""
+                        }`}
+                        onClick={() => handleVerificationMethodChange("manual")}
                       >
-                        <User className="h-4 w-4 mr-2" />
-                        Manual Verification
+                        <User className="h-4 w-4 mr-2 shrink-0" />
+                        <span className="truncate">Manual Check-in</span>
                       </Button>
                     )}
                   </div>
@@ -944,8 +962,8 @@ export default function CheckinPage() {
                         Manual Check-in
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        No biometric verification available. Confirm identity
-                        visually.
+                        Confirm the patient&apos;s identity visually, then
+                        complete the check-in.
                       </p>
                     </div>
                   </div>
