@@ -14,7 +14,32 @@ class FollowUpCallResult(models.TextChoices):
     BUSY_LATER = "busy_later", "Busy / Call Back Later"
     WRONG_NUMBER = "wrong_number", "Wrong Number"
     NOT_REACHABLE = "not_reachable", "Not Reachable / Switched Off"
+    DO_NOT_CALL = "do_not_call", "Do Not Call"
     OTHER = "other", "Other"
+
+
+# Results that END the follow-up cycle: the ticket is marked COMPLETED with
+# no ``next_call_date`` and never requeues.
+#   * CONFIRMED    — patient will return; await their visit.
+#   * WRONG_NUMBER — number is invalid; calling again is pointless.
+#   * DO_NOT_CALL  — patient asked not to be contacted.
+TERMINAL_CALL_RESULTS = frozenset(
+    {
+        FollowUpCallResult.CONFIRMED,
+        FollowUpCallResult.WRONG_NUMBER,
+        FollowUpCallResult.DO_NOT_CALL,
+    }
+)
+
+# Results that schedule a retry: a ``next_call_date`` is required and the
+# ticket requeues to PENDING on that date.
+RETRY_CALL_RESULTS = frozenset(
+    {
+        FollowUpCallResult.BUSY_LATER,
+        FollowUpCallResult.NOT_REACHABLE,
+        FollowUpCallResult.OTHER,
+    }
+)
 
 
 class FollowUpTicket(models.Model):

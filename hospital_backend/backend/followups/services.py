@@ -7,7 +7,13 @@ from django.utils import timezone
 from patients.models import Patient
 from visits.models import VisitSession
 
-from .models import FollowUpCallAttempt, FollowUpCallResult, FollowUpStatus, FollowUpTicket
+from .models import (
+    FollowUpCallAttempt,
+    FollowUpCallResult,
+    FollowUpStatus,
+    FollowUpTicket,
+    TERMINAL_CALL_RESULTS,
+)
 
 
 def _has_patient_checked_in_after_date(*, patient: Patient, date_value) -> bool:
@@ -38,6 +44,10 @@ def sync_followup_tickets(*, today=None) -> dict[str, int]:
     due_patients = Patient.objects.filter(
         next_followup_date__isnull=False,
         next_followup_date__lte=due_cutoff,
+    ).exclude(
+        # Never auto-generate follow-up calls for patients who asked not to be
+        # contacted or whose number is known to be wrong.
+        Q(do_not_call=True) | Q(phone_number_invalid=True),
     )
 
     for patient in due_patients:
@@ -74,6 +84,16 @@ def sync_followup_tickets(*, today=None) -> dict[str, int]:
             ticket.next_call_date = None
             ticket.save(update_fields=["status", "successful_at", "next_call_date", "updated_at"])
             marked_successful += 1
+            continue
+
+        # Defense-in-depth: a patient flagged do_not_call / phone_number_invalid
+        # between scheduling and the requeue date must not be re-queued. Drop
+        # the callback (leave the ticket COMPLETED, clear next_call_date).
+        # Terminal results already clear next_call_date, so this only catches
+        # the rare flag-set-after-scheduling case.
+        if ticket.patient.do_not_call or ticket.patient.phone_number_invalid:
+            ticket.next_call_date = None
+            ticket.save(update_fields=["next_call_date", "updated_at"])
             continue
 
         ticket.status = FollowUpStatus.PENDING
@@ -143,7 +163,11 @@ def complete_followup_call(
     ticket.last_call_note = note
     ticket.last_called_at = called_at
     ticket.completed_at = called_at
-    ticket.next_call_date = next_call_date if result != FollowUpCallResult.CONFIRMED else None
+    # Terminal results (confirmed / wrong_number / do_not_call) end the cycle
+    # with no callback; only retry results carry a next_call_date forward.
+    ticket.next_call_date = (
+        None if result in TERMINAL_CALL_RESULTS else next_call_date
+    )
     ticket.save(
         update_fields=[
             "status",
@@ -155,6 +179,21 @@ def complete_followup_call(
             "updated_at",
         ]
     )
+
+    # Side effects on the patient's communication / data-quality flags. These
+    # exclude the patient from future follow-up ticket generation.
+    patient_updates: list[str] = []
+    patient = ticket.patient
+    if result == FollowUpCallResult.WRONG_NUMBER and not patient.phone_number_invalid:
+        patient.phone_number_invalid = True
+        patient_updates.append("phone_number_invalid")
+    if result == FollowUpCallResult.DO_NOT_CALL and not patient.do_not_call:
+        patient.do_not_call = True
+        patient_updates.append("do_not_call")
+    if patient_updates:
+        patient_updates.append("updated_at")
+        patient.save(update_fields=patient_updates)
+
     return ticket
 
 
@@ -208,6 +247,7 @@ def build_calling_report_payload(*, start_date, end_date, patient_id=None):
         busy_later=Count("pk", filter=Q(result=FollowUpCallResult.BUSY_LATER)),
         wrong_number=Count("pk", filter=Q(result=FollowUpCallResult.WRONG_NUMBER)),
         not_reachable=Count("pk", filter=Q(result=FollowUpCallResult.NOT_REACHABLE)),
+        do_not_call=Count("pk", filter=Q(result=FollowUpCallResult.DO_NOT_CALL)),
         other=Count("pk", filter=Q(result=FollowUpCallResult.OTHER)),
     )
 
@@ -220,6 +260,7 @@ def build_calling_report_payload(*, start_date, end_date, patient_id=None):
             busy_later=Count("pk", filter=Q(result=FollowUpCallResult.BUSY_LATER)),
             wrong_number=Count("pk", filter=Q(result=FollowUpCallResult.WRONG_NUMBER)),
             not_reachable=Count("pk", filter=Q(result=FollowUpCallResult.NOT_REACHABLE)),
+            do_not_call=Count("pk", filter=Q(result=FollowUpCallResult.DO_NOT_CALL)),
             other=Count("pk", filter=Q(result=FollowUpCallResult.OTHER)),
         )
         .order_by("-total")
@@ -232,6 +273,7 @@ def build_calling_report_payload(*, start_date, end_date, patient_id=None):
             "busy_later": row["busy_later"],
             "wrong_number": row["wrong_number"],
             "not_reachable": row["not_reachable"],
+            "do_not_call": row["do_not_call"],
             "other": row["other"],
         }
         for row in staff_rows

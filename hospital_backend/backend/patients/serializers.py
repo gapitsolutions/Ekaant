@@ -618,6 +618,18 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
                 timezone.now() if fingerprint_template else None
             )
 
+        # Correcting the phone number clears the "wrong number" flag set by the
+        # follow-up calling workflow, re-enabling the patient for automated
+        # follow-up tickets. Only acts when the number actually changes so an
+        # unrelated profile edit doesn't silently un-flag a bad number.
+        new_phone = validated_data.get("phone_number")
+        if (
+            new_phone is not None
+            and new_phone != instance.phone_number
+            and instance.phone_number_invalid
+        ):
+            validated_data["phone_number_invalid"] = False
+
         # ``validate_file_number`` / ``validate_hdams_id`` /
         # ``validate_aadhaar_number`` pre-check uniqueness, but a concurrent
         # edit on another row can still slip in between the SELECT and the

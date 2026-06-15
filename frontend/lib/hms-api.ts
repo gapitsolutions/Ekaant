@@ -845,6 +845,7 @@ export interface FollowUpItemResponse {
     | "busy_later"
     | "wrong_number"
     | "not_reachable"
+    | "do_not_call"
     | "other"
     | null;
   last_call_date?: string | null;
@@ -870,6 +871,7 @@ export type FollowUpCallResult =
   | "busy_later"
   | "wrong_number"
   | "not_reachable"
+  | "do_not_call"
   | "other";
 
 export interface CompleteFollowUpCallPayload {
@@ -925,6 +927,7 @@ export interface CallingReportStaffRow {
   busy_later: number;
   wrong_number: number;
   not_reachable: number;
+  do_not_call: number;
   other: number;
 }
 
@@ -948,6 +951,7 @@ export interface CallingReportResponse {
     busy_later: number;
     wrong_number: number;
     not_reachable: number;
+    do_not_call: number;
     other: number;
   };
   staff_breakdown: CallingReportStaffRow[];

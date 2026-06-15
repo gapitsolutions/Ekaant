@@ -122,6 +122,14 @@ class Patient(models.Model):
     current_medications = models.TextField(blank=True)
     previous_treatments = models.TextField(blank=True)
     next_followup_date = models.DateField(blank=True, null=True)
+    # Communication preferences / data-quality flags driven by the follow-up
+    # calling workflow. Both exclude the patient from automated follow-up
+    # ticket generation (see followups.services.sync_followup_tickets):
+    #   * do_not_call — patient explicitly asked not to be contacted.
+    #   * phone_number_invalid — last call reached a wrong number; cleared
+    #     automatically when the phone number is edited in Edit Profile.
+    do_not_call = models.BooleanField(default=False)
+    phone_number_invalid = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

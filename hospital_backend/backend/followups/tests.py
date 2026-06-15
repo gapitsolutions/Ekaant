@@ -127,3 +127,65 @@ class FollowUpWorkflowTests(APITestCase):
         ticket = FollowUpTicket.objects.get(pk=ticket_id)
         self.assertEqual(ticket.status, FollowUpStatus.SUCCESSFUL)
         self.assertIsNotNone(ticket.successful_at)
+
+    # ── Terminal outcomes: wrong_number & do_not_call ──────────────────────
+
+    def test_wrong_number_is_terminal_and_flags_patient(self):
+        ticket_id = self._list_followups(stage="pending").data["data"]["items"][0]["id"]
+
+        response = self.client.post(
+            f"/api/v1/receptionist/follow-ups/{ticket_id}/complete-call/",
+            {"call_result": "wrong_number", "call_note": "Number belongs to someone else"},
+            format="json",
+        )
+        # No next_call_date needed → accepted, ticket terminal (COMPLETED, no requeue).
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ticket = FollowUpTicket.objects.get(pk=ticket_id)
+        self.assertEqual(ticket.status, FollowUpStatus.COMPLETED)
+        self.assertIsNone(ticket.next_call_date)
+
+        self.patient.refresh_from_db()
+        self.assertTrue(self.patient.phone_number_invalid)
+
+    def test_do_not_call_is_terminal_and_flags_patient(self):
+        ticket_id = self._list_followups(stage="pending").data["data"]["items"][0]["id"]
+
+        response = self.client.post(
+            f"/api/v1/receptionist/follow-ups/{ticket_id}/complete-call/",
+            {"call_result": "do_not_call", "call_note": "Patient asked not to be contacted"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ticket = FollowUpTicket.objects.get(pk=ticket_id)
+        self.assertEqual(ticket.status, FollowUpStatus.COMPLETED)
+        self.assertIsNone(ticket.next_call_date)
+
+        self.patient.refresh_from_db()
+        self.assertTrue(self.patient.do_not_call)
+
+    def test_flagged_patient_excluded_from_new_ticket_generation(self):
+        # Flag + clear any existing ticket, then bump the due date so sync
+        # would otherwise create a fresh ticket.
+        self.patient.do_not_call = True
+        self.patient.save(update_fields=["do_not_call"])
+        FollowUpTicket.objects.all().delete()
+        self.patient.next_followup_date = timezone.localdate() - timedelta(days=5)
+        self.patient.save(update_fields=["next_followup_date"])
+
+        response = self._list_followups(stage="pending")
+        self.assertEqual(response.data["data"]["counts"]["pending"], 0)
+        self.assertEqual(FollowUpTicket.objects.count(), 0)
+
+    def test_editing_phone_number_clears_invalid_flag(self):
+        self.patient.phone_number_invalid = True
+        self.patient.save(update_fields=["phone_number_invalid"])
+
+        response = self.client.patch(
+            f"/api/v1/patients/{self.patient.pk}/general/",
+            {"phone_number": "9111111111"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.phone_number_invalid)
+        self.assertEqual(self.patient.phone_number, "9111111111")

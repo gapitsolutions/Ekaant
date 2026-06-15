@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-15 (IST) — patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
+> **Last Updated:** 2026-06-16 (IST) — follow-up calling: new `do_not_call` outcome + `wrong_number` is now terminal (no callback date); both set patient flags (`do_not_call`, `phone_number_invalid`) that exclude the patient from automated follow-up ticket generation; editing the phone number clears `phone_number_invalid`; calling report gains a `do_not_call` bucket/column. Earlier: patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -449,10 +449,14 @@ Working flow:
    available id. Empty `hdams_id` is stored as NULL (multiple patients
    with no HDAMS id do not collide on the partial-unique index).
 4. Save partial update; manages `fingerprint_enrolled_at` based on `fingerprint_template` changes
-5. Wraps `save()` in an `IntegrityError` handler that re-raises as 409 for
+5. If `phone_number` is changed to a new value, auto-clears the patient's
+   `phone_number_invalid` flag (set by the follow-up `wrong_number` outcome),
+   re-enabling automated follow-up tickets. Only fires on an actual number
+   change.
+6. Wraps `save()` in an `IntegrityError` handler that re-raises as 409 for
    the same three unique fields, in case a concurrent edit slips through
    the pre-check race window.
-6. Return full `PatientGeneralDataSerializer` response
+7. Return full `PatientGeneralDataSerializer` response
 
 Editable identity fields: `file_number`, `hdams_id`, `aadhaar_number` —
 all subject to the uniqueness rules above. `file_number` additionally
@@ -1819,8 +1823,10 @@ Query params:
 Behavior:
 
 - Runs sync job on request:
-  - creates pending tickets when `patient.next_followup_date + 2 days` is due
-  - requeues completed unsuccessful calls when `next_call_date` is due
+  - creates pending tickets when `patient.next_followup_date + 2 days` is due,
+    **excluding patients flagged `do_not_call` or `phone_number_invalid`**
+  - requeues completed unsuccessful calls when `next_call_date` is due (a
+    patient flagged between scheduling and requeue is dropped, not requeued)
   - marks completed callbacks as `successful` if patient has checked in
 - Returns paginated items and stage counts.
 
@@ -1833,16 +1839,33 @@ Permission: `IsReceptionOrAdmin`
 
 Request body:
 
-- `call_result`: `confirmed` | `busy_later` | `wrong_number` | `not_reachable` | `other`
+- `call_result`: `confirmed` | `busy_later` | `wrong_number` | `not_reachable` | `do_not_call` | `other`
 - `call_note` (required, non-empty)
-- `next_call_date` (required when `call_result` is not `confirmed`; ignored for `confirmed`)
+- `next_call_date` — **required for retry results** (`busy_later`,
+  `not_reachable`, `other`); **ignored/forced null for terminal results**
+  (`confirmed`, `wrong_number`, `do_not_call`).
+
+Result taxonomy:
+
+- **Terminal results** end the cycle — ticket `status = completed` with
+  `next_call_date = null`; never requeued.
+  - `confirmed` — patient will return.
+  - `wrong_number` — sets `patient.phone_number_invalid = true` (cleared
+    automatically when the phone number is edited via §5.8). The number is
+    wrong, so no callback is scheduled.
+  - `do_not_call` — sets `patient.do_not_call = true`. Patient asked not to
+    be contacted.
+  - Both flags exclude the patient from future automated ticket generation.
+- **Retry results** (`busy_later`, `not_reachable`, `other`) require
+  `next_call_date`; the ticket requeues to `pending` on that date.
 
 Behavior:
 
 - Creates `FollowUpCallAttempt` history row.
-- Marks ticket `status = completed`.
-- Stores last call metadata on ticket.
-- For unsuccessful calls, schedules retry via `next_call_date`.
+- Marks ticket `status = completed`, stores last-call metadata.
+- Applies the terminal/retry `next_call_date` rule above.
+- Applies the patient communication-flag side effects for `wrong_number` /
+  `do_not_call`.
 
 ### 8.3 `GET /api/v1/receptionist/follow-ups/report/`
 
@@ -1878,6 +1901,7 @@ Response:
     "busy_later": 12,
     "wrong_number": 5,
     "not_reachable": 8,
+    "do_not_call": 2,
     "other": 2
   },
   "staff_breakdown": [
@@ -1888,6 +1912,7 @@ Response:
       "busy_later": 8,
       "wrong_number": 3,
       "not_reachable": 3,
+      "do_not_call": 1,
       "other": 1
     }
   ],
@@ -1906,7 +1931,7 @@ Response:
 }
 ```
 
-`result` values: `confirmed` | `busy_later` | `wrong_number` | `not_reachable` | `other` (mirrors `FollowUpCallResult` choices).
+`result` values: `confirmed` | `busy_later` | `wrong_number` | `not_reachable` | `do_not_call` | `other` (mirrors `FollowUpCallResult` choices).
 
 ---
 

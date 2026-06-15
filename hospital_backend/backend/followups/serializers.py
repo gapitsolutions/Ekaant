@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import FollowUpCallResult, FollowUpTicket
+from .models import FollowUpCallResult, FollowUpTicket, TERMINAL_CALL_RESULTS
 
 
 class FollowUpListQuerySerializer(serializers.Serializer):
@@ -30,13 +30,17 @@ class FollowUpCallCompleteSerializer(serializers.Serializer):
         next_call_date = attrs.get("next_call_date")
         today = timezone.localdate()
 
-        if result == FollowUpCallResult.CONFIRMED:
+        # Terminal outcomes (confirmed / wrong_number / do_not_call) end the
+        # cycle — no callback date is asked for or stored. A wrong number or a
+        # do-not-call request can't be retried on a future date.
+        if result in TERMINAL_CALL_RESULTS:
             attrs["next_call_date"] = None
             return attrs
 
+        # Retry outcomes (busy_later / not_reachable / other) require a date.
         if next_call_date is None:
             raise serializers.ValidationError(
-                "next_call_date is required when call_result is not confirmed."
+                "next_call_date is required for this call result."
             )
         if next_call_date < today:
             raise serializers.ValidationError("next_call_date cannot be in the past.")

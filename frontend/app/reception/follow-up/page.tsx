@@ -32,7 +32,7 @@ import {
   type FollowUpCallResult,
   type FollowUpItemResponse,
 } from "@/lib/hms-api";
-import { AlertCircle, Calendar, CheckCircle, CheckCircle2, Clock, MessageSquare, Phone, Search, User, RotateCcw, XCircle } from "lucide-react";
+import { AlertCircle, Ban, Calendar, CheckCircle, CheckCircle2, Clock, MessageSquare, Phone, Search, User, RotateCcw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type TabValue = "pending" | "completed" | "success" | "all";
@@ -52,11 +52,20 @@ const RESULT_OPTIONS: Array<{
     label: "Busy / Call Back Later",
     requiresNextCallDate: true,
   },
-  { value: "wrong_number", label: "Wrong Number", requiresNextCallDate: true },
+  // Wrong number is terminal — you can't call a wrong number on a future
+  // date. It flags the patient (phone_number_invalid) server-side.
+  { value: "wrong_number", label: "Wrong Number", requiresNextCallDate: false },
   {
     value: "not_reachable",
     label: "Not Reachable / Switched Off",
     requiresNextCallDate: true,
+  },
+  // Do not call is terminal — flags the patient (do_not_call) and excludes
+  // them from future follow-up tickets.
+  {
+    value: "do_not_call",
+    label: "Do Not Call",
+    requiresNextCallDate: false,
   },
   { value: "other", label: "Other", requiresNextCallDate: true },
 ];
@@ -93,6 +102,7 @@ const RESULT_ICONS: Record<string, React.ReactNode> = {
   busy_later: <Clock className="h-4 w-4 text-amber-500" />,
   wrong_number: <AlertCircle className="h-4 w-4 text-red-400" />,
   not_reachable: <XCircle className="h-4 w-4 text-slate-400" />,
+  do_not_call: <Ban className="h-4 w-4 text-rose-500" />,
   other: <MessageSquare className="h-4 w-4 text-blue-400" />,
 };
 

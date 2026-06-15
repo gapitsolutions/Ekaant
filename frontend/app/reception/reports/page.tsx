@@ -913,6 +913,7 @@ export default function ReportsPage() {
                           <TableHead className="font-bold uppercase text-[10px] tracking-wider text-amber-600 text-center">Busy</TableHead>
                           <TableHead className="font-bold uppercase text-[10px] tracking-wider text-red-600 text-center">Wrong No.</TableHead>
                           <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Unreachable</TableHead>
+                          <TableHead className="font-bold uppercase text-[10px] tracking-wider text-rose-600 text-center">Do Not Call</TableHead>
                           <TableHead className="font-bold uppercase text-[10px] tracking-wider text-blue-600 text-center">Other</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -932,6 +933,9 @@ export default function ReportsPage() {
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge className="bg-slate-50 text-slate-600 border-slate-200 font-bold px-3 py-1">{row.not_reachable}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className="bg-rose-50 text-rose-700 border-rose-100 font-bold px-3 py-1">{row.do_not_call}</Badge>
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-bold px-3 py-1">{row.other}</Badge>
