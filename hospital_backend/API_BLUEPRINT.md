@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-14 (IST) — medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
+> **Last Updated:** 2026-06-15 (IST) — patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -259,6 +259,10 @@ Request body (core required fields):
 - `phone_number`
 - `date_of_birth`
 - `sex`
+- `registration_date` (optional, `YYYY-MM-DD`): the patient's actual first
+  registration date at the hospital. Omitted → model default (today).
+  Reception supplies this to backdate historical patients. Must not be in
+  the future.
 - `fingerprint_template`
 - `relative_phone`
 - `address_line1`
@@ -269,6 +273,7 @@ Working flow:
 
 1. Validate payload and business rules in serializer:
    - DOB not in future
+   - `registration_date` not in future (when supplied)
    - phone/relative_phone digits normalization
    - Aadhaar must be 12 digits and unique
    - photo fields must be provided together

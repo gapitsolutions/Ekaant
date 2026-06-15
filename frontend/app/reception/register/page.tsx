@@ -78,13 +78,16 @@ export default function RegisterPatientPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isPhotoCaptureOpen, setIsPhotoCaptureOpen] = useState(false);
 
-  // Instant registration form data
+  // Instant registration form data. ``registration_date`` pre-fills to
+  // today (local ISO) so same-day registrations need no extra input, but
+  // reception can backdate it to the patient's real first-visit date.
   const [instantFormData, setInstantFormData] = useState({
     patient_category: "" as PatientCategory | "",
     full_name: "",
     file_number: "",
     aadhaar_number: "",
     date_of_birth: "",
+    registration_date: new Date().toLocaleDateString("en-CA"),
     sex: "" as Gender | "",
     phone: "",
     address: "",
@@ -212,6 +215,7 @@ export default function RegisterPatientPage() {
       !instantFormData.full_name ||
       !instantFormData.phone ||
       !instantFormData.date_of_birth ||
+      !instantFormData.registration_date ||
       !instantFormData.sex
     ) {
       toast.error("Please fill in all required fields");
@@ -220,6 +224,15 @@ export default function RegisterPatientPage() {
 
     if (!/^\d{10}$/.test(instantFormData.phone)) {
       toast.error("Mobile number must be exactly 10 digits.");
+      return;
+    }
+
+    // Registration date cannot be in the future (mirrors the backend guard).
+    if (
+      instantFormData.registration_date >
+      new Date().toLocaleDateString("en-CA")
+    ) {
+      toast.error("Registration date cannot be in the future.");
       return;
     }
 
@@ -288,6 +301,7 @@ export default function RegisterPatientPage() {
         full_name: instantFormData.full_name,
         phone_number: instantFormData.phone,
         date_of_birth: instantFormData.date_of_birth,
+        registration_date: instantFormData.registration_date || undefined,
         sex: instantFormData.sex,
         fingerprint_template: instantFormData.fingerprint_template || undefined,
         aadhaar_number: aadhaarDigits || undefined,
@@ -330,6 +344,7 @@ export default function RegisterPatientPage() {
       file_number: "",
       aadhaar_number: "",
       date_of_birth: "",
+      registration_date: new Date().toLocaleDateString("en-CA"),
       sex: "",
       phone: "",
       address: "",
@@ -648,6 +663,35 @@ export default function RegisterPatientPage() {
                       required
                     />
                     <FieldError message={apiErrors.get("date_of_birth")} />
+                  </div>
+
+                  {/* Registration Date — the patient's actual first-visit
+                      date at the hospital, not the data-entry date. Defaults
+                      to today; backdate for historical patients. */}
+                  <div>
+                    <Label
+                      htmlFor="registration_date"
+                      className="flex items-center gap-2"
+                    >
+                      <Calendar className="h-4 w-4 text-teal-600" />
+                      Registration Date{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="registration_date"
+                      name="registration_date"
+                      type="date"
+                      value={instantFormData.registration_date}
+                      onChange={handleInstantChange}
+                      max={new Date().toLocaleDateString("en-CA")}
+                      className="mt-1.5"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Defaults to today. Set the patient&apos;s actual first
+                      registration date if they joined the hospital earlier.
+                    </p>
+                    <FieldError message={apiErrors.get("registration_date")} />
                   </div>
 
                   {/* Sex */}

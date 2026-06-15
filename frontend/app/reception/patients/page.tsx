@@ -2254,6 +2254,23 @@ export default function PatientDataPage() {
                           />
                         </div>
                         <div>
+                          <Label>Registration Date</Label>
+                          <Input
+                            type="date"
+                            value={editingPatient.registration_date || ""}
+                            max={new Date().toLocaleDateString("en-CA")}
+                            onChange={(e) =>
+                              handleEditChange(
+                                "registration_date",
+                                e.target.value,
+                              )
+                            }
+                          />
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Patient&apos;s actual first registration date.
+                          </p>
+                        </div>
+                        <div>
                           <Label>Mobile Number</Label>
                           <Input
                             value={editingPatient.phone}

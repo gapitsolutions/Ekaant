@@ -71,6 +71,13 @@ class PatientRegistrationSerializer(serializers.Serializer):
     full_name = serializers.CharField()
     phone_number = serializers.CharField()
     date_of_birth = serializers.DateField()
+    # Actual date the patient first registered at the hospital. Optional: when
+    # omitted the model default (today) applies, preserving the prior
+    # behaviour for callers that don't send it. Reception supplies this so
+    # historical patients (who joined the hospital long before being entered
+    # into the HMS) carry their real registration date, not the data-entry
+    # date.
+    registration_date = serializers.DateField(required=False)
     sex = serializers.ChoiceField(choices=Patient._meta.get_field("sex").choices)
     fingerprint_template = serializers.CharField(required=False, allow_blank=True)
     aadhaar_number = serializers.CharField(required=False, allow_blank=True)
@@ -118,6 +125,15 @@ class PatientRegistrationSerializer(serializers.Serializer):
         if not digits:
             raise serializers.ValidationError("Phone number is required.")
         return digits
+
+    def validate_registration_date(self, value):
+        # A registration can be backdated to the patient's real first visit,
+        # but it cannot be in the future.
+        if value > timezone.localdate():
+            raise serializers.ValidationError(
+                "Registration date cannot be in the future."
+            )
+        return value
 
     def validate_relative_phone(self, value):
         return _digits_only(value) if value else ""
@@ -515,6 +531,15 @@ class PatientGeneralUpdateSerializer(serializers.ModelSerializer):
         if not digits:
             raise serializers.ValidationError("Phone number is required.")
         return digits
+
+    def validate_registration_date(self, value):
+        # Editable post-registration (e.g. correcting a backdated historical
+        # patient), but never to a future date — mirrors the register flow.
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError(
+                "Registration date cannot be in the future."
+            )
+        return value
 
     def validate_relative_phone(self, value):
         return _digits_only(value) if value else ""

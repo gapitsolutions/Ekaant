@@ -86,6 +86,10 @@ type RegisterPatientTier1Payload = {
   full_name: string;
   phone_number: string;
   date_of_birth: string;
+  // Actual first-registration date at the hospital (YYYY-MM-DD). Optional —
+  // omitting it lets the backend default to today. Reception sends the real
+  // (possibly backdated) date for historical patients.
+  registration_date?: string;
   sex: "male" | "female" | "other";
   fingerprint_template?: string;
   aadhaar_number?: string;
