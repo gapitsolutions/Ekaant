@@ -1,6 +1,7 @@
 import base64
 import binascii
 
+from django.urls import reverse
 from rest_framework import serializers
 
 from core.exceptions import ConflictError
@@ -182,11 +183,14 @@ class StaffReadSerializer(serializers.ModelSerializer):
         ]
 
     def get_photo_url(self, obj):
+        # Served via a permissioned view (admin-only), NOT the raw media URL —
+        # mirrors the patient-photo pattern so staff PII isn't exposed on open
+        # /media/. Same-origin <img> requests carry the session cookie.
         if not obj.photo:
             return None
+        path = reverse("staff-photo", kwargs={"staff_id": obj.pk})
         request = self.context.get("request")
-        url = obj.photo.url
-        return request.build_absolute_uri(url) if request else url
+        return request.build_absolute_uri(path) if request else path
 
 
 class StaffListItemSerializer(StaffReadSerializer):

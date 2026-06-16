@@ -1,2 +1,4 @@
 # Ignore Frontend-Pharmacy folder
 Frontend-Pharmacy/
+.claude
+CLAUDE.md

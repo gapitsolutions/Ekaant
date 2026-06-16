@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, IntegerField, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -40,7 +40,6 @@ from .models import (
     PaymentMethod,
     PurchaseInvoice,
     Supplier,
-    SupplierLedgerEntry,
 )
 from .serializers import (
     AuditRemovalCreateSerializer,
@@ -56,7 +55,6 @@ from .serializers import (
     PurchaseInvoiceListItemSerializer,
     PurchaseInvoiceUpdateSerializer,
     SupplierEmbeddedSerializer,
-    SupplierLedgerEntrySerializer,
     SupplierPaymentCreateSerializer,
     SupplierReadSerializer,
     SupplierWriteSerializer,
@@ -82,12 +80,30 @@ def _purchase_invoice_document_url(invoice: PurchaseInvoice, request) -> str | N
 
 
 def _supplier_queryset_with_invoice_count():
+    # Counts via correlated subqueries (one GROUP-BY row per supplier) instead
+    # of two ``Count(distinct=True)`` annotations over different relations —
+    # the latter produces a multiplicative invoices×products join that explodes
+    # on large suppliers. Subqueries keep each count independent and indexable.
+    invoice_count_sq = (
+        PurchaseInvoice.objects.filter(supplier=OuterRef("pk"))
+        .order_by()
+        .values("supplier")
+        .annotate(c=Count("*"))
+        .values("c")
+    )
+    product_count_sq = (
+        Medicine.objects.filter(suppliers=OuterRef("pk"), is_active=True)
+        .order_by()
+        .values("suppliers")
+        .annotate(c=Count("*"))
+        .values("c")
+    )
     return Supplier.objects.annotate(
-        _invoice_count=Count("purchase_invoices", distinct=True),
-        _product_count=Count(
-            "medicines",
-            distinct=True,
-            filter=Q(medicines__is_active=True),
+        _invoice_count=Coalesce(
+            Subquery(invoice_count_sq, output_field=IntegerField()), 0
+        ),
+        _product_count=Coalesce(
+            Subquery(product_count_sq, output_field=IntegerField()), 0
         ),
     )
 
@@ -243,38 +259,7 @@ class SupplierLedgerView(APIView):
 
     def get(self, request, supplier_id):
         supplier = get_object_or_404(Supplier, pk=supplier_id)
-
-        entries = list(
-            SupplierLedgerEntry.objects.filter(supplier=supplier)
-            .select_related("purchase_invoice")
-            .order_by("created_at", "id")
-        )
-
-        # Running balance computed oldest→newest, then surfaced newest-first.
-        running = Decimal("0")
-        rows = []
-        total_invoiced = Decimal("0")
-        total_paid = Decimal("0")
-        for entry in entries:
-            running += entry.amount
-            if entry.amount > 0:
-                total_invoiced += entry.amount
-            else:
-                total_paid += -entry.amount
-            rows.append(SupplierLedgerEntrySerializer.from_entry(entry, running))
-        rows.reverse()
-
-        return success_response(
-            {
-                "supplier_id": str(supplier.pk),
-                "summary": {
-                    "outstanding": str(supplier.outstanding_payable),
-                    "total_invoiced": str(total_invoiced),
-                    "total_paid": str(total_paid),
-                },
-                "entries": rows,
-            }
-        )
+        return success_response(services.supplier_ledger(supplier))
 
 
 class SupplierPaymentView(APIView):

@@ -91,6 +91,7 @@ import {
 import { generatePayslipPdf } from "@/lib/export/generatePayslipPdf";
 import { toastApiError, useApiErrors } from "@/lib/api-errors";
 import { FieldError } from "@/components/ui/field-error";
+import { ListPagination } from "@/components/ui/list-pagination";
 
 const EMPLOYMENT_TYPES: { value: EmploymentType; label: string }[] = [
   { value: "permanent", label: "Permanent" },
@@ -110,9 +111,11 @@ function fmtDate(value?: string | null): string {
 }
 
 export default function StaffManagementPage() {
+  const STAFF_PAGE_SIZE = 50;
   const [items, setItems] = useState<StaffListItem[]>([]);
   const [designations, setDesignations] = useState<Designation[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -130,26 +133,30 @@ export default function StaffManagementPage() {
     null,
   );
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage("");
-    try {
-      const data = await listStaff({
-        q: searchQuery || undefined,
-        designation: designationFilter === "all" ? undefined : designationFilter,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        pageSize: 200,
-      });
-      setItems(data.items || []);
-      setTotal(data.pagination.total);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to load staff.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchQuery, designationFilter, statusFilter]);
+  const load = useCallback(
+    async (overrides?: { page?: number }) => {
+      setIsLoading(true);
+      setErrorMessage("");
+      try {
+        const data = await listStaff({
+          q: searchQuery || undefined,
+          designation: designationFilter === "all" ? undefined : designationFilter,
+          status: statusFilter === "all" ? undefined : statusFilter,
+          page: overrides?.page ?? 1,
+          pageSize: STAFF_PAGE_SIZE,
+        });
+        setItems(data.items || []);
+        setTotal(data.pagination.total);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to load staff.",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [searchQuery, designationFilter, statusFilter],
+  );
 
   const loadDesignations = useCallback(async () => {
     try {
@@ -170,13 +177,19 @@ export default function StaffManagementPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    setPage(1);
+    load({ page: 1 });
   }, [designationFilter, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadDesignations();
     loadSummary();
   }, [loadDesignations, loadSummary]);
+
+  const goToPage = (next: number) => {
+    setPage(next);
+    load({ page: next });
+  };
 
   const openEdit = async (id: string) => {
     try {
@@ -275,7 +288,8 @@ export default function StaffManagementPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  load();
+                  setPage(1);
+                  load({ page: 1 });
                 }}
                 className="relative"
               >
@@ -395,9 +409,14 @@ export default function StaffManagementPage() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="mt-4 px-2 text-xs text-slate-400 font-medium">
-                {total} staff total
-              </div>
+              <ListPagination
+                page={page}
+                pageSize={STAFF_PAGE_SIZE}
+                total={total}
+                noun="staff member"
+                onPrev={() => goToPage(page - 1)}
+                onNext={() => goToPage(page + 1)}
+              />
             </div>
           )}
         </CardContent>

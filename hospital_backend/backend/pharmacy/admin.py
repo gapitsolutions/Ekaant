@@ -11,7 +11,32 @@ from .models import (
     StockAuditRemoval,
     StockMovement,
     Supplier,
+    SupplierLedgerEntry,
 )
+
+
+class SupplierLedgerEntryInline(admin.TabularInline):
+    """Accounts-payable ledger for a supplier — read-only (written only by
+    services; the cached ``outstanding_payable`` is derived from these)."""
+
+    model = SupplierLedgerEntry
+    extra = 0
+    can_delete = False
+    max_num = 0
+    fields = (
+        "created_at",
+        "entry_type",
+        "amount",
+        "purchase_invoice",
+        "payment_mode",
+        "reference",
+        "created_by",
+    )
+    readonly_fields = fields
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Supplier)
@@ -22,6 +47,7 @@ class SupplierAdmin(admin.ModelAdmin):
         "mobile_number",
         "gst_number",
         "drug_license_number",
+        "outstanding_payable",
         "is_active",
         "updated_at",
     )
@@ -35,7 +61,15 @@ class SupplierAdmin(admin.ModelAdmin):
         "drug_license_number",
     )
     ordering = ("company_name",)
-    readonly_fields = ("created_at", "updated_at", "created_by", "updated_by")
+    inlines = (SupplierLedgerEntryInline,)
+    # outstanding_payable is a cache recomputed from the ledger — never hand-edit.
+    readonly_fields = (
+        "outstanding_payable",
+        "created_at",
+        "updated_at",
+        "created_by",
+        "updated_by",
+    )
     fieldsets = (
         (
             "Identity",
@@ -50,6 +84,10 @@ class SupplierAdmin(admin.ModelAdmin):
             {"fields": ("gst_number", "drug_license_number", "full_address")},
         ),
         (
+            "Financials",
+            {"fields": ("outstanding_payable",)},
+        ),
+        (
             "Audit",
             {"fields": ("created_at", "updated_at", "created_by", "updated_by")},
         ),
@@ -60,16 +98,20 @@ class SupplierAdmin(admin.ModelAdmin):
 class MedicineAdmin(admin.ModelAdmin):
     list_display = (
         "name",
+        "salt",
         "category",
         "bup_category",
         "manufacturer",
         "reorder_level",
+        "mrp",
         "selling_price",
         "is_active",
     )
-    list_filter = ("category", "is_active", "bup_category")
+    list_filter = ("category", "is_active", "bup_category", "suppliers")
     search_fields = ("name", "salt", "manufacturer")
     ordering = ("name",)
+    # Twin-panel picker for the Medicine↔Supplier M2M added in the supplier work.
+    filter_horizontal = ("suppliers",)
     readonly_fields = ("created_at", "updated_at", "created_by", "updated_by")
 
 
@@ -91,6 +133,29 @@ class MedicineBatchAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at", "initial_quantity")
 
 
+class PurchaseInvoiceItemInline(admin.TabularInline):
+    """Line items for a purchase invoice — read-only (created via the dispense/
+    purchase API, which also writes stock movements)."""
+
+    model = PurchaseInvoiceItem
+    extra = 0
+    can_delete = False
+    max_num = 0
+    fields = (
+        "medicine",
+        "batch_number",
+        "expiry_date",
+        "quantity",
+        "purchase_price",
+        "gst_percentage",
+        "line_total",
+    )
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(PurchaseInvoice)
 class PurchaseInvoiceAdmin(admin.ModelAdmin):
     list_display = (
@@ -99,11 +164,12 @@ class PurchaseInvoiceAdmin(admin.ModelAdmin):
         "order_date",
         "invoice_date",
         "delivery_date",
+        "form6",
         "items_count",
         "total_amount",
         "created_at",
     )
-    list_filter = ("order_date", "invoice_date", "delivery_date", "supplier")
+    list_filter = ("form6", "order_date", "invoice_date", "delivery_date", "supplier")
     search_fields = (
         "invoice_number",
         "supplier__company_name",
@@ -112,6 +178,7 @@ class PurchaseInvoiceAdmin(admin.ModelAdmin):
     )
     list_select_related = ("supplier",)
     autocomplete_fields = ("supplier",)
+    inlines = (PurchaseInvoiceItemInline,)
     date_hierarchy = "invoice_date"
     ordering = ("-created_at",)
     readonly_fields = ("created_at", "updated_at", "created_by", "total_amount", "items_count")
@@ -273,6 +340,43 @@ class StockMovementAdmin(admin.ModelAdmin):
     date_hierarchy = "performed_at"
     ordering = ("-performed_at",)
     list_select_related = ("medicine", "batch", "performed_by")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SupplierLedgerEntry)
+class SupplierLedgerEntryAdmin(admin.ModelAdmin):
+    """Append-only supplier accounts-payable ledger — fully read-only in admin
+    (written only by pharmacy.services; the cached Supplier.outstanding_payable
+    is derived from these rows)."""
+
+    list_display = (
+        "created_at",
+        "supplier",
+        "entry_type",
+        "amount",
+        "purchase_invoice",
+        "payment_mode",
+        "reference",
+        "created_by",
+    )
+    list_filter = ("entry_type", "payment_mode", "created_at")
+    search_fields = (
+        "supplier__company_name",
+        "purchase_invoice__invoice_number",
+        "reference",
+        "note",
+    )
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+    list_select_related = ("supplier", "purchase_invoice", "created_by")
 
     def has_add_permission(self, request):
         return False

@@ -142,6 +142,47 @@ def supplier_summary() -> dict:
     }
 
 
+def supplier_ledger(supplier) -> dict:
+    """Build the accounts-payable ledger payload for one supplier: rows
+    newest-first with a per-row running balance, plus a summary
+    (outstanding / total invoiced / total paid). Kept here (not the view) so
+    the running-balance aggregation lives in the service layer.
+
+    Imports the row serializer lazily to avoid a services↔serializers import
+    cycle.
+    """
+    from .serializers import SupplierLedgerEntrySerializer
+
+    entries = list(
+        SupplierLedgerEntry.objects.filter(supplier=supplier)
+        .select_related("purchase_invoice")
+        .order_by("created_at", "id")
+    )
+
+    running = Decimal("0")
+    rows = []
+    total_invoiced = Decimal("0")
+    total_paid = Decimal("0")
+    for entry in entries:
+        running += entry.amount
+        if entry.amount > 0:
+            total_invoiced += entry.amount
+        else:
+            total_paid += -entry.amount
+        rows.append(SupplierLedgerEntrySerializer.from_entry(entry, running))
+    rows.reverse()
+
+    return {
+        "supplier_id": str(supplier.pk),
+        "summary": {
+            "outstanding": str(supplier.outstanding_payable),
+            "total_invoiced": str(total_invoiced),
+            "total_paid": str(total_paid),
+        },
+        "entries": rows,
+    }
+
+
 def supplier_outstanding(supplier_id) -> Decimal:
     """Current signed payable for a supplier (>0 ⇒ we owe them)."""
     return SupplierLedgerEntry.balance_for(supplier_id)

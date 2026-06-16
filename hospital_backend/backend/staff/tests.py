@@ -412,3 +412,75 @@ class ReceptionAttendanceLockTests(APITestCase):
         c.force_authenticate(user=pharm)
         resp = c.get(f"/api/v1/staff/attendance/?date={self.today}")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AttendanceTodayStatusAndPhotoTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="tsadmin@example.com", password="x", role="admin"
+        )
+        self.reception = User.objects.create_user(
+            email="tsreception@example.com", password="x", role="reception"
+        )
+        d, _ = Designation.objects.get_or_create(name="Nurse")
+        self.s1 = Staff.objects.create(staff_code="T1", full_name="One", designation=d)
+        self.today = timezone.localdate().isoformat()
+
+    def test_today_status_reflects_submission(self):
+        c = APIClient()
+        c.force_authenticate(user=self.reception)
+        # Before submit.
+        r = c.get("/api/v1/staff/attendance/today-status/")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertFalse(r.data["data"]["submitted"])
+        self.assertIsNone(r.data["data"]["submission"])
+        # Submit, then status flips.
+        c.post(
+            "/api/v1/staff/attendance/",
+            {"date": self.today, "entries": [{"staff_id": str(self.s1.id), "status": "present"}]},
+            format="json",
+        )
+        r2 = c.get("/api/v1/staff/attendance/today-status/")
+        self.assertTrue(r2.data["data"]["submitted"])
+        self.assertEqual(r2.data["data"]["submission"]["submitted_by_role"], "reception")
+
+    def test_photo_view_admin_only_and_404_without_photo(self):
+        admin = APIClient()
+        admin.force_authenticate(user=self.admin)
+        resp = admin.get(f"/api/v1/staff/{self.s1.id}/photo/")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)  # no photo set
+
+        pharm = User.objects.create_user(
+            email="tsphpharm@example.com", password="x", role="pharmacist"
+        )
+        c = APIClient()
+        c.force_authenticate(user=pharm)
+        resp2 = c.get(f"/api/v1/staff/{self.s1.id}/photo/")
+        self.assertEqual(resp2.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_photo_url_points_to_gated_view(self):
+        # Create staff with a photo, confirm detail photo_url targets the view.
+        admin = APIClient()
+        admin.force_authenticate(user=self.admin)
+        png = (
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+            "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        )
+        created = admin.post(
+            "/api/v1/staff/",
+            {
+                "staff_code": "T2",
+                "full_name": "Photo",
+                "designation": "Nurse",
+                "photo_base64": png,
+                "photo_mime_type": "image/png",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        url = created.data["data"]["photo_url"]
+        self.assertIn(f"/staff/{created.data['data']['id']}/photo/", url)
+        # And the gated view actually streams the file.
+        relative = url[url.index("/api/v1"):]
+        resp = admin.get(relative)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)

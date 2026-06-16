@@ -94,6 +94,7 @@ import {
 import { generatePurchaseOrderPdf } from "@/lib/export/generatePurchaseOrderPdf";
 import { toastApiError, useApiErrors } from "@/lib/api-errors";
 import { FieldError } from "@/components/ui/field-error";
+import { ListPagination } from "@/components/ui/list-pagination";
 
 
 const CATEGORY_OPTIONS: SupplierCategory[] = ["BUP", "Rx", "NRx"];
@@ -124,6 +125,7 @@ export default function SuppliersPage() {
   const [deactivateTarget, setDeactivateTarget] = useState<Supplier | null>(
     null,
   );
+  const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 50,
@@ -170,7 +172,9 @@ export default function SuppliersPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Filter change → always reset to the first page.
+    setPage(1);
+    load({ page: 1 });
     // load is captured each render; this is intentional — we want the latest
     // filters in scope when load fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,9 +184,15 @@ export default function SuppliersPage() {
     loadSummary();
   }, [loadSummary]);
 
+  const goToPage = (next: number) => {
+    setPage(next);
+    load({ page: next });
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    load();
+    setPage(1);
+    load({ page: 1 });
   };
 
   const handleDeactivate = async () => {
@@ -490,9 +500,14 @@ export default function SuppliersPage() {
                   ))}
                 </TableBody>
               </Table>
-              <div className="mt-4 px-2 text-xs text-slate-400 font-medium">
-                {pagination.total} supplier{pagination.total === 1 ? "" : "s"} total
-              </div>
+              <ListPagination
+                page={page}
+                pageSize={pagination.pageSize}
+                total={pagination.total}
+                noun="supplier"
+                onPrev={() => goToPage(page - 1)}
+                onNext={() => goToPage(page + 1)}
+              />
             </div>
           )}
         </CardContent>
@@ -888,8 +903,11 @@ function SupplierDetailView({
 
   const [products, setProducts] = useState<Medicine[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [invoices, setInvoices] = useState<PurchaseInvoiceListItem[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(true);
+  const [invoicesLoaded, setInvoicesLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState("ledger");
 
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
@@ -945,6 +963,7 @@ function SupplierDetailView({
     try {
       const data = await getInventoryMedicines({ supplier: supplier.id });
       setProducts(data.items || []);
+      setProductsLoaded(true);
     } catch (error) {
       toastApiError(error, "Failed to load products");
     } finally {
@@ -957,6 +976,7 @@ function SupplierDetailView({
     try {
       const data = await listPurchaseInvoices({ supplier: supplier.id });
       setInvoices(data.items || []);
+      setInvoicesLoaded(true);
     } catch (error) {
       toastApiError(error, "Failed to load invoices");
     } finally {
@@ -976,11 +996,21 @@ function SupplierDetailView({
     }
   }, [supplier.id]);
 
+  // Products feed the Products tab AND the Add-Invoice / Order-Generator
+  // dialogs; fetch once, on first need. Invoices feed only their tab.
+  const ensureProducts = useCallback(() => {
+    if (!productsLoaded) void loadProducts();
+  }, [productsLoaded, loadProducts]);
+
+  const ensureInvoices = useCallback(() => {
+    if (!invoicesLoaded) void loadInvoices();
+  }, [invoicesLoaded, loadInvoices]);
+
+  // Ledger is eager — it backs the always-visible Financial Summary and the
+  // default Ledger tab. Products/invoices load lazily (see ensure* above).
   useEffect(() => {
-    loadProducts();
-    loadInvoices();
     loadLedger();
-  }, [loadProducts, loadInvoices, loadLedger]);
+  }, [loadLedger]);
 
   const filteredLedger = (ledger?.entries || []).filter((e) => {
     if (ledgerFilter === "invoice") return e.entry_type === "invoice";
@@ -1056,14 +1086,19 @@ function SupplierDetailView({
           {/* Consolidated action bar */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={() => setPoOpen(true)}
-              disabled={products.length === 0}
-              className="bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl h-10 px-3.5 border-0 disabled:opacity-50"
+              onClick={() => {
+                ensureProducts();
+                setPoOpen(true);
+              }}
+              className="bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl h-10 px-3.5 border-0"
             >
               <ShoppingCart className="h-4 w-4 mr-1.5" /> Order Generator
             </Button>
             <Button
-              onClick={() => setAddInvoiceOpen(true)}
+              onClick={() => {
+                ensureProducts();
+                setAddInvoiceOpen(true);
+              }}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-10 px-3.5 border-0"
             >
               <FileText className="h-4 w-4 mr-1.5" /> Add Invoice
@@ -1159,7 +1194,15 @@ function SupplierDetailView({
 
       {/* Tabs */}
       <Card className="rounded-2xl border-slate-200 shadow-sm bg-white overflow-hidden">
-        <Tabs defaultValue="ledger" className="w-full">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => {
+            setActiveTab(v);
+            if (v === "products") ensureProducts();
+            else if (v === "invoices") ensureInvoices();
+          }}
+          className="w-full"
+        >
           <TabsList className="w-full justify-start rounded-none border-b border-slate-200 bg-white p-0 h-auto gap-2 px-2 pt-2">
             <TabsTrigger value="ledger" className="rounded-t-lg rounded-b-none border-0 data-[state=active]:bg-slate-800 data-[state=active]:text-white px-6 py-3 font-bold text-slate-500">
               <CreditCard className="h-4 w-4 mr-2" /> Ledger
@@ -1941,33 +1984,49 @@ function GlobalAddInvoiceDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [supplierId, setSupplierId] = useState("");
+  const [supplierQuery, setSupplierQuery] = useState("");
+  const [supplierResults, setSupplierResults] = useState<Supplier[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [products, setProducts] = useState<Medicine[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setSupplierId("");
+    setSupplierQuery("");
+    setSupplierResults([]);
+    setSelectedSupplier(null);
     setProducts([]);
-    listSuppliers({ is_active: true, pageSize: 200 })
-      .then((data) => setSuppliers(data.items || []))
-      .catch((error) => toastApiError(error, "Failed to load suppliers"));
   }, [open]);
 
+  // Server-side supplier search (debounced) — no client-side 200-row cap.
   useEffect(() => {
-    if (!supplierId) {
+    if (!open || selectedSupplier) return;
+    const handle = setTimeout(() => {
+      setIsSearching(true);
+      listSuppliers({
+        is_active: true,
+        q: supplierQuery.trim() || undefined,
+        pageSize: 20,
+      })
+        .then((data) => setSupplierResults(data.items || []))
+        .catch((error) => toastApiError(error, "Failed to search suppliers"))
+        .finally(() => setIsSearching(false));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [open, supplierQuery, selectedSupplier]);
+
+  useEffect(() => {
+    if (!selectedSupplier) {
       setProducts([]);
       return;
     }
     setIsLoadingProducts(true);
-    getInventoryMedicines({ supplier: supplierId })
+    getInventoryMedicines({ supplier: selectedSupplier.id })
       .then((data) => setProducts(data.items || []))
       .catch((error) => toastApiError(error, "Failed to load products"))
       .finally(() => setIsLoadingProducts(false));
-  }, [supplierId]);
-
-  const selectedSupplier = suppliers.find((s) => s.id === supplierId) || null;
+  }, [selectedSupplier]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1977,29 +2036,68 @@ function GlobalAddInvoiceDialog({
             <FileSpreadsheet className="h-5 w-5 text-emerald-600" /> Enter Purchase Invoice
           </DialogTitle>
           <DialogDescription className="text-slate-500">
-            Record a purchase invoice from any vendor. Pick the supplier to begin.
+            Record a purchase invoice from any vendor. Search the supplier to begin.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-1.5">
           <Label className="text-xs font-bold text-slate-500 uppercase">Supplier *</Label>
-          <Select value={supplierId} onValueChange={setSupplierId}>
-            <SelectTrigger className="bg-slate-50 border-slate-200">
-              <SelectValue placeholder="Select a supplier" />
-            </SelectTrigger>
-            <SelectContent>
-              {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.company_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {selectedSupplier ? (
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
+              <span className="font-bold text-slate-800 text-sm">{selectedSupplier.company_name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-slate-500 hover:text-slate-900"
+                onClick={() => setSelectedSupplier(null)}
+              >
+                Change
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  autoFocus
+                  value={supplierQuery}
+                  onChange={(e) => setSupplierQuery(e.target.value)}
+                  placeholder="Search supplier by name / contact / GST…"
+                  className="pl-8 bg-slate-50 border-slate-200"
+                />
+              </div>
+              <div className="mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-50">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Spinner className="h-4 w-4 text-primary" />
+                  </div>
+                ) : supplierResults.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-slate-400">
+                    {supplierQuery.trim() ? "No matching suppliers." : "Type to search suppliers."}
+                  </p>
+                ) : (
+                  supplierResults.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelectedSupplier(s)}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors"
+                    >
+                      <span className="font-semibold text-slate-800 text-sm">{s.company_name}</span>
+                      {s.contact_person && (
+                        <span className="text-xs text-slate-400 ml-2">{s.contact_person}</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {!selectedSupplier ? (
-          <p className="py-8 text-center text-sm text-slate-400">
-            Choose a supplier to enter invoice details.
+          <p className="py-6 text-center text-sm text-slate-400">
+            Search and select a supplier to enter invoice details.
           </p>
         ) : isLoadingProducts ? (
           <div className="flex items-center justify-center py-10">

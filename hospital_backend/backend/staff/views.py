@@ -1,7 +1,11 @@
+import mimetypes
+
 from django.db.models import Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers as drf_serializers
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 
 from core.pagination import paginate_queryset
@@ -47,6 +51,26 @@ class StaffSummaryView(APIView):
 
     def get(self, request):
         return success_response(services.staff_summary())
+
+
+class StaffPhotoView(APIView):
+    """Serve a staff member's profile photo through a permission gate
+    (admin-only) instead of the raw /media/ URL, mirroring PatientPhotoView so
+    staff PII isn't exposed on open media."""
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, staff_id):
+        staff = get_object_or_404(Staff, pk=staff_id)
+        if not staff.photo:
+            raise NotFound("Staff photo not found.")
+        guessed_type, _ = mimetypes.guess_type(staff.photo.name)
+        response = FileResponse(
+            staff.photo.open("rb"),
+            content_type=guessed_type or "application/octet-stream",
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class StaffListCreateView(APIView):
@@ -142,47 +166,18 @@ class AttendanceRosterView(APIView):
 
     permission_classes = [IsReceptionOrAdmin]
 
-    @staticmethod
-    def _submission_payload(submission):
-        if submission is None:
-            return None
-        return {
-            "submitted_by_name": (
-                submission.submitted_by.full_name
-                if submission.submitted_by_id
-                else ""
-            ),
-            "submitted_by_role": submission.submitted_by_role,
-            "submitted_at": submission.submitted_at.isoformat(),
-        }
-
     def get(self, request):
         date_str = (request.query_params.get("date") or "").strip()
         if not date_str:
             raise drf_serializers.ValidationError("date is required (YYYY-MM-DD).")
 
-        staff = Staff.objects.filter(is_active=True).select_related("designation")
-        marks = {
-            a.staff_id: a.status
-            for a in StaffAttendance.objects.filter(date=date_str)
-        }
-        items = [
-            {
-                "staff_id": str(s.id),
-                "staff_code": s.staff_code,
-                "full_name": s.full_name,
-                "designation": s.designation.name,
-                "status": marks.get(s.id),
-            }
-            for s in staff
-        ]
         submission = services.day_submission(date_str)
         is_admin = getattr(request.user, "role", None) == "admin"
         return success_response(
             {
                 "date": date_str,
-                "items": items,
-                "submission": self._submission_payload(submission),
+                "items": services.attendance_roster(date_str),
+                "submission": services.submission_dict(submission),
                 # Admins can always mark/edit; reception only if not yet locked.
                 "can_submit": is_admin or submission is None,
             }
@@ -216,9 +211,19 @@ class AttendanceRosterView(APIView):
             {
                 "date": on_date,
                 "marked": result["marked"],
-                "submission": self._submission_payload(result["submission"]),
+                "submission": services.submission_dict(result["submission"]),
             }
         )
+
+
+class AttendanceTodayStatusView(APIView):
+    """Lightweight today's-attendance lock state for the reception dashboard
+    button — avoids fetching the full roster just to read submission state."""
+
+    permission_classes = [IsReceptionOrAdmin]
+
+    def get(self, request):
+        return success_response(services.today_attendance_status())
 
 
 class StaffAttendanceView(APIView):

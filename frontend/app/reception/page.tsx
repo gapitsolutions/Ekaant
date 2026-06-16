@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import {
   getAttendanceRoster,
+  getTodayAttendanceStatus,
   bulkMarkAttendance,
   type AttendanceRosterItem,
   type AttendanceStatus,
@@ -95,7 +96,8 @@ export default function ReceptionDashboard() {
   const today = new Date().toLocaleDateString("en-CA");
 
   const refreshAttendanceStatus = () => {
-    getAttendanceRoster(today)
+    // Lightweight status check (not the full roster) just for the button state.
+    getTodayAttendanceStatus()
       .then((data) => setTodaySubmission(data.submission))
       .catch(() => {
         /* non-fatal — button stays enabled */

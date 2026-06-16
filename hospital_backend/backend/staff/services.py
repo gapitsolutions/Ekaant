@@ -152,33 +152,70 @@ def day_submission(on_date):
     return AttendanceDaySubmission.objects.filter(date=on_date).first()
 
 
+def submission_dict(submission) -> dict | None:
+    """Serialise a day-submission row for API responses (or None)."""
+    if submission is None:
+        return None
+    return {
+        "submitted_by_name": (
+            submission.submitted_by.full_name if submission.submitted_by_id else ""
+        ),
+        "submitted_by_role": submission.submitted_by_role,
+        "submitted_at": submission.submitted_at.isoformat(),
+    }
+
+
+def attendance_roster(on_date) -> list[dict]:
+    """Active staff with their mark for ``on_date`` (``status`` null when
+    unmarked) — the bulk-mark grid payload."""
+    staff = Staff.objects.filter(is_active=True).select_related("designation")
+    marks = {
+        a.staff_id: a.status for a in StaffAttendance.objects.filter(date=on_date)
+    }
+    return [
+        {
+            "staff_id": str(s.id),
+            "staff_code": s.staff_code,
+            "full_name": s.full_name,
+            "designation": s.designation.name,
+            "status": marks.get(s.id),
+        }
+        for s in staff
+    ]
+
+
+def today_attendance_status() -> dict:
+    """Lightweight lock state for *today* — for the reception dashboard button
+    (avoids fetching the whole roster just to read submission state)."""
+    submission = day_submission(timezone.localdate())
+    return {"submitted": submission is not None, "submission": submission_dict(submission)}
+
+
 @transaction.atomic
 def submit_daily_attendance(*, on_date, entries: list[dict], user) -> dict:
     """Reception flow: mark every staff member for ``on_date`` and lock the day.
 
     A day can be submitted only once (``AttendanceDaySubmission.date`` is
-    unique). A second attempt — by reception — is refused so the marks can't be
-    altered after submission; corrections are an admin task. The marking user
-    (and a snapshot of their auth role) is recorded on the lock row.
+    unique). The lock row is claimed FIRST via ``get_or_create`` — which the DB
+    unique constraint makes atomic even under concurrent submits — so a second
+    attempt is refused (409) before any marks are written and can't 500 on an
+    IntegrityError. Corrections after submission are an admin task. The marking
+    user and a snapshot of their auth role are recorded on the lock row.
     """
-    # Lock against a concurrent double-submit of the same day.
-    existing = (
-        AttendanceDaySubmission.objects.select_for_update()
-        .filter(date=on_date)
-        .first()
+    submission, created = AttendanceDaySubmission.objects.get_or_create(
+        date=on_date,
+        defaults={
+            "submitted_by": user,
+            "submitted_by_role": getattr(user, "role", "") or "",
+        },
     )
-    if existing is not None:
+    if not created:
         raise ConflictError(
             "Attendance for this day has already been submitted and cannot be "
             "changed. Ask an admin to make corrections."
         )
 
     written = bulk_mark_attendance(on_date=on_date, entries=entries, user=user)
-    submission = AttendanceDaySubmission.objects.create(
-        date=on_date,
-        submitted_by=user,
-        submitted_by_role=getattr(user, "role", "") or "",
-    )
     return {"marked": written, "submission": submission}
 
 

@@ -177,6 +177,20 @@ export async function getAttendanceRoster(
   );
 }
 
+// Lightweight today's-lock state — for the reception dashboard button, so it
+// doesn't have to pull the whole roster just to read submission state.
+export interface AttendanceTodayStatus {
+  submitted: boolean;
+  submission: AttendanceDaySubmission | null;
+}
+
+export async function getTodayAttendanceStatus(): Promise<AttendanceTodayStatus> {
+  return apiRequest<AttendanceTodayStatus>(
+    "/api/v1/staff/attendance/today-status/",
+    {},
+  );
+}
+
 export async function bulkMarkAttendance(
   date: string,
   entries: { staff_id: string; status: AttendanceStatus }[],

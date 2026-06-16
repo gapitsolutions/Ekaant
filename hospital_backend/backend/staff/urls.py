@@ -9,12 +9,22 @@ urlpatterns = [
         name="staff-designation-list-create",
     ),
     path(
+        "staff/attendance/today-status/",
+        views.AttendanceTodayStatusView.as_view(),
+        name="staff-attendance-today-status",
+    ),
+    path(
         "staff/attendance/",
         views.AttendanceRosterView.as_view(),
         name="staff-attendance-roster",
     ),
     path("staff/summary/", views.StaffSummaryView.as_view(), name="staff-summary"),
     path("staff/", views.StaffListCreateView.as_view(), name="staff-list-create"),
+    path(
+        "staff/<uuid:staff_id>/photo/",
+        views.StaffPhotoView.as_view(),
+        name="staff-photo",
+    ),
     path(
         "staff/<uuid:staff_id>/attendance/",
         views.StaffAttendanceView.as_view(),
