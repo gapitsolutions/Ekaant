@@ -23,6 +23,9 @@ from core.exceptions import ConflictError
 from patients.models import Patient
 from visits.models import VisitSession, VisitStage, VisitStatus
 
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import Coalesce
+
 from .models import (
     DispenseInvoice,
     DispenseInvoiceAmendment,
@@ -30,6 +33,7 @@ from .models import (
     DispenseStatus,
     Medicine,
     MedicineBatch,
+    MedicineCategory,
     MovementType,
     PaymentMethod,
     PurchaseInvoice,
@@ -38,6 +42,8 @@ from .models import (
     StockAuditRemoval,
     StockMovement,
     Supplier,
+    SupplierLedgerEntry,
+    SupplierLedgerType,
 )
 from .serializers import ALLOWED_PURCHASE_INVOICE_DOCUMENT_MIME_TYPES
 
@@ -94,6 +100,137 @@ def _purchase_invoice_document_filename(data: dict, invoice: PurchaseInvoice) ->
     return f"{stem}.{extension}"
 
 
+# ────────────────────────────────────────────────────────────
+# Supplier payables ledger (accounts payable)
+# ────────────────────────────────────────────────────────────
+
+
+def supplier_summary() -> dict:
+    """Directory-wide aggregate for the supplier console KPI cards.
+
+    Computed with aggregate queries (NOT from the paginated list) so the
+    headline counts/totals are independent of page size. Category counts and
+    the outstanding total are scoped to *active* suppliers, mirroring the
+    directory's default ``active`` filter; ``total``/``inactive`` cover all
+    rows so the cards can drive the status filter too.
+    """
+    qs = Supplier.objects.all()
+    active = qs.filter(is_active=True)
+
+    by_category = {
+        cat: active.filter(categories__contains=[cat]).count()
+        for cat in MedicineCategory.values
+    }
+    outstanding_total = active.aggregate(
+        total=Coalesce(Sum("outstanding_payable"), Decimal("0"))
+    )["total"]
+    suppliers_with_dues = active.filter(outstanding_payable__gt=0).count()
+
+    counts = qs.aggregate(
+        total=Count("id"),
+        active=Count("id", filter=Q(is_active=True)),
+        inactive=Count("id", filter=Q(is_active=False)),
+    )
+
+    return {
+        "total": counts["total"],
+        "active": counts["active"],
+        "inactive": counts["inactive"],
+        "by_category": by_category,
+        "outstanding_total": str(outstanding_total),
+        "suppliers_with_dues": suppliers_with_dues,
+    }
+
+
+def supplier_outstanding(supplier_id) -> Decimal:
+    """Current signed payable for a supplier (>0 ⇒ we owe them)."""
+    return SupplierLedgerEntry.balance_for(supplier_id)
+
+
+def sync_supplier_outstanding_cache(supplier_id) -> Decimal:
+    """Recompute ``Supplier.outstanding_payable`` from the ledger (never
+    increment by hand). Negative balances (overpayment / credit) clamp to 0
+    for the cache while the ledger keeps the true signed total."""
+    balance = SupplierLedgerEntry.balance_for(supplier_id)
+    Supplier.objects.filter(id=supplier_id).update(
+        outstanding_payable=balance if balance > 0 else Decimal("0")
+    )
+    return balance
+
+
+def _record_supplier_ledger_entry(
+    *,
+    supplier_id,
+    entry_type,
+    amount: Decimal,
+    invoice=None,
+    payment_mode="",
+    reference="",
+    note="",
+    user=None,
+):
+    if amount == 0:
+        return None
+    return SupplierLedgerEntry.objects.create(
+        supplier_id=supplier_id,
+        entry_type=entry_type,
+        amount=amount,
+        purchase_invoice=invoice,
+        payment_mode=payment_mode,
+        reference=reference,
+        note=note,
+        created_by=user,
+    )
+
+
+def post_invoice_payable(*, invoice: PurchaseInvoice, user=None) -> Decimal:
+    """Book a purchase invoice's total as a +payable ledger entry and refresh
+    the supplier's cached balance. Called from ``process_purchase_invoice``."""
+    _record_supplier_ledger_entry(
+        supplier_id=invoice.supplier_id,
+        entry_type=SupplierLedgerType.INVOICE,
+        amount=invoice.total_amount,
+        invoice=invoice,
+        note=f"Purchase invoice {invoice.invoice_number}",
+        user=user,
+    )
+    return sync_supplier_outstanding_cache(invoice.supplier_id)
+
+
+@transaction.atomic
+def record_supplier_payment(
+    *, supplier_id, amount: Decimal, payment_mode="", reference="", note="", user=None
+) -> Decimal:
+    """Record a payment made to a supplier (−payable) and refresh the cache.
+
+    Overpayment is rejected: a payment cannot exceed the current outstanding
+    (which would create an unexpected supplier credit). Returns the new
+    outstanding balance."""
+    amount = Decimal(amount)
+    if amount <= 0:
+        raise serializers.ValidationError("Payment amount must be positive.")
+
+    # Lock the supplier row so concurrent payments can't both pass the
+    # over-payment check against a stale balance.
+    Supplier.objects.select_for_update().get(id=supplier_id)
+    outstanding = SupplierLedgerEntry.balance_for(supplier_id)
+    if amount > outstanding + Decimal("0.01"):
+        raise serializers.ValidationError(
+            f"Payment ₹{amount} exceeds outstanding ₹{outstanding}."
+        )
+
+    _record_supplier_ledger_entry(
+        supplier_id=supplier_id,
+        entry_type=SupplierLedgerType.PAYMENT,
+        amount=-amount,
+        payment_mode=payment_mode,
+        reference=reference,
+        note=note,
+        user=user,
+    )
+    return sync_supplier_outstanding_cache(supplier_id)
+
+
 @transaction.atomic
 def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
     invoice_number = data["invoice_number"]
@@ -113,6 +250,7 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
             invoice_date=data["invoice_date"],
             delivery_date=data.get("delivery_date"),
             notes=data.get("notes", ""),
+            form6=data.get("form6", False),
             created_by=user,
         )
     except IntegrityError as exc:
@@ -208,6 +346,11 @@ def process_purchase_invoice(*, data: dict, user) -> PurchaseInvoice:
     invoice.total_amount = _q2(total_amount)
     invoice.items_count = items_count
     invoice.save(update_fields=["total_amount", "items_count", "updated_at"])
+
+    # Book the invoice total onto the supplier's payables ledger (+amount)
+    # and refresh the cached outstanding balance — same settlement model as
+    # the patient billing ledger, but for money we owe the supplier.
+    post_invoice_payable(invoice=invoice, user=user)
 
     logger.info(
         "PURCHASE: %s | supplier=%s | items=%d | total=%s",

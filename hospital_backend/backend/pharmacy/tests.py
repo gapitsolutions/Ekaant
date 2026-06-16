@@ -25,6 +25,7 @@ from pharmacy.models import (
     PurchaseInvoiceItem,
     StockMovement,
     Supplier,
+    SupplierLedgerEntry,
 )
 from pharmacy.serializers import (
     DispenseCreateSerializer,
@@ -593,3 +594,180 @@ class DispenseFinancialTests(TestCase):
         self.assertEqual(inv.amount_paid, Decimal("0.00"))
         # Ledger nets back to zero (charge + payment + reversal adjustment).
         self.assertEqual(self._balance(), Decimal("0.00"))
+
+
+class SupplierPayableLedgerTests(TestCase):
+    """Phase 2: supplier accounts-payable ledger + payments."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="adminledger@example.com", password="x", role="admin"
+        )
+        self.supplier = Supplier.objects.create(company_name="Ledger Pharma")
+        self.medicine = Medicine.objects.create(
+            name="Amoxicillin 500mg",
+            salt="Amoxicillin",
+            category=MedicineCategory.RX,
+            manufacturer="Generic Co",
+            mrp=Decimal("20.00"),
+            selling_price=Decimal("18.00"),
+        )
+        self.today = timezone.localdate()
+
+    def _make_invoice(self, number, qty=100, price="10.00", gst="0.00"):
+        return services.process_purchase_invoice(
+            data={
+                "invoice_number": number,
+                "supplier_id": self.supplier.id,
+                "order_date": self.today,
+                "invoice_date": self.today,
+                "delivery_date": None,
+                "notes": "",
+                "items": [
+                    {
+                        "medicine_id": self.medicine.id,
+                        "category": "",
+                        "subcategory": "",
+                        "batch_number": f"B-{number}",
+                        "expiry_date": self.today + timedelta(days=400),
+                        "quantity": qty,
+                        "purchase_price": Decimal(price),
+                        "gst_percentage": Decimal(gst),
+                    }
+                ],
+            },
+            user=self.user,
+        )
+
+    def test_invoice_posts_payable_and_updates_cache(self):
+        inv = self._make_invoice("INV-L1")  # 100 * 10 = 1000, gst 0
+        self.supplier.refresh_from_db()
+        self.assertEqual(self.supplier.outstanding_payable, Decimal("1000.00"))
+        self.assertEqual(services.supplier_outstanding(self.supplier.id), Decimal("1000.00"))
+        self.assertEqual(
+            SupplierLedgerEntry.objects.filter(
+                supplier=self.supplier, purchase_invoice=inv
+            ).count(),
+            1,
+        )
+
+    def test_payment_reduces_outstanding(self):
+        self._make_invoice("INV-L2")  # 1000
+        services.record_supplier_payment(
+            supplier_id=self.supplier.id,
+            amount=Decimal("400.00"),
+            payment_mode="bank",
+            user=self.user,
+        )
+        self.supplier.refresh_from_db()
+        self.assertEqual(self.supplier.outstanding_payable, Decimal("600.00"))
+
+    def test_overpayment_rejected(self):
+        self._make_invoice("INV-L3")  # 1000
+        with self.assertRaises(Exception):
+            services.record_supplier_payment(
+                supplier_id=self.supplier.id,
+                amount=Decimal("5000.00"),
+                user=self.user,
+            )
+        self.supplier.refresh_from_db()
+        self.assertEqual(self.supplier.outstanding_payable, Decimal("1000.00"))
+
+    def test_ledger_endpoint_returns_summary_and_rows(self):
+        self._make_invoice("INV-L4")  # 1000
+        services.record_supplier_payment(
+            supplier_id=self.supplier.id, amount=Decimal("250.00"), user=self.user
+        )
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        resp = client.get(f"/api/v1/pharmacy/suppliers/{self.supplier.id}/ledger/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.data["data"]
+        self.assertEqual(data["summary"]["outstanding"], "750.00")
+        self.assertEqual(data["summary"]["total_invoiced"], "1000.00")
+        self.assertEqual(data["summary"]["total_paid"], "250.00")
+        self.assertEqual(len(data["entries"]), 2)
+
+    def test_ledger_admin_only(self):
+        pharmacist = User.objects.create_user(
+            email="pharmonly@example.com", password="x", role="pharmacist"
+        )
+        client = APIClient()
+        client.force_authenticate(user=pharmacist)
+        resp = client.get(f"/api/v1/pharmacy/suppliers/{self.supplier.id}/ledger/")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class SupplierSummaryTests(TestCase):
+    """Phase A: supplier directory KPI aggregate + product_count annotation."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="summaryadmin@example.com", password="x", role="admin"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+        self.bup = Supplier.objects.create(
+            company_name="BUP Wholesaler", categories=["BUP"]
+        )
+        self.rx = Supplier.objects.create(
+            company_name="Rx Distributor", categories=["Rx", "NRx"]
+        )
+        Supplier.objects.create(
+            company_name="Dormant Vendor", categories=["Rx"], is_active=False
+        )
+        # Give the BUP supplier an outstanding balance via the ledger.
+        SupplierLedgerEntry.objects.create(
+            supplier=self.bup, entry_type="invoice", amount=Decimal("5000.00")
+        )
+        services.sync_supplier_outstanding_cache(self.bup.id)
+
+        # Map an active medicine to the Rx supplier for product_count.
+        med = Medicine.objects.create(
+            name="Cetirizine 10mg",
+            salt="Cetirizine",
+            category=MedicineCategory.RX,
+            manufacturer="Generic Co",
+            mrp=Decimal("12.00"),
+            selling_price=Decimal("10.00"),
+        )
+        med.suppliers.add(self.rx)
+
+    def test_summary_aggregate(self):
+        # Migration 0004 seeds baseline suppliers, so compare the endpoint to
+        # independently-computed ORM aggregates rather than hardcoded counts.
+        resp = self.client.get("/api/v1/pharmacy/suppliers/summary/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.data["data"]
+
+        active = Supplier.objects.filter(is_active=True)
+        self.assertEqual(data["total"], Supplier.objects.count())
+        self.assertEqual(data["active"], active.count())
+        self.assertEqual(
+            data["inactive"], Supplier.objects.filter(is_active=False).count()
+        )
+        self.assertEqual(
+            data["by_category"]["BUP"],
+            active.filter(categories__contains=["BUP"]).count(),
+        )
+        # The two suppliers we created are reflected in their buckets.
+        self.assertGreaterEqual(data["by_category"]["BUP"], 1)
+        self.assertGreaterEqual(data["by_category"]["NRx"], 1)
+        # Only our BUP supplier carries a balance.
+        self.assertEqual(data["outstanding_total"], "5000.00")
+        self.assertEqual(data["suppliers_with_dues"], 1)
+
+    def test_product_count_in_list(self):
+        resp = self.client.get("/api/v1/pharmacy/suppliers/?is_active=true")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        by_name = {s["company_name"]: s for s in resp.data["data"]["items"]}
+        self.assertEqual(by_name["Rx Distributor"]["product_count"], 1)
+        self.assertEqual(by_name["BUP Wholesaler"]["product_count"], 0)
+
+    def test_has_dues_filter(self):
+        resp = self.client.get(
+            "/api/v1/pharmacy/suppliers/?is_active=true&has_dues=true"
+        )
+        names = {s["company_name"] for s in resp.data["data"]["items"]}
+        self.assertEqual(names, {"BUP Wholesaler"})

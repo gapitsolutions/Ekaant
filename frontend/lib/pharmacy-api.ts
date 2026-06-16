@@ -72,11 +72,15 @@ export async function getInventoryMedicines(options?: {
   category?: MedicineCategory;
   bup_category?: BupStrength;
   search?: string;
+  // Scope to medicines linked to one supplier (Medicine.suppliers M2M) —
+  // powers the supplier console Products tab.
+  supplier?: string;
 }): Promise<MedicineListResponse> {
   const params = new URLSearchParams();
   if (options?.category) params.set("category", options.category);
   if (options?.bup_category) params.set("bup_category", options.bup_category);
   if (options?.search) params.set("search", options.search);
+  if (options?.supplier) params.set("supplier", options.supplier);
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiRequest<MedicineListResponse>(
     `/api/v1/pharmacy/inventory/medicines/${suffix}`,
@@ -193,6 +197,8 @@ export interface PurchaseInvoicePayload {
   invoice_document_mime_type?: string;
   invoice_document_filename?: string;
   notes?: string;
+  // Form 6 (controlled-substance register) compliance flag.
+  form6?: boolean;
   items: PurchaseInvoiceItemPayload[];
 }
 
@@ -223,6 +229,56 @@ export async function submitPurchaseInvoice(
       method: "POST",
       body: payload,
     },
+  );
+}
+
+// ── Purchase Invoice history (per supplier) ──
+export interface PurchaseInvoiceListItem {
+  id: string;
+  invoice_number: string;
+  order_date: string | null;
+  invoice_date: string;
+  delivery_date: string | null;
+  total_amount: string;
+  items_count: number;
+  form6: boolean;
+  notes: string;
+  invoice_document_url: string | null;
+  items: {
+    medicine_id: string;
+    medicine_name: string;
+    category: string;
+    subcategory: string;
+    batch_number: string;
+    expiry_date: string;
+    quantity: number;
+    purchase_price: string;
+    gst_percentage: string;
+    line_total: string;
+  }[];
+}
+
+export async function listPurchaseInvoices(options?: {
+  supplier?: string;
+}): Promise<{ items: PurchaseInvoiceListItem[]; total: number }> {
+  const params = new URLSearchParams();
+  if (options?.supplier) params.set("supplier", options.supplier);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ items: PurchaseInvoiceListItem[]; total: number }>(
+    `/api/v1/pharmacy/inventory/invoices/${suffix}`,
+    {},
+  );
+}
+
+// Toggle the Form 6 compliance flag on an existing invoice (the only
+// mutable field — invoices otherwise drive stock and the payable ledger).
+export async function updatePurchaseInvoiceForm6(
+  invoiceId: string,
+  form6: boolean,
+): Promise<PurchaseInvoiceListItem> {
+  return apiRequest<PurchaseInvoiceListItem>(
+    `/api/v1/pharmacy/inventory/invoices/${invoiceId}/`,
+    { method: "PATCH", body: { form6 } },
   );
 }
 
@@ -734,6 +790,11 @@ export interface Supplier {
   categories: SupplierCategory[];
   is_active: boolean;
   invoice_count: number | null;
+  // Count of active medicines mapped to this supplier (Medicine.suppliers M2M).
+  product_count: number | null;
+  // Cached accounts-payable balance (money owed to this supplier). Decimal
+  // serialised as string. See API_BLUEPRINT — supplier payables ledger.
+  outstanding_payable: string;
   created_at: string;
   updated_at: string;
 }
@@ -747,6 +808,7 @@ export interface SupplierListQuery {
   q?: string;
   is_active?: boolean;
   category?: SupplierCategory;
+  has_dues?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -759,11 +821,30 @@ export async function listSuppliers(
   if (query.is_active !== undefined)
     params.set("is_active", String(query.is_active));
   if (query.category) params.set("category", query.category);
+  if (query.has_dues) params.set("has_dues", "true");
   if (query.page) params.set("page", String(query.page));
   if (query.pageSize) params.set("pageSize", String(query.pageSize));
   const qs = params.toString();
   return apiRequest<SupplierListResponse>(
     `/api/v1/pharmacy/suppliers/${qs ? `?${qs}` : ""}`,
+    {},
+  );
+}
+
+// Directory-wide KPI aggregate for the supplier console cards. Comes from a
+// dedicated summary endpoint (aggregate queries), NOT the paginated list.
+export interface SupplierSummary {
+  total: number;
+  active: number;
+  inactive: number;
+  by_category: Record<SupplierCategory, number>;
+  outstanding_total: string; // decimal as string
+  suppliers_with_dues: number;
+}
+
+export async function getSupplierSummary(): Promise<SupplierSummary> {
+  return apiRequest<SupplierSummary>(
+    "/api/v1/pharmacy/suppliers/summary/",
     {},
   );
 }
@@ -809,6 +890,56 @@ export async function deactivateSupplier(
 
 export async function getSupplier(supplierId: string): Promise<Supplier> {
   return apiRequest<Supplier>(`/api/v1/pharmacy/suppliers/${supplierId}/`, {});
+}
+
+// ── Supplier payables ledger (admin-only) ──
+export interface SupplierLedgerRow {
+  id: string;
+  date: string;
+  entry_type: "invoice" | "payment" | "adjustment";
+  credit: string; // invoice booked (+payable)
+  debit: string; // payment made (−payable)
+  balance: string; // running outstanding after this row
+  payment_mode: string;
+  reference: string;
+  note: string;
+  invoice_number: string;
+}
+
+export interface SupplierLedgerResponse {
+  supplier_id: string;
+  summary: {
+    outstanding: string;
+    total_invoiced: string;
+    total_paid: string;
+  };
+  entries: SupplierLedgerRow[];
+}
+
+export async function getSupplierLedger(
+  supplierId: string,
+): Promise<SupplierLedgerResponse> {
+  return apiRequest<SupplierLedgerResponse>(
+    `/api/v1/pharmacy/suppliers/${supplierId}/ledger/`,
+    {},
+  );
+}
+
+export interface SupplierPaymentPayload {
+  amount: string | number;
+  payment_mode?: "cash" | "online" | "bank";
+  reference?: string;
+  note?: string;
+}
+
+export async function recordSupplierPayment(
+  supplierId: string,
+  payload: SupplierPaymentPayload,
+): Promise<{ outstanding: string }> {
+  return apiRequest<{ outstanding: string }>(
+    `/api/v1/pharmacy/suppliers/${supplierId}/payments/`,
+    { method: "POST", body: payload },
+  );
 }
 
 // ── Utilities ──

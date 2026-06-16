@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "visits",
     "pharmacy",  # NEW
     "billing",  # NEW — consultation fee config + patient financial ledger
+    "staff",  # NEW — HR staff/employee directory (standalone, not auth users)
 ]
 
 MIDDLEWARE = [

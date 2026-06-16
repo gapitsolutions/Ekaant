@@ -10,9 +10,24 @@ urlpatterns = [
         name="pharmacy-supplier-list-create",
     ),
     path(
+        "pharmacy/suppliers/summary/",
+        views.SupplierSummaryView.as_view(),
+        name="pharmacy-supplier-summary",
+    ),
+    path(
         "pharmacy/suppliers/<uuid:supplier_id>/",
         views.SupplierDetailView.as_view(),
         name="pharmacy-supplier-detail",
+    ),
+    path(
+        "pharmacy/suppliers/<uuid:supplier_id>/ledger/",
+        views.SupplierLedgerView.as_view(),
+        name="pharmacy-supplier-ledger",
+    ),
+    path(
+        "pharmacy/suppliers/<uuid:supplier_id>/payments/",
+        views.SupplierPaymentView.as_view(),
+        name="pharmacy-supplier-payment",
     ),
 
     # Medicine CRUD
@@ -46,7 +61,12 @@ urlpatterns = [
     path(
         "pharmacy/inventory/invoices/",
         views.PurchaseInvoiceCreateView.as_view(),
-        name="pharmacy-purchase-invoice-create",
+        name="pharmacy-purchase-invoice-list-create",
+    ),
+    path(
+        "pharmacy/inventory/invoices/<uuid:invoice_id>/",
+        views.PurchaseInvoiceDetailView.as_view(),
+        name="pharmacy-purchase-invoice-detail",
     ),
     path(
         "pharmacy/inventory/invoices/<uuid:invoice_id>/document/",

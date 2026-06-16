@@ -221,6 +221,7 @@ class MedicineBulkImportSerializer(serializers.Serializer):
 class SupplierReadSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
     invoice_count = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Supplier
@@ -236,6 +237,8 @@ class SupplierReadSerializer(serializers.ModelSerializer):
             "categories",
             "is_active",
             "invoice_count",
+            "product_count",
+            "outstanding_payable",
             "created_at",
             "updated_at",
         )
@@ -251,6 +254,14 @@ class SupplierReadSerializer(serializers.ModelSerializer):
         if annotated is not None:
             return annotated
         return obj.purchase_invoices.count()
+
+    def get_product_count(self, obj):
+        # Active medicines mapped via the Medicine.suppliers M2M. Annotated by
+        # the view; falls back to a count for one-off reads.
+        annotated = getattr(obj, "_product_count", None)
+        if annotated is not None:
+            return annotated
+        return obj.medicines.filter(is_active=True).count()
 
 
 class SupplierEmbeddedSerializer(serializers.Serializer):
@@ -268,6 +279,101 @@ class SupplierEmbeddedSerializer(serializers.Serializer):
             "company_name": supplier.company_name,
             "mobile_number": supplier.mobile_number,
         }
+
+
+class PurchaseInvoiceListItemSerializer:
+    """Full purchase-invoice payload for the supplier console Invoice-History
+    tab — header + line items + Form 6 + document URL. Built as a classmethod
+    (not a DRF serializer) to embed the request-relative document URL cheaply.
+    Callers must ``prefetch_related('items__medicine')``.
+    """
+
+    @classmethod
+    def from_invoice(cls, invoice, document_url=None) -> dict:
+        items = [
+            {
+                "medicine_id": str(item.medicine_id),
+                "medicine_name": item.medicine.name if item.medicine_id else "",
+                "category": item.category,
+                "subcategory": item.subcategory,
+                "batch_number": item.batch_number,
+                "expiry_date": item.expiry_date,
+                "quantity": item.quantity,
+                "purchase_price": str(item.purchase_price),
+                "gst_percentage": str(item.gst_percentage),
+                "line_total": str(item.line_total),
+            }
+            for item in invoice.items.all()
+        ]
+        return {
+            "id": str(invoice.id),
+            "invoice_number": invoice.invoice_number,
+            "order_date": invoice.order_date,
+            "invoice_date": invoice.invoice_date,
+            "delivery_date": invoice.delivery_date,
+            "total_amount": str(invoice.total_amount),
+            "items_count": invoice.items_count,
+            "form6": invoice.form6,
+            "notes": invoice.notes,
+            "invoice_document_url": document_url,
+            "items": items,
+        }
+
+
+class SupplierPaymentCreateSerializer(serializers.Serializer):
+    """Body for recording a payment to a supplier (admin-only)."""
+
+    amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01")
+    )
+    payment_mode = serializers.ChoiceField(
+        choices=["cash", "online", "bank"], required=False, default="cash"
+    )
+    reference = serializers.CharField(
+        max_length=120, required=False, allow_blank=True, default=""
+    )
+    note = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+
+
+class SupplierLedgerEntrySerializer:
+    """Ledger row payload for the supplier console Ledger tab. ``debit`` /
+    ``credit`` mirror the on-screen accounting convention:
+      credit (+) = invoice booked (increases payable),
+      debit  (−) = payment made   (decreases payable).
+    """
+
+    @classmethod
+    def from_entry(cls, entry, running_balance) -> dict:
+        amount = entry.amount
+        is_invoice = amount > 0
+        return {
+            "id": str(entry.id),
+            "date": entry.created_at,
+            "entry_type": entry.entry_type,
+            "credit": str(amount) if is_invoice else "0",
+            "debit": str(-amount) if not is_invoice else "0",
+            "balance": str(running_balance),
+            "payment_mode": entry.payment_mode,
+            "reference": entry.reference,
+            "note": entry.note,
+            "invoice_number": (
+                entry.purchase_invoice.invoice_number
+                if entry.purchase_invoice_id
+                else ""
+            ),
+        }
+
+
+class PurchaseInvoiceUpdateSerializer(serializers.Serializer):
+    """Minimal mutable surface for an existing invoice: only the Form 6 flag.
+
+    Purchase invoices are otherwise immutable (they drive stock and the
+    payable ledger); the compliance marker is the one safe post-hoc edit.
+    """
+
+    form6 = serializers.BooleanField()
 
 
 class SupplierWriteSerializer(serializers.ModelSerializer):
@@ -406,6 +512,8 @@ class PurchaseInvoiceCreateSerializer(serializers.Serializer):
         required=False, allow_blank=True, default=""
     )
     notes = serializers.CharField(required=False, allow_blank=True, default="")
+    # Form 6 compliance flag for this invoice (controlled-substance register).
+    form6 = serializers.BooleanField(required=False, default=False)
     items = PurchaseInvoiceItemWriteSerializer(many=True, min_length=1)
 
     def validate_invoice_date(self, value):

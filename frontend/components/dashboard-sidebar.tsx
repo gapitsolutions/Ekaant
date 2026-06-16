@@ -38,6 +38,7 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
   admin: [
     { title: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
     { title: "Suppliers", href: "/admin/suppliers", icon: Building2 },
+    { title: "Staff", href: "/admin/staff", icon: Users },
     { title: "Billing Settings", href: "/admin/billing", icon: Wallet },
   ],
   reception: [

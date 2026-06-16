@@ -5,8 +5,8 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
-from django.db.models import CheckConstraint, F, Index, Q, UniqueConstraint
-from django.db.models.functions import Lower
+from django.db.models import CheckConstraint, F, Index, Q, Sum, UniqueConstraint
+from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 
 
@@ -223,6 +223,13 @@ class Supplier(models.Model):
         blank=True,
     )
     is_active = models.BooleanField(default=True)
+    # Cached accounts-payable balance (money WE owe this supplier). Never
+    # hand-edited — recomputed from SupplierLedgerEntry by
+    # ``services.sync_supplier_outstanding_cache``. Mirrors the
+    # Patient.outstanding_debt / billing-ledger pattern.
+    outstanding_payable = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
@@ -260,6 +267,75 @@ class Supplier(models.Model):
         return self.company_name
 
 
+class SupplierLedgerType(models.TextChoices):
+    INVOICE = "invoice", "Invoice (payable booked)"
+    PAYMENT = "payment", "Payment made"
+    ADJUSTMENT = "adjustment", "Adjustment / Reversal"
+
+
+class SupplierLedgerEntry(models.Model):
+    """Append-only accounts-payable ledger — money the hospital owes a
+    supplier. The mirror of the patient-side billing ledger:
+
+        +amount  → increases payable   (``invoice`` — purchase booked)
+        -amount  → decreases payable   (``payment`` — money paid out)
+         signed  → corrections          (``adjustment``)
+
+    Outstanding payable for a supplier = ``SUM(amount)``. Written only by
+    ``pharmacy.services`` so the cached ``Supplier.outstanding_payable`` stays
+    consistent. History is never mutated — reversals post a compensating row.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.CASCADE, related_name="ledger_entries"
+    )
+    entry_type = models.CharField(max_length=16, choices=SupplierLedgerType.choices)
+    # Signed: +increases payable (invoice), -decreases (payment/recovery).
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    # Links an ``invoice`` entry to its PurchaseInvoice. SET_NULL so the
+    # financial history survives even if an invoice row is ever removed.
+    purchase_invoice = models.ForeignKey(
+        "PurchaseInvoice",
+        on_delete=models.SET_NULL,
+        related_name="ledger_entries",
+        blank=True,
+        null=True,
+    )
+    # Payment-only metadata.
+    payment_mode = models.CharField(max_length=16, blank=True, default="")
+    reference = models.CharField(max_length=120, blank=True, default="")
+    note = models.CharField(max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="supplier_ledger_entries_created",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Supplier Ledger Entry"
+        verbose_name_plural = "Supplier Ledger Entries"
+        indexes = [
+            Index(fields=["supplier", "-created_at"]),
+            Index(fields=["purchase_invoice"]),
+            Index(fields=["entry_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.supplier_id} {self.entry_type} {self.amount}"
+
+    @staticmethod
+    def balance_for(supplier_id) -> Decimal:
+        agg = SupplierLedgerEntry.objects.filter(supplier_id=supplier_id).aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0"))
+        )
+        return agg["total"] or Decimal("0")
+
+
 class PurchaseInvoice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_number = models.CharField(max_length=50, unique=True)
@@ -277,6 +353,9 @@ class PurchaseInvoice(models.Model):
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     items_count = models.PositiveIntegerField(default=0)
     notes = models.TextField(blank=True, default="")
+    # Form 6 (controlled-substance purchase register) compliance flag. Toggled
+    # per invoice from the vendor console; purely a record-keeping marker.
+    form6 = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(

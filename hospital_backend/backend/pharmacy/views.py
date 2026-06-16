@@ -21,7 +21,11 @@ from rest_framework.views import APIView
 
 from core.exceptions import ConflictError
 from core.pagination import paginate_queryset
-from core.permissions import IsPharmacistOrAdmin, IsReceptionAdminOrPharmacist
+from core.permissions import (
+    IsAdminRole,
+    IsPharmacistOrAdmin,
+    IsReceptionAdminOrPharmacist,
+)
 from core.responses import success_response
 from visits.models import VisitSession, VisitStage, VisitStatus
 
@@ -36,6 +40,7 @@ from .models import (
     PaymentMethod,
     PurchaseInvoice,
     Supplier,
+    SupplierLedgerEntry,
 )
 from .serializers import (
     AuditRemovalCreateSerializer,
@@ -48,7 +53,11 @@ from .serializers import (
     MedicineReadSerializer,
     MedicineWriteSerializer,
     PurchaseInvoiceCreateSerializer,
+    PurchaseInvoiceListItemSerializer,
+    PurchaseInvoiceUpdateSerializer,
     SupplierEmbeddedSerializer,
+    SupplierLedgerEntrySerializer,
+    SupplierPaymentCreateSerializer,
     SupplierReadSerializer,
     SupplierWriteSerializer,
 )
@@ -74,7 +83,12 @@ def _purchase_invoice_document_url(invoice: PurchaseInvoice, request) -> str | N
 
 def _supplier_queryset_with_invoice_count():
     return Supplier.objects.annotate(
-        _invoice_count=Count("purchase_invoices", distinct=True)
+        _invoice_count=Count("purchase_invoices", distinct=True),
+        _product_count=Count(
+            "medicines",
+            distinct=True,
+            filter=Q(medicines__is_active=True),
+        ),
     )
 
 
@@ -119,6 +133,10 @@ class SupplierListCreateView(APIView):
                 )
             queryset = queryset.filter(categories__contains=[category])
 
+        has_dues_raw = (request.query_params.get("has_dues") or "").strip().lower()
+        if has_dues_raw in {"true", "1", "yes"}:
+            queryset = queryset.filter(outstanding_payable__gt=0)
+
         try:
             page = int(request.query_params.get("page", 1))
         except (TypeError, ValueError):
@@ -148,6 +166,19 @@ class SupplierListCreateView(APIView):
             SupplierReadSerializer(annotated).data,
             status_code=status.HTTP_201_CREATED,
         )
+
+
+class SupplierSummaryView(APIView):
+    """Directory-wide KPI aggregate for the supplier console cards.
+
+    Same read audience as the supplier list (the cards sit atop the same
+    table). Counts/totals come from aggregate queries, never the page.
+    """
+
+    permission_classes = [IsReceptionAdminOrPharmacist]
+
+    def get(self, request):
+        return success_response(services.supplier_summary())
 
 
 class SupplierDetailView(APIView):
@@ -200,6 +231,74 @@ class SupplierDetailView(APIView):
         )
 
 
+class SupplierLedgerView(APIView):
+    """Accounts-payable ledger for one supplier (admin-only — financial).
+
+    Returns ledger rows newest-first with a per-row running balance, plus a
+    summary (outstanding / total invoiced / total paid). All derived from the
+    append-only SupplierLedgerEntry table.
+    """
+
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, supplier_id):
+        supplier = get_object_or_404(Supplier, pk=supplier_id)
+
+        entries = list(
+            SupplierLedgerEntry.objects.filter(supplier=supplier)
+            .select_related("purchase_invoice")
+            .order_by("created_at", "id")
+        )
+
+        # Running balance computed oldest→newest, then surfaced newest-first.
+        running = Decimal("0")
+        rows = []
+        total_invoiced = Decimal("0")
+        total_paid = Decimal("0")
+        for entry in entries:
+            running += entry.amount
+            if entry.amount > 0:
+                total_invoiced += entry.amount
+            else:
+                total_paid += -entry.amount
+            rows.append(SupplierLedgerEntrySerializer.from_entry(entry, running))
+        rows.reverse()
+
+        return success_response(
+            {
+                "supplier_id": str(supplier.pk),
+                "summary": {
+                    "outstanding": str(supplier.outstanding_payable),
+                    "total_invoiced": str(total_invoiced),
+                    "total_paid": str(total_paid),
+                },
+                "entries": rows,
+            }
+        )
+
+
+class SupplierPaymentView(APIView):
+    """Record a payment to a supplier (admin-only). Posts a −payable ledger
+    entry and refreshes the cached outstanding balance."""
+
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, supplier_id):
+        get_object_or_404(Supplier, pk=supplier_id)
+        serializer = SupplierPaymentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        outstanding = services.record_supplier_payment(
+            supplier_id=supplier_id,
+            amount=data["amount"],
+            payment_mode=data.get("payment_mode", "cash"),
+            reference=data.get("reference", ""),
+            note=data.get("note", ""),
+            user=request.user,
+        )
+        return success_response({"outstanding": str(outstanding)})
+
+
 # ────────────────────────────────────────────────────────────
 # Medicine CRUD
 # ────────────────────────────────────────────────────────────
@@ -221,11 +320,16 @@ class MedicineListCreateView(APIView):
         category = (request.query_params.get("category") or "").strip()
         bup_category = (request.query_params.get("bup_category") or "").strip()
         search = (request.query_params.get("search") or "").strip()
+        # ``supplier`` scopes the list to medicines linked to one supplier via
+        # the Medicine.suppliers M2M — powers the supplier console Products tab.
+        supplier = (request.query_params.get("supplier") or "").strip()
 
         if category:
             queryset = queryset.filter(category=category)
         if bup_category:
             queryset = queryset.filter(bup_category=bup_category)
+        if supplier:
+            queryset = queryset.filter(suppliers__id=supplier)
         if search:
             queryset = queryset.filter(
                 Q(name__icontains=search) | Q(salt__icontains=search)
@@ -406,6 +510,26 @@ class InventoryStatsView(APIView):
 class PurchaseInvoiceCreateView(APIView):
     permission_classes = [IsPharmacistOrAdmin]
 
+    def get(self, request):
+        # Purchase-invoice history, optionally scoped to one supplier
+        # (?supplier=<id>) for the vendor console Invoice-History tab.
+        queryset = (
+            PurchaseInvoice.objects.select_related("supplier")
+            .prefetch_related("items__medicine")
+            .order_by("-invoice_date", "-created_at")
+        )
+        supplier_id = (request.query_params.get("supplier") or "").strip()
+        if supplier_id:
+            queryset = queryset.filter(supplier_id=supplier_id)
+
+        items = [
+            PurchaseInvoiceListItemSerializer.from_invoice(
+                inv, _purchase_invoice_document_url(inv, request)
+            )
+            for inv in queryset
+        ]
+        return success_response({"items": items, "total": len(items)})
+
     def post(self, request):
         serializer = PurchaseInvoiceCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -429,6 +553,29 @@ class PurchaseInvoiceCreateView(APIView):
                 ),
             },
             status_code=status.HTTP_201_CREATED,
+        )
+
+
+class PurchaseInvoiceDetailView(APIView):
+    """PATCH a purchase invoice's Form 6 flag (the only mutable field)."""
+
+    permission_classes = [IsPharmacistOrAdmin]
+
+    def patch(self, request, invoice_id):
+        invoice = get_object_or_404(
+            PurchaseInvoice.objects.select_related("supplier").prefetch_related(
+                "items__medicine"
+            ),
+            pk=invoice_id,
+        )
+        serializer = PurchaseInvoiceUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invoice.form6 = serializer.validated_data["form6"]
+        invoice.save(update_fields=["form6", "updated_at"])
+        return success_response(
+            PurchaseInvoiceListItemSerializer.from_invoice(
+                invoice, _purchase_invoice_document_url(invoice, request)
+            )
         )
 
 

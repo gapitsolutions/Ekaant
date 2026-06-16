@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-16 (IST) — follow-up calling: new `do_not_call` outcome + `wrong_number` is now terminal (no callback date); both set patient flags (`do_not_call`, `phone_number_invalid`) that exclude the patient from automated follow-up ticket generation; editing the phone number clears `phone_number_invalid`; calling report gains a `do_not_call` bucket/column. Earlier: patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
+> **Last Updated:** 2026-06-16 (IST) — staff console UI integration: new `GET /staff/summary/` directory KPI aggregate (total/active/inactive + by-designation, from aggregate queries); staff create/update now accept optional `photo_base64`/`photo_mime_type` (JSON base64, mirrors patient-photo contract → `Staff.photo`/`photo_url`); staff detail rebuilt as a modal console (Profile/Attendance/Salary/Salary-Records). Earlier: supplier console UI integration: new `GET /pharmacy/suppliers/summary/` directory KPI aggregate (counts by category + outstanding total, from aggregate queries not the page); supplier list/detail now expose `product_count` (active mapped medicines) and the list accepts `has_dues=true`; historical purchase invoices backfilled into the supplier payables ledger (migration `0013`) so the Ledger tab shows invoices + payments. Staff phase 5: payroll + stored, regenerable **payslips** — admin-only `GET /staff/<id>/payroll/` (preview, no persistence) and `GET|POST /staff/<id>/payslips/` (snapshot history + generate). Transparent deduction model (`per_day × unpaid_absent`, paid-leave allowance offsets first N absences); regeneration appends a new snapshot row; payslip PDF rendered client-side from the stored snapshot. Phase 4: `StaffAttendance` (one mark per staff/day, present/absent/half_day) — admin-only daily roster + bulk mark (`/staff/attendance/`) and per-staff monthly calendar/stats (`/staff/<id>/attendance/`). Phase 3: new **`staff`** app — standalone admin-only HR directory (`Staff` + dynamic `Designation`), masked sensitive fields, soft-delete. Earlier: supplier/vendor console (phase 2): supplier accounts-payable ledger (`SupplierLedgerEntry`) + cached `Supplier.outstanding_payable`; booking a purchase invoice auto-posts a payable; new admin-only `GET /suppliers/<id>/ledger/` and `POST /suppliers/<id>/payments/`. Phase 1: purchase invoices gain a `form6` flag (set on create, toggled via new `PATCH /inventory/invoices/<id>/`); `GET /inventory/invoices/?supplier=` lists a supplier's invoice history with line items; medicine list accepts `?supplier=` (M2M filter). Earlier same day — follow-up calling: new `do_not_call` outcome + `wrong_number` is now terminal (no callback date); both set patient flags (`do_not_call`, `phone_number_invalid`) that exclude the patient from automated follow-up ticket generation; editing the phone number clears `phone_number_invalid`; calling report gains a `do_not_call` bucket/column. Earlier: patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -776,6 +776,8 @@ Query params:
 - `category` (optional): `BUP`, `Rx`, `NRx`
 - `bup_category` (optional): used in conjunction with `category=BUP`
 - `search` (optional): icontains over `name` or `salt`
+- `supplier` (optional): Supplier UUID — scopes to medicines linked to that
+  supplier via the `Medicine.suppliers` M2M (supplier console Products tab)
 
 Response:
 
@@ -1002,15 +1004,21 @@ Computation:
 - `todays_revenue` — `Sum(DispenseInvoice.net_payable)` where `dispense_date = today` and `status = success`
 - `dispensed_today_count` — count of successful `DispenseInvoice` rows where `dispense_date = today` (same queryset as `todays_revenue`, aggregated together in a single round-trip)
 
-### 7.9 `POST /api/v1/pharmacy/inventory/invoices/`
+### 7.9 `GET|POST /api/v1/pharmacy/inventory/invoices/`
 
-View: `PurchaseInvoiceCreateView.post`
-Serializer: `PurchaseInvoiceCreateSerializer`
+View: `PurchaseInvoiceCreateView` (GET = list, POST = create)
+Serializer: `PurchaseInvoiceCreateSerializer` (create); `PurchaseInvoiceListItemSerializer` (list)
 Service: `services.process_purchase_invoice`
 Permission: `IsPharmacistOrAdmin`
-Transaction: atomic
+Transaction: atomic (create)
 
-**Use case:** Pharmacist submits a supplier invoice to load stock.
+**GET — purchase-invoice history.** Query param `supplier` (optional UUID)
+scopes to one supplier (vendor console Invoice-History tab). Returns
+`{items[], total}` where each item carries header fields, `form6`,
+`invoice_document_url`, and full line `items[]` (medicine, batch, expiry,
+qty, purchase_price, gst, line_total). Newest first.
+
+**POST — submit a supplier invoice to load stock.**
 
 Request body:
 
@@ -1025,6 +1033,7 @@ Request body:
   "invoice_document_mime_type": "application/pdf",
   "invoice_document_filename": "supplier-bill.pdf",
   "notes": "",
+  "form6": false,
   "items": [
     {
       "medicine_id": "uuid",
@@ -1091,6 +1100,20 @@ Response (201):
 ```
 
 Errors: 400 validation, 404 supplier or medicine not found, 409 duplicate invoice number.
+
+`form6` is an optional boolean (default `false`) recording Form-6
+(controlled-substance register) compliance for the invoice.
+
+### 7.9.0.5 `PATCH /api/v1/pharmacy/inventory/invoices/<invoice_id>/`
+
+View: `PurchaseInvoiceDetailView.patch`
+Serializer: `PurchaseInvoiceUpdateSerializer`
+Permission: `IsPharmacistOrAdmin`
+
+Toggles the invoice's `form6` flag — the **only** mutable field on a
+purchase invoice (invoices otherwise drive stock and the payable ledger and
+are immutable). Body: `{ "form6": true|false }`. Returns the full invoice
+payload (same shape as the §7.9 GET list item).
 
 ### 7.9.1 `GET /api/v1/pharmacy/inventory/invoices/<invoice_id>/document/`
 
@@ -1731,7 +1754,12 @@ Fields:
 - `contact_person`, `mobile_number`, `email`, `full_address`,
 - `gst_number`, `drug_license_number`,
 - `categories` (PostgreSQL array of `MedicineCategory` values: `BUP`, `Rx`, `NRx`),
-- `is_active`, `invoice_count` (annotated), `created_at`, `updated_at`.
+- `is_active`, `invoice_count` (annotated),
+- `product_count` (annotated) — count of **active** medicines mapped to the
+  supplier via the `Medicine.suppliers` M2M (the directory's "Mapped Products"),
+- `outstanding_payable` — cached accounts-payable balance (money owed to this
+  supplier), recomputed from the supplier ledger (see below),
+- `created_at`, `updated_at`.
 
 Validation (on create/update):
 
@@ -1748,9 +1776,29 @@ Permission: `IsReceptionAdminOrPharmacist` (broadly readable so any picker can p
 
 Query params: `q` (search company / contact / GST / drug license / mobile),
 `is_active` (`true`/`false`), `category` (one of `BUP`, `Rx`, `NRx`),
+`has_dues` (`true` → only suppliers with `outstanding_payable > 0`),
 `page` (default 1), `pageSize` (default 50, max 200).
 
 Response: `{ items: Supplier[], pagination: { page, pageSize, total } }`.
+
+#### `GET /api/v1/pharmacy/suppliers/summary/`
+
+Permission: `IsReceptionAdminOrPharmacist` (same audience as the list — the
+console's KPI cards sit atop the same table).
+
+Directory-wide aggregate computed with aggregate queries (NOT the paginated
+list), so headline counts are independent of page size. Category counts and the
+outstanding total are scoped to **active** suppliers; `total`/`inactive` cover
+all rows. Response:
+
+```json
+{
+  "total": 12, "active": 11, "inactive": 1,
+  "by_category": { "BUP": 1, "Rx": 6, "NRx": 4 },
+  "outstanding_total": "602672.00",
+  "suppliers_with_dues": 3
+}
+```
 
 #### `POST /api/v1/pharmacy/suppliers/`
 
@@ -1770,6 +1818,53 @@ Permission: `IsPharmacistOrAdmin`. **Soft-delete only** — sets `is_active=Fals
 Returns `{ deactivated: true, supplier_id, is_active: false }`.
 
 To reactivate, send `PATCH` with `{ "is_active": true }`.
+
+### 7.21 Supplier payables ledger (accounts payable)
+
+`SupplierLedgerEntry` is an **append-only** ledger of money the hospital owes
+each supplier — the mirror of the patient-side billing ledger
+(`PatientLedgerEntry`):
+
+- `+amount` (`invoice`) — a purchase invoice was booked (increases payable),
+- `-amount` (`payment`) — a payment was made (decreases payable),
+- signed (`adjustment`) — corrections/reversals.
+
+Outstanding payable for a supplier = `SUM(amount)`. Booking a purchase invoice
+(§7.9 POST) **auto-posts** a `+invoice` entry and refreshes the cached
+`Supplier.outstanding_payable`. History is never mutated.
+
+#### `GET /api/v1/pharmacy/suppliers/<supplier_id>/ledger/`
+
+Permission: **`IsAdminRole`** (financial data — admin only).
+
+Returns:
+
+```json
+{
+  "supplier_id": "uuid",
+  "summary": { "outstanding": "750.00", "total_invoiced": "1000.00", "total_paid": "250.00" },
+  "entries": [
+    {
+      "id": "uuid", "date": "2026-06-16T10:30:00+05:30",
+      "entry_type": "payment", "credit": "0", "debit": "250.00",
+      "balance": "750.00", "payment_mode": "bank", "reference": "UTR123",
+      "note": "", "invoice_number": ""
+    }
+  ]
+}
+```
+
+`entries` are newest-first; each carries the running `balance` (outstanding
+after that row, computed oldest→newest). `credit` = invoice booked, `debit` =
+payment made.
+
+#### `POST /api/v1/pharmacy/suppliers/<supplier_id>/payments/`
+
+Permission: **`IsAdminRole`**. Records a payment (−payable) and refreshes the
+cache. Body: `{ amount (>0, required), payment_mode (cash|online|bank), reference?, note? }`.
+Rejected (400) if `amount` exceeds the current outstanding (no supplier
+credit). Returns `{ "outstanding": "<new balance>" }`. The row lock on the
+supplier serialises concurrent payments against a fresh balance.
 
 ### 7.21 Billing (consultation fee + patient financial ledger)
 
@@ -1935,6 +2030,132 @@ Response:
 
 ---
 
+## 8A. Staff API Blueprint
+
+HR staff/employee directory — a **standalone** entity, deliberately NOT linked
+to `accounts.User`. `User` rows grant server authentication (reception,
+pharmacist, admin); `Staff` rows are HR records (designation, payroll,
+attendance, contact, bank) for people who may or may not have a login. This
+keeps sensitive PII off the auth model and avoids forcing login accounts for
+every employee. **All staff endpoints are admin-only (`IsAdminRole`).**
+
+Models:
+
+- `Designation` — dynamic job-title lookup (`name` case-insensitively unique,
+  `is_active`). Seeded: Physician, Nurse, Manager, Psychiatrist, Counsellor,
+  Doctor. New titles are **get-or-created** when a staff record is saved with
+  an unrecognised designation, so a typed value persists in the picker.
+- `Staff` — `staff_code` (admin-entered, unique — 409 on collision),
+  `full_name`, `designation` (FK PROTECT), `employment_type`
+  (`permanent`/`locum`/`contract`), `is_active` (soft-delete), `joined_date`,
+  personal fields (`date_of_birth`, `gender`, `mobile_number`, `email`,
+  `address`, `photo`, `gov_registration`), **confidential** fields
+  (`aadhaar_number`, `pan_number`, `bank_account_number`, `bank_ifsc`,
+  `monthly_salary`), and payroll config (`holiday_allowed`, `sunday_holiday`).
+
+Sensitivity: list responses **mask** `aadhaar_number` / `pan_number` /
+`bank_account_number` (last 4 only) and **omit** `monthly_salary` / `bank_ifsc`
+/ `address`. Detail responses (single GET) return full values.
+
+**Photo upload:** create/update optionally accept `photo_base64` +
+`photo_mime_type` (sent together; `image/jpeg` or `image/png`, ≤ 2 MB),
+decoded server-side onto `Staff.photo` — mirrors the patient-photo contract so
+the request stays JSON (no multipart). Read responses expose `photo_url`.
+
+### 8A.1 `GET|POST /api/v1/staff/`
+
+GET — list; query params `q` (name/code/mobile/email), `designation` (name),
+`status` (`active`/`inactive`), `page`, `pageSize`. Items are masked. POST —
+create; body uses `designation` as a **name string** (existing or new), and may
+include `photo_base64`/`photo_mime_type`. 409 on duplicate `staff_code`.
+
+### 8A.0 `GET /api/v1/staff/summary/`
+
+Admin-only directory KPI aggregate for the console cards — computed via
+aggregate queries (NOT the paginated list). Response:
+
+```json
+{
+  "total": 12, "active": 11, "inactive": 1,
+  "by_designation": { "Manager": 2, "Nurse": 4, "Physician": 5 }
+}
+```
+
+`by_designation` counts active staff only.
+
+### 8A.2 `GET|PATCH|DELETE /api/v1/staff/<staff_id>/`
+
+GET — full detail (unmasked). PATCH — partial update (same body shape; designation
+name resolved/created). DELETE — **soft-delete** (`is_active=False`); reactivate
+via `PATCH {"is_active": true}`.
+
+### 8A.3 `GET|POST /api/v1/staff/designations/`
+
+GET — active designations for the picker. POST — create a designation
+(409 on case-insensitive duplicate).
+
+### 8A.4 Attendance
+
+`StaffAttendance` — one mark per `(staff, date)` (`unique_together`), status
+`present` / `absent` / `half_day`. Half-days count as 0.5 present + 0.5 absent
+in the derived stats (and payroll, Phase 5). All admin-only.
+
+#### `GET|POST /api/v1/staff/attendance/`
+
+GET — daily roster; **`date` (YYYY-MM-DD) required**. Returns every active
+staff member with their `status` for that date (`null` when unmarked) for the
+bulk-mark grid. POST — bulk upsert `{ date, entries: [{staff_id, status}] }`;
+returns `{ date, marked }`. Idempotent (`update_or_create` per row).
+
+#### `GET|PATCH /api/v1/staff/<staff_id>/attendance/`
+
+GET — `?month=YYYY-MM` (defaults to current month) → `{ year, month, by_date:
+{ "YYYY-MM-DD": status }, stats: { present, absent, half_day, marked_days,
+effective_present, effective_absent } }`. PATCH — upsert one day
+`{ date, status }`.
+
+### 8A.5 Payroll & Payslips
+
+`Payslip` — a stored, immutable **snapshot** of a month's computed pay for one
+staff member (audit). Regenerating a month creates a **new row** (history is
+preserved); the latest by `generated_at` is authoritative. The same figures are
+also computable on demand (preview) without persisting. All admin-only.
+
+**Computation (transparent deduction model, in `services.compute_payroll`):**
+
+```
+per_day          = monthly_salary / days_in_month
+effective_absent = absent + 0.5 * half_day            (from marked attendance)
+paid_leave_used  = min(holiday_allowed, effective_absent)
+unpaid_absent    = effective_absent - paid_leave_used
+deduction        = per_day * unpaid_absent
+net_pay          = max(0, monthly_salary - deduction)
+```
+
+`holiday_allowed` is a monthly paid-leave allowance offsetting the first N
+absences. `sunday_holiday` / `sundays_in_month` are surfaced for context only —
+deductions come solely from *marked* unpaid absences, so unmarked Sundays never
+deduct. Every figure is returned and snapshotted so the policy is auditable.
+
+#### `GET /api/v1/staff/<staff_id>/payroll/`
+
+Preview (no persistence). `?month=YYYY-MM` (defaults to current month) → the
+full breakdown: `{ year, month, monthly_salary, days_in_month, sundays_in_month,
+sunday_holiday, holiday_allowed, present_days, absent_days, half_days,
+paid_leave_used, unpaid_absent, per_day_rate, deduction, net_pay, marked_days }`.
+Decimal fields serialise as strings.
+
+#### `GET|POST /api/v1/staff/<staff_id>/payslips/`
+
+GET — `{ items: [...] }` of stored payslips (newest first), each adding
+identity (`staff_name`, `staff_code`, `designation`) and provenance
+(`generated_at`, `generated_by_name`) to the computed fields above. POST —
+`{ month: "YYYY-MM" }` computes + persists a snapshot and returns it
+(`201`). The payslip PDF is rendered client-side from the stored snapshot
+(`frontend/lib/export/generatePayslipPdf.ts`) — the backend stores no PDF.
+
+---
+
 ## 9. Data Model and Enum Blueprint
 
 ### 9.1 `accounts.User`
@@ -2088,6 +2309,7 @@ Stock movement type reference:
 **Pharmacy:**
 
 - `GET    /api/v1/pharmacy/suppliers/`
+- `GET    /api/v1/pharmacy/suppliers/summary/`
 - `POST   /api/v1/pharmacy/suppliers/`
 - `GET    /api/v1/pharmacy/suppliers/<supplier_id>/`
 - `PATCH  /api/v1/pharmacy/suppliers/<supplier_id>/`
@@ -2115,3 +2337,21 @@ Stock movement type reference:
 - `GET    /api/v1/pharmacy/reports/expiry/`
 - `GET    /api/v1/billing/settings/`
 - `PATCH  /api/v1/billing/settings/` (admin only)
+
+**Staff (all admin-only):**
+
+- `GET    /api/v1/staff/summary/`
+- `GET    /api/v1/staff/`
+- `POST   /api/v1/staff/`
+- `GET    /api/v1/staff/<staff_id>/`
+- `PATCH  /api/v1/staff/<staff_id>/`
+- `DELETE /api/v1/staff/<staff_id>/` (soft-delete)
+- `GET    /api/v1/staff/designations/`
+- `POST   /api/v1/staff/designations/`
+- `GET    /api/v1/staff/attendance/` (daily roster)
+- `POST   /api/v1/staff/attendance/` (bulk mark)
+- `GET    /api/v1/staff/<staff_id>/attendance/` (monthly)
+- `PATCH  /api/v1/staff/<staff_id>/attendance/` (single day)
+- `GET    /api/v1/staff/<staff_id>/payroll/` (preview)
+- `GET    /api/v1/staff/<staff_id>/payslips/` (history)
+- `POST   /api/v1/staff/<staff_id>/payslips/` (generate snapshot)
