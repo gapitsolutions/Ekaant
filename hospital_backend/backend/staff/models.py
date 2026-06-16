@@ -165,6 +165,37 @@ class StaffAttendance(models.Model):
         return f"{self.staff_id} {self.date} {self.status}"
 
 
+class AttendanceDaySubmission(models.Model):
+    """A per-calendar-day lock recording that the day's attendance was
+    *submitted* (typically by reception). ``date`` is unique, so a day can be
+    submitted only once — the reception flow refuses a second submission and
+    cannot edit after. Admins bypass this lock entirely (they correct via the
+    per-staff / bulk admin endpoints). ``submitted_by_role`` snapshots the
+    marking user's auth role at submission time so it stays accurate even if
+    that user's role later changes.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    date = models.DateField(unique=True)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="attendance_day_submissions",
+        blank=True,
+        null=True,
+    )
+    submitted_by_role = models.CharField(max_length=20, blank=True, default="")
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date"]
+        verbose_name = "Attendance Day Submission"
+        verbose_name_plural = "Attendance Day Submissions"
+
+    def __str__(self):
+        return f"{self.date} by {self.submitted_by_id}"
+
+
 class Payslip(models.Model):
     """A stored, immutable snapshot of a month's payroll computation for one
     staff member — kept for audit. Regenerating a month creates a NEW row

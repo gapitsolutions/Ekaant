@@ -30,6 +30,25 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import {
+  getAttendanceRoster,
+  bulkMarkAttendance,
+  type AttendanceRosterItem,
+  type AttendanceStatus,
+  type AttendanceDaySubmission,
+} from "@/lib/staff-api";
+import { toastApiError } from "@/lib/api-errors";
 import {
   Fingerprint,
   UserPlus,
@@ -43,6 +62,9 @@ import {
   Phone,
   FileText,
   Link,
+  CalendarCheck,
+  Loader2,
+  Lock,
 } from "lucide-react";
 
 interface StatData {
@@ -65,6 +87,25 @@ export default function ReceptionDashboard() {
   );
   const [selectedStat, setSelectedStat] = useState<StatData | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
+  // Today's attendance submission/lock state (null = not yet submitted).
+  const [todaySubmission, setTodaySubmission] =
+    useState<AttendanceDaySubmission | null>(null);
+
+  const today = new Date().toLocaleDateString("en-CA");
+
+  const refreshAttendanceStatus = () => {
+    getAttendanceRoster(today)
+      .then((data) => setTodaySubmission(data.submission))
+      .catch(() => {
+        /* non-fatal — button stays enabled */
+      });
+  };
+
+  useEffect(() => {
+    refreshAttendanceStatus();
+    ///eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -284,14 +325,31 @@ export default function ReceptionDashboard() {
         title="Reception Dashboard"
         subtitle="Welcome back! Manage patient check-ins and registrations"
         actions={
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
-            <Clock className="h-4 w-4" />
-            {new Date().toLocaleDateString("en-IN", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setAttendanceOpen(true)}
+              className={`rounded-xl h-10 px-4 font-bold flex items-center gap-2 ${
+                todaySubmission
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                  : "bg-primary hover:bg-primary-dark text-white shadow-md"
+              }`}
+            >
+              {todaySubmission ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <CalendarCheck className="h-4 w-4" />
+              )}
+              {todaySubmission ? "Attendance Marked" : "Mark Attendance"}
+            </Button>
+            <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+              <Clock className="h-4 w-4" />
+              {new Date().toLocaleDateString("en-IN", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
           </div>
         }
       />
@@ -577,6 +635,190 @@ export default function ReceptionDashboard() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <ReceptionAttendanceDialog
+        open={attendanceOpen}
+        date={today}
+        onOpenChange={setAttendanceOpen}
+        onSubmitted={(submission) => setTodaySubmission(submission)}
+      />
     </div>
+  );
+}
+
+// Reception's daily staff-attendance entry. Marks **today** only, **once** —
+// after submission the day is locked (read-only here); corrections are an admin
+// task. The submitting user + their auth role are recorded server-side.
+function ReceptionAttendanceDialog({
+  open,
+  date,
+  onOpenChange,
+  onSubmitted,
+}: {
+  open: boolean;
+  date: string;
+  onOpenChange: (open: boolean) => void;
+  onSubmitted: (submission: AttendanceDaySubmission) => void;
+}) {
+  const [roster, setRoster] = useState<AttendanceRosterItem[]>([]);
+  const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({});
+  const [submission, setSubmission] = useState<AttendanceDaySubmission | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setIsLoading(true);
+    getAttendanceRoster(date)
+      .then((data) => {
+        setRoster(data.items);
+        setSubmission(data.submission);
+        const initial: Record<string, AttendanceStatus> = {};
+        data.items.forEach((it) => {
+          initial[it.staff_id] = it.status ?? "present";
+        });
+        setMarks(initial);
+      })
+      .catch((error) => toastApiError(error, "Failed to load roster"))
+      .finally(() => setIsLoading(false));
+  }, [open, date]);
+
+  const locked = submission !== null;
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const result = await bulkMarkAttendance(
+        date,
+        roster.map((it) => ({ staff_id: it.staff_id, status: marks[it.staff_id] })),
+      );
+      toast.success("Attendance submitted for today");
+      if (result.submission) {
+        setSubmission(result.submission);
+        onSubmitted(result.submission);
+      }
+      onOpenChange(false);
+    } catch (error) {
+      toastApiError(error, "Failed to submit attendance");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const cycle: { value: AttendanceStatus; label: string; cls: string }[] = [
+    { value: "present", label: "P", cls: "bg-emerald-600" },
+    { value: "absent", label: "A", cls: "bg-rose-600" },
+    { value: "half_day", label: "½", cls: "bg-amber-500" },
+  ];
+
+  const prettyTime = (iso: string) =>
+    new Date(iso).toLocaleString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <CalendarCheck className="h-5 w-5 text-primary" /> Mark Today&apos;s Attendance
+          </DialogTitle>
+          <DialogDescription className="text-slate-500">
+            {new Date(date).toLocaleDateString("en-IN", {
+              weekday: "long",
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}
+            . Attendance can be submitted only once per day; corrections are made
+            by an admin.
+          </DialogDescription>
+        </DialogHeader>
+
+        {locked && submission && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Already submitted today by{" "}
+              <span className="font-bold">{submission.submitted_by_name || "—"}</span>{" "}
+              <span className="capitalize">({submission.submitted_by_role})</span> at{" "}
+              {prettyTime(submission.submitted_at)}. This is read-only — ask an
+              admin to make corrections.
+            </span>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Spinner className="h-5 w-5 text-primary" />
+          </div>
+        ) : roster.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-400">No active staff.</p>
+        ) : (
+          <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+            {roster.map((it) => (
+              <div
+                key={it.staff_id}
+                className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-800 text-sm truncate">{it.full_name}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {it.staff_code} · {it.designation}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  {cycle.map((opt) => {
+                    const selected = (marks[it.staff_id] ?? it.status) === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={locked}
+                        onClick={() =>
+                          setMarks((prev) => ({ ...prev, [it.staff_id]: opt.value }))
+                        }
+                        className={`h-8 w-8 rounded-lg text-xs font-black transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                          selected
+                            ? `${opt.cls} text-white shadow-sm`
+                            : "bg-white text-slate-400 border border-slate-200 hover:border-slate-300"
+                        }`}
+                        title={opt.value}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            className="rounded-xl border-slate-200"
+            onClick={() => onOpenChange(false)}
+            disabled={isSaving}
+          >
+            Close
+          </Button>
+          {!locked && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || roster.length === 0}
+              className="bg-primary hover:bg-primary-dark text-white rounded-xl"
+            >
+              {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit Attendance
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

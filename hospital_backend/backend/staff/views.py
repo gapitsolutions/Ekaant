@@ -1,10 +1,11 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import serializers as drf_serializers
 from rest_framework.views import APIView
 
 from core.pagination import paginate_queryset
-from core.permissions import IsAdminRole
+from core.permissions import IsAdminRole, IsReceptionOrAdmin
 from core.responses import success_response
 
 from . import services
@@ -130,11 +131,30 @@ class AttendanceRosterView(APIView):
     """Daily attendance roster (admin-only).
 
     GET ?date=YYYY-MM-DD — every active staff member with their mark for that
-    date (``status`` null when unmarked) so the UI can render a bulk-mark grid.
+    date (``status`` null when unmarked) so the UI can render a bulk-mark grid,
+    plus the day's submission/lock state.
     POST — bulk upsert ``{ date, entries: [{staff_id, status}] }``.
+
+    Reception + admin. Reception is restricted to **today** and may submit a
+    day only **once** (the day is then locked — no edits). Admin may mark/edit
+    any day repeatedly and is never blocked by the lock.
     """
 
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsReceptionOrAdmin]
+
+    @staticmethod
+    def _submission_payload(submission):
+        if submission is None:
+            return None
+        return {
+            "submitted_by_name": (
+                submission.submitted_by.full_name
+                if submission.submitted_by_id
+                else ""
+            ),
+            "submitted_by_role": submission.submitted_by_role,
+            "submitted_at": submission.submitted_at.isoformat(),
+        }
 
     def get(self, request):
         date_str = (request.query_params.get("date") or "").strip()
@@ -156,18 +176,48 @@ class AttendanceRosterView(APIView):
             }
             for s in staff
         ]
-        return success_response({"date": date_str, "items": items})
+        submission = services.day_submission(date_str)
+        is_admin = getattr(request.user, "role", None) == "admin"
+        return success_response(
+            {
+                "date": date_str,
+                "items": items,
+                "submission": self._submission_payload(submission),
+                # Admins can always mark/edit; reception only if not yet locked.
+                "can_submit": is_admin or submission is None,
+            }
+        )
 
     def post(self, request):
         serializer = BulkAttendanceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        written = services.bulk_mark_attendance(
-            on_date=serializer.validated_data["date"],
-            entries=serializer.validated_data["entries"],
-            user=request.user,
+        on_date = serializer.validated_data["date"]
+        entries = serializer.validated_data["entries"]
+        is_admin = getattr(request.user, "role", None) == "admin"
+
+        if is_admin:
+            # Admin path — unlocked, may mark/edit any day repeatedly.
+            written = services.bulk_mark_attendance(
+                on_date=on_date, entries=entries, user=request.user
+            )
+            return success_response(
+                {"date": on_date, "marked": written, "submission": None}
+            )
+
+        # Reception path — today only, once per day, then locked.
+        if on_date != timezone.localdate():
+            raise drf_serializers.ValidationError(
+                "Reception can only mark attendance for the current day."
+            )
+        result = services.submit_daily_attendance(
+            on_date=on_date, entries=entries, user=request.user
         )
         return success_response(
-            {"date": serializer.validated_data["date"], "marked": written}
+            {
+                "date": on_date,
+                "marked": result["marked"],
+                "submission": self._submission_payload(result["submission"]),
+            }
         )
 
 

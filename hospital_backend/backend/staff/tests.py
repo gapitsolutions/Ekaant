@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
@@ -311,3 +312,103 @@ class StaffSummaryAndPhotoTests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ReceptionAttendanceLockTests(APITestCase):
+    """Reception can mark today's attendance once; the day then locks. Admins
+    bypass the lock and can correct any day."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="lockadmin@example.com", password="x", role="admin"
+        )
+        self.reception = User.objects.create_user(
+            email="reception@example.com", password="x", role="reception"
+        )
+        d, _ = Designation.objects.get_or_create(name="Nurse")
+        self.s1 = Staff.objects.create(staff_code="L1", full_name="One", designation=d)
+        self.s2 = Staff.objects.create(staff_code="L2", full_name="Two", designation=d)
+        self.today = timezone.localdate().isoformat()
+
+    def _reception(self):
+        c = APIClient()
+        c.force_authenticate(user=self.reception)
+        return c
+
+    def _entries(self):
+        return [
+            {"staff_id": str(self.s1.id), "status": "present"},
+            {"staff_id": str(self.s2.id), "status": "absent"},
+        ]
+
+    def test_reception_can_submit_today_once_then_locked(self):
+        c = self._reception()
+        # Before: roster says can_submit.
+        roster = c.get(f"/api/v1/staff/attendance/?date={self.today}")
+        self.assertTrue(roster.data["data"]["can_submit"])
+        self.assertIsNone(roster.data["data"]["submission"])
+
+        r1 = c.post(
+            "/api/v1/staff/attendance/",
+            {"date": self.today, "entries": self._entries()},
+            format="json",
+        )
+        self.assertEqual(r1.status_code, status.HTTP_200_OK)
+        self.assertEqual(r1.data["data"]["submission"]["submitted_by_role"], "reception")
+
+        # After: locked.
+        roster2 = c.get(f"/api/v1/staff/attendance/?date={self.today}")
+        self.assertFalse(roster2.data["data"]["can_submit"])
+        self.assertIsNotNone(roster2.data["data"]["submission"])
+
+        # Second submit is refused.
+        r2 = c.post(
+            "/api/v1/staff/attendance/",
+            {"date": self.today, "entries": self._entries()},
+            format="json",
+        )
+        self.assertEqual(r2.status_code, status.HTTP_409_CONFLICT)
+
+    def test_reception_cannot_mark_past_date(self):
+        c = self._reception()
+        resp = c.post(
+            "/api/v1/staff/attendance/",
+            {"date": "2020-01-01", "entries": self._entries()},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_admin_can_edit_after_reception_lock(self):
+        self._reception().post(
+            "/api/v1/staff/attendance/",
+            {"date": self.today, "entries": self._entries()},
+            format="json",
+        )
+        admin = APIClient()
+        admin.force_authenticate(user=self.admin)
+        # Admin re-marks the same locked day — allowed, not blocked.
+        resp = admin.post(
+            "/api/v1/staff/attendance/",
+            {
+                "date": self.today,
+                "entries": [{"staff_id": str(self.s1.id), "status": "half_day"}],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            StaffAttendance.objects.get(staff=self.s1, date=self.today).status,
+            "half_day",
+        )
+        # Admin roster GET can always submit.
+        roster = admin.get(f"/api/v1/staff/attendance/?date={self.today}")
+        self.assertTrue(roster.data["data"]["can_submit"])
+
+    def test_pharmacist_forbidden(self):
+        pharm = User.objects.create_user(
+            email="lockpharm@example.com", password="x", role="pharmacist"
+        )
+        c = APIClient()
+        c.force_authenticate(user=pharm)
+        resp = c.get(f"/api/v1/staff/attendance/?date={self.today}")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)

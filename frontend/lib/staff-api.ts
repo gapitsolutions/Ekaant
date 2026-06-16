@@ -152,10 +152,26 @@ export interface AttendanceRosterItem {
   status: AttendanceStatus | null;
 }
 
+// Per-day submission/lock marker. Present once a day has been submitted
+// (typically by reception). Records who submitted it and their auth role.
+export interface AttendanceDaySubmission {
+  submitted_by_name: string;
+  submitted_by_role: string;
+  submitted_at: string;
+}
+
+export interface AttendanceRosterResponse {
+  date: string;
+  items: AttendanceRosterItem[];
+  submission: AttendanceDaySubmission | null;
+  // Reception: true only if the day isn't locked yet. Admin: always true.
+  can_submit: boolean;
+}
+
 export async function getAttendanceRoster(
   date: string,
-): Promise<{ date: string; items: AttendanceRosterItem[] }> {
-  return apiRequest<{ date: string; items: AttendanceRosterItem[] }>(
+): Promise<AttendanceRosterResponse> {
+  return apiRequest<AttendanceRosterResponse>(
     `/api/v1/staff/attendance/?date=${encodeURIComponent(date)}`,
     {},
   );
@@ -164,11 +180,19 @@ export async function getAttendanceRoster(
 export async function bulkMarkAttendance(
   date: string,
   entries: { staff_id: string; status: AttendanceStatus }[],
-): Promise<{ date: string; marked: number }> {
-  return apiRequest<{ date: string; marked: number }>(
-    "/api/v1/staff/attendance/",
-    { method: "POST", body: { date, entries } },
-  );
+): Promise<{
+  date: string;
+  marked: number;
+  submission: AttendanceDaySubmission | null;
+}> {
+  return apiRequest<{
+    date: string;
+    marked: number;
+    submission: AttendanceDaySubmission | null;
+  }>("/api/v1/staff/attendance/", {
+    method: "POST",
+    body: { date, entries },
+  });
 }
 
 export interface MonthAttendance {

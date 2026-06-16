@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Designation, Payslip, Staff, StaffAttendance
+from .models import (
+    AttendanceDaySubmission,
+    Designation,
+    Payslip,
+    Staff,
+    StaffAttendance,
+)
 
 
 @admin.register(Designation)
@@ -29,3 +35,10 @@ class StaffAttendanceAdmin(admin.ModelAdmin):
     list_filter = ("status", "date")
     search_fields = ("staff__staff_code", "staff__full_name")
     autocomplete_fields = ("staff",)
+
+
+@admin.register(AttendanceDaySubmission)
+class AttendanceDaySubmissionAdmin(admin.ModelAdmin):
+    list_display = ("date", "submitted_by", "submitted_by_role", "submitted_at")
+    list_filter = ("submitted_by_role", "date")
+    search_fields = ("submitted_by__full_name", "submitted_by__email")

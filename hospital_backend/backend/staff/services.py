@@ -10,7 +10,15 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from .models import AttendanceStatus, Payslip, Staff, StaffAttendance
+from core.exceptions import ConflictError
+
+from .models import (
+    AttendanceDaySubmission,
+    AttendanceStatus,
+    Payslip,
+    Staff,
+    StaffAttendance,
+)
 from .serializers import resolve_designation
 
 
@@ -124,7 +132,10 @@ def upsert_attendance(*, staff_id, on_date, status, user) -> StaffAttendance:
 
 @transaction.atomic
 def bulk_mark_attendance(*, on_date, entries: list[dict], user) -> int:
-    """Upsert many (staff, date) marks for one date. Returns rows written."""
+    """Upsert many (staff, date) marks for one date. Returns rows written.
+
+    Unlocked — used by the admin flow, which may mark/edit any day repeatedly.
+    """
     count = 0
     for entry in entries:
         StaffAttendance.objects.update_or_create(
@@ -134,6 +145,41 @@ def bulk_mark_attendance(*, on_date, entries: list[dict], user) -> int:
         )
         count += 1
     return count
+
+
+def day_submission(on_date):
+    """Return the AttendanceDaySubmission for a date, or None."""
+    return AttendanceDaySubmission.objects.filter(date=on_date).first()
+
+
+@transaction.atomic
+def submit_daily_attendance(*, on_date, entries: list[dict], user) -> dict:
+    """Reception flow: mark every staff member for ``on_date`` and lock the day.
+
+    A day can be submitted only once (``AttendanceDaySubmission.date`` is
+    unique). A second attempt — by reception — is refused so the marks can't be
+    altered after submission; corrections are an admin task. The marking user
+    (and a snapshot of their auth role) is recorded on the lock row.
+    """
+    # Lock against a concurrent double-submit of the same day.
+    existing = (
+        AttendanceDaySubmission.objects.select_for_update()
+        .filter(date=on_date)
+        .first()
+    )
+    if existing is not None:
+        raise ConflictError(
+            "Attendance for this day has already been submitted and cannot be "
+            "changed. Ask an admin to make corrections."
+        )
+
+    written = bulk_mark_attendance(on_date=on_date, entries=entries, user=user)
+    submission = AttendanceDaySubmission.objects.create(
+        date=on_date,
+        submitted_by=user,
+        submitted_by_role=getattr(user, "role", "") or "",
+    )
+    return {"marked": written, "submission": submission}
 
 
 def month_attendance(*, staff_id, year: int, month: int) -> dict:
