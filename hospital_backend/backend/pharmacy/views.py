@@ -279,6 +279,7 @@ class SupplierPaymentView(APIView):
             payment_mode=data.get("payment_mode", "cash"),
             reference=data.get("reference", ""),
             note=data.get("note", ""),
+            payment_date=data.get("payment_date") or timezone.localdate(),
             user=request.user,
         )
         return success_response({"outstanding": str(outstanding)})

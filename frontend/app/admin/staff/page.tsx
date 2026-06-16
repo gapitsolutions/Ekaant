@@ -42,6 +42,7 @@ import {
 import {
   Briefcase,
   CalendarCheck,
+  Camera,
   CreditCard,
   Download,
   FileText,
@@ -58,8 +59,10 @@ import {
   ShieldOff,
   User,
   UserCog,
+  UserPlus,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   bulkMarkAttendance,
@@ -92,6 +95,7 @@ import { generatePayslipPdf } from "@/lib/export/generatePayslipPdf";
 import { toastApiError, useApiErrors } from "@/lib/api-errors";
 import { FieldError } from "@/components/ui/field-error";
 import { ListPagination } from "@/components/ui/list-pagination";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 const EMPLOYMENT_TYPES: { value: EmploymentType; label: string }[] = [
   { value: "permanent", label: "Permanent" },
@@ -630,7 +634,14 @@ function StaffConsoleModal({
 
   return (
     <Dialog open={staffId !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl w-[96vw] rounded-2xl p-0 overflow-hidden max-h-[92vh] flex flex-col gap-0">
+      <DialogContent
+        showCloseButton={false}
+        className="w-[96vw] sm:max-w-5xl rounded-2xl p-0 overflow-hidden max-h-[92vh] flex flex-col gap-0"
+      >
+        {/* Always present (even while loading) so Radix has an accessible title. */}
+        <DialogTitle className="sr-only">
+          {staff ? staff.full_name : "Staff details"}
+        </DialogTitle>
         {isLoading || !staff ? (
           <div className="flex items-center justify-center py-32">
             <Spinner className="h-6 w-6 text-primary" />
@@ -639,7 +650,6 @@ function StaffConsoleModal({
           <>
             {/* Header */}
             <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 text-white shrink-0">
-              <DialogTitle className="sr-only">{staff.full_name}</DialogTitle>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0">
@@ -677,6 +687,15 @@ function StaffConsoleModal({
                     className={`h-10 w-10 rounded-xl bg-white/5 border border-white/10 ${staff.is_active ? "text-slate-300 hover:text-rose-400 hover:bg-rose-500/10" : "text-slate-300 hover:text-emerald-300 hover:bg-emerald-500/10"}`}
                   >
                     {staff.is_active ? <ShieldOff className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    onClick={onClose}
+                    variant="ghost"
+                    size="icon"
+                    title="Close"
+                    className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/15"
+                  >
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -1121,7 +1140,7 @@ function DailyAttendanceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl rounded-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-primary" /> Mark Daily Attendance
@@ -1366,47 +1385,67 @@ function StaffFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-800">{isEdit ? "Edit Staff" : "Add Staff"}</DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Required: staff code, name, designation. Confidential fields are
-            admin-only and masked in lists.
-          </DialogDescription>
+      <DialogContent className="w-[95vw] sm:max-w-2xl rounded-2xl p-0 overflow-hidden max-h-[92vh] flex flex-col gap-0">
+        <DialogHeader className="space-y-0 border-b border-slate-100 bg-slate-50/60 px-6 py-5 text-left">
+          <div className="flex items-start gap-3">
+            <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              {isEdit ? <Pencil className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-bold text-slate-800">
+                {isEdit ? "Edit Staff Member" : "Add New Staff Member"}
+              </DialogTitle>
+              <DialogDescription className="text-slate-500">
+                Required: staff code, name, designation. Confidential fields are
+                admin-only and masked in lists.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="flex items-center gap-4">
-          <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-            {photoPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoPreview} alt="Staff photo" className="w-full h-full object-cover" />
-            ) : (
-              <User className="h-9 w-9 text-slate-300" />
-            )}
+        <div className="overflow-y-auto px-6 py-5 space-y-5">
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 rounded-2xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
+                {photoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoPreview} alt="Staff photo" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="h-9 w-9 text-slate-300" />
+                )}
+              </div>
+              <button
+                type="button"
+                title={photoPreview ? "Change photo" : "Upload photo"}
+                onClick={() => document.getElementById("staff-photo-input")?.click()}
+                className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-primary text-white flex items-center justify-center shadow ring-2 ring-white hover:bg-primary-dark transition-colors"
+              >
+                <Camera className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-700">Profile Photo</p>
+              <p className="text-[11px] text-slate-400 mb-2">JPEG or PNG, up to 2 MB.</p>
+              <input
+                id="staff-photo-input"
+                type="file"
+                accept="image/jpeg,image/png"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-slate-200 h-8"
+                onClick={() => document.getElementById("staff-photo-input")?.click()}
+              >
+                {photoPreview ? "Change photo" : "Upload photo"}
+              </Button>
+            </div>
           </div>
-          <div>
-            <Label className="text-xs font-bold text-slate-600 uppercase">Profile Photo</Label>
-            <p className="text-[11px] text-slate-400 mb-1.5">JPEG or PNG, up to 2 MB.</p>
-            <input
-              id="staff-photo-input"
-              type="file"
-              accept="image/jpeg,image/png"
-              onChange={handlePhotoChange}
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-xl border-slate-200"
-              onClick={() => document.getElementById("staff-photo-input")?.click()}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> {photoPreview ? "Change photo" : "Upload photo"}
-            </Button>
-          </div>
-        </div>
 
-        <Section title="Identity & Role">
+        <Section title="Identity & Role" icon={<Briefcase className="h-3.5 w-3.5 text-primary" />}>
           <FormField label="Staff Code *">
             <Input value={form.staff_code} onChange={(e) => set("staff_code", e.target.value)} className="bg-slate-50 border-slate-200 font-mono" placeholder="e.g. S001" />
             <FieldError message={apiErrors.get("staff_code")} />
@@ -1416,18 +1455,16 @@ function StaffFormDialog({
             <FieldError message={apiErrors.get("full_name")} />
           </FormField>
           <FormField label="Designation *">
-            <Input
+            <SearchableSelect
+              options={designations.map((d) => ({ value: d.name, label: d.name }))}
               value={form.designation}
-              onChange={(e) => set("designation", e.target.value)}
-              list="staff-designations"
-              className="bg-slate-50 border-slate-200"
+              onValueChange={(v) => set("designation", v)}
               placeholder="Pick or type a new one"
+              searchPlaceholder="Search designations…"
+              emptyMessage="No matching designation."
+              allowCustomValue
+              className="bg-slate-50 border-slate-200"
             />
-            <datalist id="staff-designations">
-              {designations.map((d) => (
-                <option key={d.id} value={d.name} />
-              ))}
-            </datalist>
             <FieldError message={apiErrors.get("designation")} />
           </FormField>
           <FormField label="Employment Type">
@@ -1448,7 +1485,7 @@ function StaffFormDialog({
           </FormField>
         </Section>
 
-        <Section title="Personal & Contact">
+        <Section title="Personal & Contact" icon={<User className="h-3.5 w-3.5 text-primary" />}>
           <FormField label="Date of Birth">
             <Input type="date" value={form.date_of_birth ?? ""} onChange={(e) => set("date_of_birth", e.target.value)} className="bg-slate-50 border-slate-200" />
           </FormField>
@@ -1475,7 +1512,7 @@ function StaffFormDialog({
           </FormField>
         </Section>
 
-        <Section title="Confidential — Payroll & Bank">
+        <Section title="Confidential — Payroll & Bank" icon={<Shield className="h-3.5 w-3.5 text-primary" />}>
           <FormField label="Monthly Salary (₹)">
             <Input type="number" value={form.monthly_salary} onChange={(e) => set("monthly_salary", e.target.value)} className="bg-slate-50 border-slate-200" />
           </FormField>
@@ -1499,8 +1536,9 @@ function StaffFormDialog({
             Sunday is a paid holiday
           </label>
         </Section>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-slate-100 bg-slate-50/60 px-6 py-4">
           <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary-dark text-white rounded-xl">
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -1512,11 +1550,22 @@ function StaffFormDialog({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="space-y-3">
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{title}</p>
-      <div className="grid grid-cols-2 gap-3">{children}</div>
+    <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
+        {icon}
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">{title}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 p-4">{children}</div>
     </div>
   );
 }

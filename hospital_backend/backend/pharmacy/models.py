@@ -306,6 +306,11 @@ class SupplierLedgerEntry(models.Model):
     payment_mode = models.CharField(max_length=16, blank=True, default="")
     reference = models.CharField(max_length=120, blank=True, default="")
     note = models.CharField(max_length=255, blank=True, default="")
+    # User-stated date the payment was actually made. Display/record only —
+    # the running balance still follows posting order (``created_at``) so a
+    # back-dated payment can't rewrite historical balances. Null for
+    # invoice/adjustment rows.
+    payment_date = models.DateField(blank=True, null=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

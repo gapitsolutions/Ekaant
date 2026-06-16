@@ -335,6 +335,9 @@ class SupplierPaymentCreateSerializer(serializers.Serializer):
     note = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
+    # Date the payment was actually made (defaults to today server-side when
+    # omitted). Display/record only — does not affect running-balance order.
+    payment_date = serializers.DateField(required=False, allow_null=True)
 
 
 class SupplierLedgerEntrySerializer:
@@ -350,7 +353,12 @@ class SupplierLedgerEntrySerializer:
         is_invoice = amount > 0
         return {
             "id": str(entry.id),
-            "date": entry.created_at,
+            # Payments show the user-stated payment date; everything else shows
+            # the posting timestamp. (Balance order is unaffected — see model.)
+            "date": entry.payment_date or entry.created_at,
+            "payment_date": (
+                entry.payment_date.isoformat() if entry.payment_date else None
+            ),
             "entry_type": entry.entry_type,
             "credit": str(amount) if is_invoice else "0",
             "debit": str(-amount) if not is_invoice else "0",

@@ -208,6 +208,7 @@ def _record_supplier_ledger_entry(
     payment_mode="",
     reference="",
     note="",
+    payment_date=None,
     user=None,
 ):
     if amount == 0:
@@ -220,6 +221,7 @@ def _record_supplier_ledger_entry(
         payment_mode=payment_mode,
         reference=reference,
         note=note,
+        payment_date=payment_date,
         created_by=user,
     )
 
@@ -240,13 +242,21 @@ def post_invoice_payable(*, invoice: PurchaseInvoice, user=None) -> Decimal:
 
 @transaction.atomic
 def record_supplier_payment(
-    *, supplier_id, amount: Decimal, payment_mode="", reference="", note="", user=None
+    *,
+    supplier_id,
+    amount: Decimal,
+    payment_mode="",
+    reference="",
+    note="",
+    payment_date=None,
+    user=None,
 ) -> Decimal:
     """Record a payment made to a supplier (−payable) and refresh the cache.
 
     Overpayment is rejected: a payment cannot exceed the current outstanding
-    (which would create an unexpected supplier credit). Returns the new
-    outstanding balance."""
+    (which would create an unexpected supplier credit). ``payment_date`` is the
+    date the payment was actually made (display/record only — balances still
+    follow posting order). Returns the new outstanding balance."""
     amount = Decimal(amount)
     if amount <= 0:
         raise serializers.ValidationError("Payment amount must be positive.")
@@ -267,6 +277,7 @@ def record_supplier_payment(
         payment_mode=payment_mode,
         reference=reference,
         note=note,
+        payment_date=payment_date,
         user=user,
     )
     return sync_supplier_outstanding_cache(supplier_id)

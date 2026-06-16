@@ -723,7 +723,7 @@ function ReceptionAttendanceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl rounded-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-primary" /> Mark Today&apos;s Attendance

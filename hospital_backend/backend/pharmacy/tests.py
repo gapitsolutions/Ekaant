@@ -771,3 +771,59 @@ class SupplierSummaryTests(TestCase):
         )
         names = {s["company_name"] for s in resp.data["data"]["items"]}
         self.assertEqual(names, {"BUP Wholesaler"})
+
+
+class SupplierPaymentDateTests(TestCase):
+    """payment_date is recorded on the payment ledger entry and surfaced in the
+    ledger row, without affecting balance ordering (display/record only)."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="paydateadmin@example.com", password="x", role="admin"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+        self.supplier = Supplier.objects.create(company_name="PayDate Pharma")
+        # Seed an outstanding payable so a payment is allowed.
+        SupplierLedgerEntry.objects.create(
+            supplier=self.supplier, entry_type="invoice", amount=Decimal("1000.00")
+        )
+        services.sync_supplier_outstanding_cache(self.supplier.id)
+
+    def test_payment_records_and_surfaces_payment_date(self):
+        resp = self.client.post(
+            f"/api/v1/pharmacy/suppliers/{self.supplier.id}/payments/",
+            {
+                "amount": "400.00",
+                "payment_mode": "bank",
+                "payment_date": "2026-06-01",
+                "reference": "UTR-9",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        entry = SupplierLedgerEntry.objects.get(
+            supplier=self.supplier, entry_type="payment"
+        )
+        self.assertEqual(entry.payment_date.isoformat(), "2026-06-01")
+
+        ledger = self.client.get(
+            f"/api/v1/pharmacy/suppliers/{self.supplier.id}/ledger/"
+        )
+        rows = ledger.data["data"]["entries"]
+        pay_row = next(r for r in rows if r["entry_type"] == "payment")
+        self.assertEqual(pay_row["payment_date"], "2026-06-01")
+        # Outstanding still correct (1000 - 400).
+        self.assertEqual(ledger.data["data"]["summary"]["outstanding"], "600.00")
+
+    def test_payment_date_optional_defaults_today(self):
+        resp = self.client.post(
+            f"/api/v1/pharmacy/suppliers/{self.supplier.id}/payments/",
+            {"amount": "100.00"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        entry = SupplierLedgerEntry.objects.get(
+            supplier=self.supplier, entry_type="payment"
+        )
+        self.assertIsNotNone(entry.payment_date)

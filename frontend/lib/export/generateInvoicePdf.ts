@@ -277,6 +277,23 @@ export async function generateInvoicePdf(
     y += 5;
   }
 
+  // ── Remarks / Notes ── (ledger remarks captured at dispense time)
+  const noteText = (invoice.notes || "").trim();
+  if (noteText) {
+    y += 2;
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor("#94a3b8");
+    doc.text("REMARKS / NOTES", 14, y);
+    y += 4;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor("#475569");
+    const lines = doc.splitTextToSize(noteText, pageWidth - 28) as string[];
+    doc.text(lines, 14, y);
+    y += lines.length * 4 + 2;
+  }
+
   // ── Footer ──
   y += 5;
   doc.setDrawColor(HOSPITAL_PRIMARY_COLOR);

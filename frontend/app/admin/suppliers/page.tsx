@@ -59,6 +59,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  Printer,
   Search,
   Shield,
   ShieldOff,
@@ -67,7 +68,6 @@ import {
   Trash2,
 } from "lucide-react";
 import {
-  addInventoryMedicine,
   createSupplier,
   deactivateSupplier,
   getInventoryMedicines,
@@ -77,13 +77,10 @@ import {
   listPurchaseInvoices,
   listSuppliers,
   recordSupplierPayment,
-  submitPurchaseInvoice,
+  updateInventoryMedicine,
   updatePurchaseInvoiceForm6,
   updateSupplier,
-  type BupStrength,
   type Medicine,
-  type MedicineCategory,
-  type PurchaseInvoiceItemPayload,
   type PurchaseInvoiceListItem,
   type Supplier,
   type SupplierCategory,
@@ -92,6 +89,9 @@ import {
   type SupplierWritePayload,
 } from "@/lib/pharmacy-api";
 import { generatePurchaseOrderPdf } from "@/lib/export/generatePurchaseOrderPdf";
+import { generateSupplierLedgerPdf } from "@/lib/export/generateSupplierLedgerPdf";
+import { PurchaseInvoiceForm } from "@/components/pharmacy/purchase-invoice-form";
+import { MedicineFormDialog } from "@/components/pharmacy/medicine-form-dialog";
 import { toastApiError, useApiErrors } from "@/lib/api-errors";
 import { FieldError } from "@/components/ui/field-error";
 import { ListPagination } from "@/components/ui/list-pagination";
@@ -534,7 +534,7 @@ export default function SuppliersPage() {
           loadSummary();
         }}
       />
-      <GlobalAddInvoiceDialog
+      <InvoiceFormDialog
         open={globalInvoiceOpen}
         onOpenChange={setGlobalInvoiceOpen}
         onSaved={() => {
@@ -762,7 +762,7 @@ function SupplierFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-2xl">
+      <DialogContent className="w-[95vw] sm:max-w-2xl rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800">{isEdit ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
           <DialogDescription className="text-slate-500">
@@ -879,12 +879,6 @@ function SupplierFormDialog({
 // Supplier detail / vendor console
 // ──────────────────────────────────────────────────────────────────────────
 
-const BUP_STRENGTHS: BupStrength[] = [
-  "0.4mg + 0.1mg",
-  "1.0mg + 0.25mg",
-  "2.0mg + 0.5mg",
-];
-
 function money(value: string | number | null | undefined): string {
   const n = typeof value === "string" ? parseFloat(value) : value ?? 0;
   if (Number.isNaN(n)) return "₹0";
@@ -910,6 +904,7 @@ function SupplierDetailView({
   const [activeTab, setActiveTab] = useState("ledger");
 
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [registerMedicineOpen, setRegisterMedicineOpen] = useState(false);
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [poOpen, setPoOpen] = useState(false);
@@ -921,6 +916,7 @@ function SupplierDetailView({
   const [ledger, setLedger] = useState<SupplierLedgerResponse | null>(null);
   const [isLoadingLedger, setIsLoadingLedger] = useState(true);
   const [ledgerFilter, setLedgerFilter] = useState<"all" | "invoice" | "payment">("all");
+  const [ledgerSearch, setLedgerSearch] = useState("");
 
   const reloadSupplier = useCallback(async () => {
     try {
@@ -1013,9 +1009,21 @@ function SupplierDetailView({
   }, [loadLedger]);
 
   const filteredLedger = (ledger?.entries || []).filter((e) => {
-    if (ledgerFilter === "invoice") return e.entry_type === "invoice";
-    if (ledgerFilter === "payment") return e.entry_type === "payment";
-    return true;
+    if (ledgerFilter === "invoice" && e.entry_type !== "invoice") return false;
+    if (ledgerFilter === "payment" && e.entry_type !== "payment") return false;
+    // Client-side search (no backend call) over the already-loaded rows —
+    // description, invoice no., reference, payment mode, and type.
+    const q = ledgerSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [
+      e.note,
+      e.invoice_number,
+      e.reference,
+      e.payment_mode,
+      e.entry_type,
+    ]
+      .filter(Boolean)
+      .some((field) => field.toLowerCase().includes(q));
   });
 
   const handleToggleForm6 = async (
@@ -1165,9 +1173,29 @@ function SupplierDetailView({
             <Shield className="h-4 w-4 text-primary" />
             <CardTitle className="text-sm font-bold text-slate-900">License Summary</CardTitle>
           </CardHeader>
-          <CardContent className="p-4 grid grid-cols-2 gap-4">
-            <SummaryTile label="GST Number" value={supplier.gst_number || "N/A"} />
-            <SummaryTile label="Drug License" value={supplier.drug_license_number || "N/A"} />
+          <CardContent className="p-4 grid grid-cols-2 gap-4 items-center min-h-[88px]">
+            <div className="bg-slate-50/60 border border-slate-100 p-3 rounded-xl flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider leading-none">GST Number (Tax ID)</span>
+                <strong className="text-[11px] sm:text-xs font-extrabold text-slate-800 block mt-1.5 leading-none font-mono truncate">
+                  {supplier.gst_number || "N/A"}
+                </strong>
+              </div>
+            </div>
+            <div className="bg-slate-50/60 border border-slate-100 p-3 rounded-xl flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-sky-500/10 flex items-center justify-center text-sky-500 shrink-0">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider leading-none">Drug License No.</span>
+                <strong className="text-[11px] sm:text-xs font-extrabold text-slate-800 block mt-1.5 leading-none font-mono truncate">
+                  {supplier.drug_license_number || "N/A"}
+                </strong>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card className="rounded-2xl border-slate-200 shadow-sm bg-white">
@@ -1228,6 +1256,36 @@ function SupplierDetailView({
                     {f === "all" ? "All" : f + "s"}
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    value={ledgerSearch}
+                    onChange={(e) => setLedgerSearch(e.target.value)}
+                    placeholder="Search ledger…"
+                    className="pl-8 h-9 w-[200px] bg-white border-slate-200 rounded-xl text-xs"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!ledger) return;
+                    void generateSupplierLedgerPdf({
+                      supplier: {
+                        company_name: supplier.company_name,
+                        gst_number: supplier.gst_number,
+                        full_address: supplier.full_address,
+                      },
+                      summary: ledger.summary,
+                      rows: filteredLedger,
+                    });
+                  }}
+                  disabled={!ledger || filteredLedger.length === 0}
+                  className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600"
+                >
+                  <Printer className="h-3.5 w-3.5 mr-1.5" /> Print Ledger
+                </Button>
               </div>
             </div>
             {isLoadingLedger ? (
@@ -1318,7 +1376,8 @@ function SupplierDetailView({
                       <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Category</TableHead>
                       <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-right">MRP</TableHead>
                       <TableHead className="font-bold uppercase text-[10px] tracking-wider text-primary text-right">Selling</TableHead>
-                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Stock</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Reorder</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px] tracking-wider text-slate-500 text-center">Balance Stock</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1339,6 +1398,7 @@ function SupplierDetailView({
                           </TableCell>
                           <TableCell className="py-3.5 px-4 text-right font-mono text-slate-700">{money(m.mrp)}</TableCell>
                           <TableCell className="py-3.5 px-4 text-right font-mono font-bold text-primary">{money(m.selling_price)}</TableCell>
+                          <TableCell className="py-3.5 px-4 text-center font-mono text-slate-500 text-xs">{m.reorder_level}</TableCell>
                           <TableCell className="py-3.5 px-4 text-center">
                             <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-lg border ${stock <= m.reorder_level ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
                               {stock} tabs
@@ -1458,15 +1518,27 @@ function SupplierDetailView({
         open={addProductOpen}
         supplier={supplier}
         onOpenChange={setAddProductOpen}
-        onSaved={() => {
+        onLinked={() => void loadProducts()}
+        onRegisterNew={() => {
           setAddProductOpen(false);
+          setRegisterMedicineOpen(true);
+        }}
+      />
+      <MedicineFormDialog
+        open={registerMedicineOpen}
+        editTarget={null}
+        presetSupplier={supplier}
+        suppliers={[supplier]}
+        onOpenChange={setRegisterMedicineOpen}
+        onSupplierCreated={() => {}}
+        onSuccess={() => {
+          setRegisterMedicineOpen(false);
           void loadProducts();
         }}
       />
-      <AddInvoiceDialog
+      <InvoiceFormDialog
         open={addInvoiceOpen}
-        supplier={supplier}
-        products={products}
+        lockedSupplier={supplier}
         onOpenChange={setAddInvoiceOpen}
         onSaved={() => {
           setAddInvoiceOpen(false);
@@ -1553,565 +1625,88 @@ function DetailMeta({
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-slate-50/60 border border-slate-100 p-3 rounded-xl">
-      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-      <strong className="text-xs font-extrabold text-slate-800 block mt-1 font-mono break-all">{value}</strong>
-    </div>
-  );
-}
 
-
-function AddProductDialog({
-  open,
-  supplier,
-  onOpenChange,
-  onSaved,
-}: {
-  open: boolean;
-  supplier: Supplier;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  const [form, setForm] = useState({
-    name: "",
-    salt: "",
-    category: "Rx" as MedicineCategory,
-    bup_category: "" as BupStrength | "",
-    manufacturer: "",
-    mrp: "",
-    selling_price: "",
-    reorder_level: "50",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const apiErrors = useApiErrors();
-
-  useEffect(() => {
-    if (open) {
-      setForm({
-        name: "",
-        salt: "",
-        category: "Rx",
-        bup_category: "",
-        manufacturer: supplier.company_name,
-        mrp: "",
-        selling_price: "",
-        reorder_level: "50",
-      });
-      apiErrors.clear();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const handleSubmit = async () => {
-    if (!form.name.trim() || !form.salt.trim()) {
-      toast.error("Name and salt are required");
-      return;
-    }
-    if (form.category === "BUP" && !form.bup_category) {
-      toast.error("Select a BUP strength");
-      return;
-    }
-    const mrp = parseFloat(form.mrp) || 0;
-    const sp = parseFloat(form.selling_price) || 0;
-    if (sp > mrp) {
-      toast.error("Selling price cannot exceed MRP");
-      return;
-    }
-    apiErrors.clear();
-    setIsSubmitting(true);
-    try {
-      await addInventoryMedicine({
-        name: form.name.trim(),
-        salt: form.salt.trim(),
-        category: form.category,
-        bup_category: form.category === "BUP" ? (form.bup_category as BupStrength) : null,
-        manufacturer: form.manufacturer.trim() || supplier.company_name,
-        reorder_level: parseInt(form.reorder_level) || 0,
-        mrp: mrp.toFixed(2),
-        selling_price: sp.toFixed(2),
-        // Link to this supplier via the Medicine.suppliers M2M.
-        supplier_ids: [supplier.id],
-      });
-      toast.success("Product added");
-      onSaved();
-    } catch (error) {
-      apiErrors.setFromError(error);
-      toastApiError(error, "Failed to add product");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" /> Add Product
-          </DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Register a product supplied by {supplier.company_name}.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="font-bold text-slate-700 text-xs uppercase">Category *</Label>
-            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v as MedicineCategory })}>
-              <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="BUP">BUP (Controlled)</SelectItem>
-                <SelectItem value="Rx">Rx (Prescription)</SelectItem>
-                <SelectItem value="NRx">NRx (General)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {form.category === "BUP" && (
-            <div className="space-y-1.5">
-              <Label className="font-bold text-slate-700 text-xs uppercase">BUP Strength *</Label>
-              <Select value={form.bup_category} onValueChange={(v) => setForm({ ...form, bup_category: v as BupStrength })}>
-                <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>
-                  {BUP_STRENGTHS.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="space-y-1.5 col-span-2">
-            <Label className="font-bold text-slate-700 text-xs uppercase">Product Name *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-slate-50 border-slate-200" />
-            <FieldError message={apiErrors.get("name")} />
-          </div>
-          <div className="space-y-1.5 col-span-2">
-            <Label className="font-bold text-slate-700 text-xs uppercase">Salt Composition *</Label>
-            <Input value={form.salt} onChange={(e) => setForm({ ...form, salt: e.target.value })} className="bg-slate-50 border-slate-200" />
-            <FieldError message={apiErrors.get("salt")} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="font-bold text-slate-700 text-xs uppercase">MRP (₹)</Label>
-            <Input type="number" value={form.mrp} onChange={(e) => setForm({ ...form, mrp: e.target.value })} className="bg-slate-50 border-slate-200" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="font-bold text-primary text-xs uppercase">Selling Price (₹)</Label>
-            <Input type="number" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} className="bg-emerald-50/30 border-primary/30 text-primary font-bold" />
-          </div>
-          <div className="space-y-1.5 col-span-2">
-            <Label className="font-bold text-slate-700 text-xs uppercase">Reorder Level (tablets)</Label>
-            <Input type="number" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} className="bg-slate-50 border-slate-200" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary-dark text-white rounded-xl">
-            {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save Product
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-
-interface InvoiceLineDraft {
-  key: string;
-  medicineId: string;
-  batchNumber: string;
-  expiryDate: string;
-  quantity: string;
-  purchasePrice: string;
-  gstPercentage: string;
-}
-
-// Shared purchase-invoice form body (no Dialog shell). Used by both the
-// per-supplier AddInvoiceDialog and the global GlobalAddInvoiceDialog so the
-// line-item editor + submit logic lives in one place. Mount it fresh per use
-// (the wrappers remount it) so its draft state always starts clean.
-function PurchaseInvoiceEditor({
-  supplier,
-  products,
-  onSaved,
-  onCancel,
-}: {
-  supplier: Supplier;
-  products: Medicine[];
-  onSaved: () => void;
-  onCancel: () => void;
-}) {
-  const today = new Date().toLocaleDateString("en-CA");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [orderDate, setOrderDate] = useState(today);
-  const [invoiceDate, setInvoiceDate] = useState(today);
-  const [deliveryDate, setDeliveryDate] = useState(today);
-  const [form6, setForm6] = useState(false);
-  const [lines, setLines] = useState<InvoiceLineDraft[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const addLine = () => {
-    setLines((prev) => [
-      ...prev,
-      {
-        key: `l-${Date.now()}-${prev.length}`,
-        medicineId: products[0]?.id || "",
-        batchNumber: "",
-        expiryDate: "",
-        quantity: "1",
-        purchasePrice: "",
-        gstPercentage: "12",
-      },
-    ]);
-  };
-
-  const updateLine = (key: string, patch: Partial<InvoiceLineDraft>) => {
-    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  };
-
-  const grandTotal = lines.reduce((sum, l) => {
-    const base = (parseFloat(l.purchasePrice) || 0) * (parseInt(l.quantity) || 0);
-    return sum + base + base * ((parseFloat(l.gstPercentage) || 0) / 100);
-  }, 0);
-
-  const handleSubmit = async () => {
-    if (!invoiceNumber.trim()) {
-      toast.error("Invoice number is required");
-      return;
-    }
-    if (lines.length === 0) {
-      toast.error("Add at least one line item");
-      return;
-    }
-    for (const l of lines) {
-      if (!l.medicineId) { toast.error("Select a product for every line"); return; }
-      if (!l.batchNumber.trim()) { toast.error("Batch number is required for every line"); return; }
-      if (!l.expiryDate) { toast.error("Expiry date is required for every line"); return; }
-      if ((parseInt(l.quantity) || 0) < 1) { toast.error("Quantity must be at least 1"); return; }
-    }
-
-    const items: PurchaseInvoiceItemPayload[] = lines.map((l) => {
-      const med = products.find((m) => m.id === l.medicineId);
-      return {
-        medicine_id: l.medicineId,
-        category: (med?.category || "Rx") as MedicineCategory,
-        subcategory: med?.bup_category || null,
-        batch_number: l.batchNumber.trim(),
-        expiry_date: l.expiryDate,
-        quantity: parseInt(l.quantity) || 0,
-        purchase_price: (parseFloat(l.purchasePrice) || 0).toFixed(2),
-        gst_percentage: (parseFloat(l.gstPercentage) || 0).toFixed(2),
-      };
-    });
-
-    setIsSubmitting(true);
-    try {
-      await submitPurchaseInvoice({
-        invoice_number: invoiceNumber.trim(),
-        supplier_id: supplier.id,
-        order_date: orderDate,
-        invoice_date: invoiceDate,
-        delivery_date: deliveryDate || null,
-        form6,
-        items,
-      });
-      toast.success(`Invoice ${invoiceNumber} saved — stock loaded.`);
-      onSaved();
-    } catch (error) {
-      toastApiError(error, "Failed to save invoice");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-emerald-600" /> Enter Purchase Invoice
-        </DialogTitle>
-        <DialogDescription className="text-slate-500">
-          Record a purchase invoice from {supplier.company_name}. Stock loads
-          into inventory on save.
-        </DialogDescription>
-      </DialogHeader>
-
-      {products.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-500">
-            Add at least one product for this supplier before recording an invoice.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="col-span-2 md:col-span-1 space-y-1.5">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Invoice No. *</Label>
-                <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="bg-slate-50 border-slate-200" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Order Date</Label>
-                <Input type="date" value={orderDate} max={invoiceDate} onChange={(e) => setOrderDate(e.target.value)} className="bg-slate-50 border-slate-200" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Invoice Date *</Label>
-                <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="bg-slate-50 border-slate-200" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Delivery Date</Label>
-                <Input type="date" value={deliveryDate} min={invoiceDate} onChange={(e) => setDeliveryDate(e.target.value)} className="bg-slate-50 border-slate-200" />
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Switch checked={form6} onCheckedChange={setForm6} className="data-[state=checked]:bg-emerald-600" />
-              Form 6 cleared for this invoice
-            </label>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-slate-500 uppercase">Line Items</Label>
-                <Button onClick={addLine} variant="outline" className="h-8 rounded-lg border-slate-200 text-xs font-bold">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Line
-                </Button>
-              </div>
-              {lines.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-4 text-center border border-dashed border-slate-200 rounded-xl">
-                  No line items yet. Click &ldquo;Add Line&rdquo;.
-                </p>
-              ) : (
-                lines.map((l) => (
-                  <div key={l.key} className="grid grid-cols-12 gap-2 items-end rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-                    <div className="col-span-12 sm:col-span-4">
-                      <Label className="text-[10px] text-slate-400">Product</Label>
-                      <Select value={l.medicineId} onValueChange={(v) => updateLine(l.key, { medicineId: v })}>
-                        <SelectTrigger className="h-9 text-xs bg-white"><SelectValue placeholder="Product" /></SelectTrigger>
-                        <SelectContent>
-                          {products.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-6 sm:col-span-2">
-                      <Label className="text-[10px] text-slate-400">Batch</Label>
-                      <Input value={l.batchNumber} onChange={(e) => updateLine(l.key, { batchNumber: e.target.value })} className="h-9 text-xs bg-white" />
-                    </div>
-                    <div className="col-span-6 sm:col-span-2">
-                      <Label className="text-[10px] text-slate-400">Expiry</Label>
-                      <Input type="date" value={l.expiryDate} onChange={(e) => updateLine(l.key, { expiryDate: e.target.value })} className="h-9 text-xs bg-white" />
-                    </div>
-                    <div className="col-span-4 sm:col-span-1">
-                      <Label className="text-[10px] text-slate-400">Qty</Label>
-                      <Input type="number" min={1} value={l.quantity} onChange={(e) => updateLine(l.key, { quantity: e.target.value })} className="h-9 text-xs bg-white text-center" />
-                    </div>
-                    <div className="col-span-4 sm:col-span-1">
-                      <Label className="text-[10px] text-slate-400">Price</Label>
-                      <Input type="number" min={0} value={l.purchasePrice} onChange={(e) => updateLine(l.key, { purchasePrice: e.target.value })} className="h-9 text-xs bg-white text-center" />
-                    </div>
-                    <div className="col-span-3 sm:col-span-1">
-                      <Label className="text-[10px] text-slate-400">GST%</Label>
-                      <Input type="number" min={0} value={l.gstPercentage} onChange={(e) => updateLine(l.key, { gstPercentage: e.target.value })} className="h-9 text-xs bg-white text-center" />
-                    </div>
-                    <div className="col-span-1 flex justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => setLines((prev) => prev.filter((x) => x.key !== l.key))} className="h-9 w-9 text-rose-500 hover:bg-rose-50">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 px-4 py-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Grand Total (incl. GST)</span>
-              <span className="text-lg font-black text-primary font-mono">{money(grandTotal)}</span>
-            </div>
-          </div>
-        )}
-
-      <DialogFooter>
-        <Button variant="outline" className="rounded-xl border-slate-200" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting || products.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">
-          {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Save Invoice
-        </Button>
-      </DialogFooter>
-    </>
-  );
-}
-
-
-// Per-supplier invoice dialog — thin shell around the shared editor. Keyed on
-// open so the editor remounts (fresh draft) each time it's opened.
-function AddInvoiceDialog({
-  open,
-  supplier,
-  products,
-  onOpenChange,
-  onSaved,
-}: {
-  open: boolean;
-  supplier: Supplier;
-  products: Medicine[];
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
-        {open && (
-          <PurchaseInvoiceEditor
-            supplier={supplier}
-            products={products}
-            onSaved={onSaved}
-            onCancel={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-
-// Global "Add Invoice" — pick any active supplier, then record an invoice
-// against it. Loads that supplier's products on selection, then reuses the
-// shared editor. Mirrors the new-feat global invoice entry point.
-function GlobalAddInvoiceDialog({
+function InvoiceFormDialog({
   open,
   onOpenChange,
+  lockedSupplier,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  lockedSupplier?: Supplier;
   onSaved: () => void;
 }) {
-  const [supplierQuery, setSupplierQuery] = useState("");
-  const [supplierResults, setSupplierResults] = useState<Supplier[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [products, setProducts] = useState<Medicine[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  // Supplier console's single invoice entry point. Wraps the SHARED
+  // PurchaseInvoiceForm (global medicine catalogue + search + document upload).
+  // With `lockedSupplier` the form is pinned to that supplier (profile Add
+  // Invoice); without it the form's own supplier selector drives a global add.
+  // Booking auto-maps the supplier onto each medicine server-side.
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+
+  const loadMedicines = useCallback(
+    () => getInventoryMedicines().then((d) => setMedicines(d.items || [])),
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
-    setSupplierQuery("");
-    setSupplierResults([]);
-    setSelectedSupplier(null);
-    setProducts([]);
-  }, [open]);
-
-  // Server-side supplier search (debounced) — no client-side 200-row cap.
-  useEffect(() => {
-    if (!open || selectedSupplier) return;
-    const handle = setTimeout(() => {
-      setIsSearching(true);
-      listSuppliers({
-        is_active: true,
-        q: supplierQuery.trim() || undefined,
-        pageSize: 20,
-      })
-        .then((data) => setSupplierResults(data.items || []))
-        .catch((error) => toastApiError(error, "Failed to search suppliers"))
-        .finally(() => setIsSearching(false));
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [open, supplierQuery, selectedSupplier]);
-
-  useEffect(() => {
-    if (!selectedSupplier) {
-      setProducts([]);
-      return;
+    setIsLoading(true);
+    const tasks: Promise<unknown>[] = [loadMedicines()];
+    if (!lockedSupplier) {
+      tasks.push(
+        listSuppliers({ is_active: true, pageSize: 200 }).then((d) =>
+          setSuppliers(d.items || []),
+        ),
+      );
     }
-    setIsLoadingProducts(true);
-    getInventoryMedicines({ supplier: selectedSupplier.id })
-      .then((data) => setProducts(data.items || []))
-      .catch((error) => toastApiError(error, "Failed to load products"))
-      .finally(() => setIsLoadingProducts(false));
-  }, [selectedSupplier]);
+    Promise.all(tasks)
+      .catch((e) => toastApiError(e, "Failed to load invoice data"))
+      .finally(() => setIsLoading(false));
+  }, [open, lockedSupplier, loadMedicines]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-emerald-600" /> Enter Purchase Invoice
-          </DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Record a purchase invoice from any vendor. Search the supplier to begin.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-1.5">
-          <Label className="text-xs font-bold text-slate-500 uppercase">Supplier *</Label>
-          {selectedSupplier ? (
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
-              <span className="font-bold text-slate-800 text-sm">{selectedSupplier.company_name}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-slate-500 hover:text-slate-900"
-                onClick={() => setSelectedSupplier(null)}
-              >
-                Change
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  autoFocus
-                  value={supplierQuery}
-                  onChange={(e) => setSupplierQuery(e.target.value)}
-                  placeholder="Search supplier by name / contact / GST…"
-                  className="pl-8 bg-slate-50 border-slate-200"
-                />
-              </div>
-              <div className="mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-50">
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Spinner className="h-4 w-4 text-primary" />
-                  </div>
-                ) : supplierResults.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-slate-400">
-                    {supplierQuery.trim() ? "No matching suppliers." : "Type to search suppliers."}
-                  </p>
-                ) : (
-                  supplierResults.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSelectedSupplier(s)}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors"
-                    >
-                      <span className="font-semibold text-slate-800 text-sm">{s.company_name}</span>
-                      {s.contact_person && (
-                        <span className="text-xs text-slate-400 ml-2">{s.contact_person}</span>
-                      )}
-                    </button>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {!selectedSupplier ? (
-          <p className="py-6 text-center text-sm text-slate-400">
-            Search and select a supplier to enter invoice details.
-          </p>
-        ) : isLoadingProducts ? (
-          <div className="flex items-center justify-center py-10">
-            <Spinner className="h-5 w-5 text-primary" />
+      <DialogContent className="w-[97vw] sm:max-w-6xl rounded-2xl p-0 overflow-hidden max-h-[92vh] overflow-y-auto">
+        <DialogTitle className="sr-only">Enter purchase invoice</DialogTitle>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Spinner className="h-6 w-6 text-primary" />
           </div>
         ) : (
-          <PurchaseInvoiceEditor
-            key={selectedSupplier.id}
-            supplier={selectedSupplier}
-            products={products}
-            onSaved={onSaved}
-            onCancel={() => onOpenChange(false)}
+          <PurchaseInvoiceForm
+            key={lockedSupplier?.id ?? "global"}
+            medicines={medicines}
+            suppliers={suppliers}
+            lockedSupplier={lockedSupplier}
+            onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
+            onRegisterMedicine={() => setRegisterOpen(true)}
+            onSuccess={onSaved}
+            title={
+              lockedSupplier
+                ? `Add Invoice — ${lockedSupplier.company_name}`
+                : "Enter Purchase Invoice"
+            }
           />
         )}
+        {/* Inline "New medicine" from the invoice flow (Option B). Newly
+            registered medicines are refetched so they're immediately
+            selectable; presetSupplier links it to the pinned supplier. */}
+        <MedicineFormDialog
+          open={registerOpen}
+          editTarget={null}
+          presetSupplier={lockedSupplier}
+          suppliers={lockedSupplier ? [lockedSupplier] : suppliers}
+          onOpenChange={setRegisterOpen}
+          onSupplierCreated={(s) => setSuppliers((prev) => [s, ...prev])}
+          onSuccess={() => {
+            setRegisterOpen(false);
+            void loadMedicines();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -2127,7 +1722,7 @@ function InvoiceDetailDialog({
 }) {
   return (
     <Dialog open={invoice !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl w-[95vw] rounded-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl rounded-2xl max-h-[85vh] overflow-y-auto">
         {invoice && (
           <>
             <DialogHeader>
@@ -2195,6 +1790,215 @@ function InvoiceDetailDialog({
 }
 
 
+// Add Product — first asks whether to link a PREDEFINED medicine (search the
+// global catalogue → link to this supplier via the Medicine.suppliers M2M) or
+// REGISTER a brand-new one (delegates to the shared MedicineFormDialog via
+// onRegisterNew). Linking reuses updateInventoryMedicine with a merged
+// supplier_ids list so other links aren't dropped.
+function AddProductDialog({
+  open,
+  supplier,
+  onOpenChange,
+  onLinked,
+  onRegisterNew,
+}: {
+  open: boolean;
+  supplier: Supplier;
+  onOpenChange: (open: boolean) => void;
+  onLinked: () => void;
+  onRegisterNew: () => void;
+}) {
+  const [mode, setMode] = useState<"choose" | "existing">("choose");
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setMode("choose");
+    setSearch("");
+    setIsLoading(true);
+    getInventoryMedicines()
+      .then((d) => setMedicines(d.items || []))
+      .catch((e) => toastApiError(e, "Failed to load medicines"))
+      .finally(() => setIsLoading(false));
+  }, [open]);
+
+  const isLinked = (m: Medicine) =>
+    (m.suppliers || []).some((s) => s.id === supplier.id);
+
+  const filtered = medicines.filter((m) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      m.name.toLowerCase().includes(q) || m.salt.toLowerCase().includes(q)
+    );
+  });
+
+  const linkMedicine = async (m: Medicine) => {
+    if (isLinked(m)) return;
+    setLinkingId(m.id);
+    try {
+      const merged = Array.from(
+        new Set([...(m.suppliers || []).map((s) => s.id), supplier.id]),
+      );
+      await updateInventoryMedicine(m.id, { supplier_ids: merged });
+      toast.success(`${m.name} linked to ${supplier.company_name}`);
+      setMedicines((prev) =>
+        prev.map((x) =>
+          x.id === m.id
+            ? {
+                ...x,
+                suppliers: [
+                  ...(x.suppliers || []),
+                  {
+                    id: supplier.id,
+                    company_name: supplier.company_name,
+                    is_active: supplier.is_active,
+                    categories: supplier.categories,
+                  },
+                ],
+              }
+            : x,
+        ),
+      );
+      onLinked();
+    } catch (e) {
+      toastApiError(e, "Failed to link medicine");
+    } finally {
+      setLinkingId(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px] rounded-2xl bg-white p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-3 border-b border-slate-100">
+          <DialogTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+            <Package className="h-5 w-5 text-primary" /> Add Product
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-400 mt-1">
+            Link a product to {supplier.company_name}.
+          </DialogDescription>
+        </DialogHeader>
+
+        {mode === "choose" ? (
+          <div className="p-6 grid sm:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setMode("existing")}
+              className="text-left rounded-2xl border border-slate-200 bg-slate-50/50 hover:border-primary/40 hover:bg-primary/5 transition-all p-5 group"
+            >
+              <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3">
+                <Package className="h-5 w-5" />
+              </div>
+              <p className="font-bold text-slate-800 text-sm">Predefined formulation</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Pick an existing medicine from the catalogue and link it to this supplier.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={onRegisterNew}
+              className="text-left rounded-2xl border border-slate-200 bg-slate-50/50 hover:border-primary/40 hover:bg-primary/5 transition-all p-5 group"
+            >
+              <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3">
+                <Plus className="h-5 w-5" />
+              </div>
+              <p className="font-bold text-slate-800 text-sm">Register new medicine</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Create a brand-new medicine; it will be linked to this supplier.
+              </p>
+            </button>
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search catalogue by name or salt…"
+                autoFocus
+                className="pl-9 h-10 rounded-xl bg-slate-50 border-slate-200 text-xs"
+              />
+            </div>
+            <div className="max-h-[340px] overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-50">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Spinner className="h-5 w-5 text-primary" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <p className="py-8 text-center text-xs text-slate-400 font-bold">
+                  No medicines match your search.
+                </p>
+              ) : (
+                filtered.map((m) => {
+                  const linked = isLinked(m);
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-slate-50/60"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 text-sm truncate">{m.name}</p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {m.salt} · {m.category}
+                          {m.bup_category ? ` · ${m.bup_category}` : ""}
+                        </p>
+                      </div>
+                      {linked ? (
+                        <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold shrink-0">
+                          Linked
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => void linkMedicine(m)}
+                          disabled={linkingId === m.id}
+                          className="h-8 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs font-bold shrink-0"
+                        >
+                          {linkingId === m.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Link
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="p-4 border-t border-slate-100 bg-white">
+          {mode === "existing" && (
+            <Button
+              variant="outline"
+              className="rounded-xl border-slate-200 font-bold mr-auto"
+              onClick={() => setMode("choose")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            className="rounded-xl border-slate-200 font-bold"
+            onClick={() => onOpenChange(false)}
+          >
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MakePaymentDialog({
   open,
   supplier,
@@ -2208,8 +2012,10 @@ function MakePaymentDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const today = new Date().toLocaleDateString("en-CA");
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<"cash" | "online" | "bank">("online");
+  const [paymentDate, setPaymentDate] = useState(today);
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2218,9 +2024,11 @@ function MakePaymentDialog({
     if (open) {
       setAmount("");
       setMode("online");
+      setPaymentDate(today);
       setReference("");
       setNote("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const due = parseFloat(outstanding) || 0;
@@ -2235,11 +2043,16 @@ function MakePaymentDialog({
       toast.error("Payment cannot exceed the outstanding balance");
       return;
     }
+    if (!paymentDate) {
+      toast.error("Select a payment date");
+      return;
+    }
     setIsSubmitting(true);
     try {
       await recordSupplierPayment(supplier.id, {
         amount: value.toFixed(2),
         payment_mode: mode,
+        payment_date: paymentDate,
         reference: reference.trim(),
         note: note.trim(),
       });
@@ -2254,47 +2067,55 @@ function MakePaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+      <DialogContent className="sm:max-w-[480px] rounded-2xl bg-white p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-3 border-b border-slate-100">
+          <DialogTitle className="text-base font-black text-slate-800 flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" /> Make Payment
           </DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Record a payment to {supplier.company_name}.
+          <DialogDescription className="text-xs text-slate-400 mt-1">
+            Record a payment made to {supplier.company_name}.
           </DialogDescription>
         </DialogHeader>
-        <div className={`flex items-center justify-between rounded-xl px-4 py-3 border ${due > 0 ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}`}>
-          <p className={`text-xs font-bold uppercase tracking-wider ${due > 0 ? "text-rose-500" : "text-emerald-600"}`}>Outstanding</p>
-          <p className={`text-lg font-extrabold ${due > 0 ? "text-rose-600" : "text-emerald-600"}`}>{money(due)}</p>
+        <div className="p-6 pt-4 space-y-4">
+          <div className={`flex items-center justify-between rounded-xl px-4 py-3 border ${due > 0 ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}`}>
+            <p className={`text-xs font-bold uppercase tracking-wider ${due > 0 ? "text-rose-500" : "text-emerald-600"}`}>
+              {due > 0 ? "Outstanding Balance" : "No Outstanding Balance"}
+            </p>
+            <p className={`text-lg font-extrabold ${due > 0 ? "text-rose-600" : "text-emerald-600"}`}>{money(due)}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Amount (₹) *</Label>
+              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-10 rounded-xl bg-slate-50 border-slate-200" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Payment Date *</Label>
+              <Input type="date" value={paymentDate} max={today} onChange={(e) => setPaymentDate(e.target.value)} className="h-10 rounded-xl bg-slate-50 border-slate-200" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Payment Mode *</Label>
+              <Select value={mode} onValueChange={(v) => setMode(v as "cash" | "online" | "bank")}>
+                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Reference / UTR</Label>
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. UTR123456" className="h-10 rounded-xl bg-slate-50 border-slate-200 font-mono" />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Note (Optional)</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Payment for invoice SUN-0091" className="h-10 rounded-xl bg-slate-50 border-slate-200" />
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Amount (₹) *</Label>
-            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-slate-50 border-slate-200" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Mode *</Label>
-            <Select value={mode} onValueChange={(v) => setMode(v as "cash" | "online" | "bank")}>
-              <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="online">Online</SelectItem>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="bank">Bank</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5 col-span-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Reference / UTR</Label>
-            <Input value={reference} onChange={(e) => setReference(e.target.value)} className="bg-slate-50 border-slate-200 font-mono" />
-          </div>
-          <div className="space-y-1.5 col-span-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Note</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} className="bg-slate-50 border-slate-200" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || due <= 0} className="bg-primary hover:bg-primary-dark text-white rounded-xl">
+        <DialogFooter className="p-4 border-t border-slate-100 bg-white">
+          <Button variant="outline" className="rounded-xl border-slate-200 font-bold" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting || due <= 0} className="bg-primary hover:bg-primary-dark text-white rounded-xl font-bold">
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Record Payment
           </Button>
@@ -2359,6 +2180,12 @@ function GeneratePoDialog({
     setDraft((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
   const selectedCount = Object.values(draft).filter((d) => d.selected).length;
+  const grandTotal = Object.values(draft)
+    .filter((d) => d.selected)
+    .reduce((sum, d) => {
+      const base = (parseInt(d.quantity) || 0) * (parseFloat(d.price) || 0);
+      return sum + base + base * ((parseFloat(d.gst) || 0) / 100);
+    }, 0);
 
   const handleGenerate = async () => {
     const items = Object.values(draft)
@@ -2405,99 +2232,133 @@ function GeneratePoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] rounded-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-primary" /> Generate Purchase Order
+      <DialogContent className="w-[96vw] sm:max-w-5xl rounded-2xl bg-white p-0 overflow-hidden max-h-[92vh] flex flex-col gap-0">
+        <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
+          <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+            <FileSpreadsheet className="h-6 w-6 text-violet-600" /> Purchase Order Generator
           </DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Select products and quantities to send to {supplier.company_name}.
-            Downloads a PDF — purchase orders are not stored.
+          <DialogDescription className="text-sm font-semibold text-slate-500 mt-1">
+            Select items and quantities to generate a print-ready Purchase Order
+            for {supplier.company_name}. (PO PDF only — not stored.)
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">PO Number</Label>
-            <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="bg-slate-50 border-slate-200 font-mono" />
+        <div className="p-6 space-y-6 overflow-y-auto bg-slate-50/30">
+          {/* Meta inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold text-slate-500 uppercase">PO Number</Label>
+              <Input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="rounded-xl border-slate-200 h-9 font-mono text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold text-slate-500 uppercase">Order Date</Label>
+              <Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="rounded-xl border-slate-200 h-9 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold text-slate-500 uppercase">Expected Delivery</Label>
+              <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="rounded-xl border-slate-200 h-9 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold text-slate-500 uppercase">Payment Terms</Label>
+              <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                <SelectTrigger className="h-9 rounded-xl border-slate-200 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Net 30">Net 30</SelectItem>
+                  <SelectItem value="Net 15">Net 15</SelectItem>
+                  <SelectItem value="COD">COD</SelectItem>
+                  <SelectItem value="Advance">Advance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold text-slate-500 uppercase">Dispatch Method</Label>
+              <Select value={dispatchMethod} onValueChange={setDispatchMethod}>
+                <SelectTrigger className="h-9 rounded-xl border-slate-200 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Courier">Courier</SelectItem>
+                  <SelectItem value="Road Transporter">Road Transporter</SelectItem>
+                  <SelectItem value="Self Pickup">Self Pickup</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Order Date</Label>
-            <Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="bg-slate-50 border-slate-200" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Expected</Label>
-            <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="bg-slate-50 border-slate-200" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Payment Terms</Label>
-            <Select value={paymentTerms} onValueChange={setPaymentTerms}>
-              <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Net 30">Net 30</SelectItem>
-                <SelectItem value="Net 15">Net 15</SelectItem>
-                <SelectItem value="COD">COD</SelectItem>
-                <SelectItem value="Advance">Advance</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Dispatch</Label>
-            <Select value={dispatchMethod} onValueChange={setDispatchMethod}>
-              <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Courier">Courier</SelectItem>
-                <SelectItem value="Road Transporter">Road Transporter</SelectItem>
-                <SelectItem value="Self Pickup">Self Pickup</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <div className="border border-slate-200 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase">
-                <th className="py-2.5 px-3 w-10"></th>
-                <th className="py-2.5 px-3">Product</th>
-                <th className="py-2.5 px-3 text-center w-24">Qty</th>
-                <th className="py-2.5 px-3 text-center w-28">Unit Price</th>
-                <th className="py-2.5 px-3 text-center w-20">GST%</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {products.map((m) => {
-                const d = draft[m.id];
-                if (!d) return null;
-                return (
-                  <tr key={m.id} className={d.selected ? "bg-primary/5" : "hover:bg-slate-50/50"}>
-                    <td className="py-2 px-3 text-center">
-                      <Checkbox checked={d.selected} onCheckedChange={(c) => update(m.id, { selected: c === true })} />
-                    </td>
-                    <td className="py-2 px-3 font-bold text-slate-800">{m.name}</td>
-                    <td className="py-2 px-3">
-                      <Input type="number" min={1} value={d.quantity} disabled={!d.selected} onChange={(e) => update(m.id, { quantity: e.target.value })} className="h-8 text-xs bg-white text-center" />
-                    </td>
-                    <td className="py-2 px-3">
-                      <Input type="number" min={0} value={d.price} disabled={!d.selected} onChange={(e) => update(m.id, { price: e.target.value })} className="h-8 text-xs bg-white text-center" />
-                    </td>
-                    <td className="py-2 px-3">
-                      <Input type="number" min={0} value={d.gst} disabled={!d.selected} onChange={(e) => update(m.id, { gst: e.target.value })} className="h-8 text-xs bg-white text-center" />
-                    </td>
+          {/* Catalog items */}
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Select Catalog Items</h4>
+            <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden shadow-sm overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[680px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-2.5 px-4 text-center w-12">Select</th>
+                    <th className="py-2.5 px-4">Item &amp; Composition</th>
+                    <th className="py-2.5 px-4 text-center">Stock / Reorder</th>
+                    <th className="py-2.5 px-4 text-center w-24">Order Qty</th>
+                    <th className="py-2.5 px-4 text-right w-28">Unit Price (₹)</th>
+                    <th className="py-2.5 px-4 text-center w-20">GST %</th>
+                    <th className="py-2.5 px-4 text-right w-28">Total (₹)</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {products.map((m) => {
+                    const d = draft[m.id];
+                    if (!d) return null;
+                    const stock = (m.batches || []).reduce((s, b) => s + (b.quantity || 0), 0);
+                    const base = d.selected ? (parseInt(d.quantity) || 0) * (parseFloat(d.price) || 0) : 0;
+                    const lineTotal = base + base * ((parseFloat(d.gst) || 0) / 100);
+                    return (
+                      <tr key={m.id} className={d.selected ? "bg-violet-50/40" : "hover:bg-slate-50/50"}>
+                        <td className="py-3 px-4 text-center">
+                          <Checkbox
+                            checked={d.selected}
+                            onCheckedChange={(c) => update(m.id, { selected: c === true })}
+                            className="data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
+                          />
+                        </td>
+                        <td className="py-3 px-4">
+                          <p className="font-extrabold text-slate-800">{m.name}</p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{m.salt}</p>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <p className={`font-bold ${stock <= m.reorder_level ? "text-amber-600" : "text-slate-600"}`}>
+                            {stock} / {m.reorder_level}
+                          </p>
+                          <p className="text-[9px] text-slate-400">Current / Target</p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Input type="number" min={1} value={d.quantity} disabled={!d.selected} onChange={(e) => update(m.id, { quantity: e.target.value })} className="h-8 rounded-lg border-slate-200 text-center text-xs font-semibold" />
+                        </td>
+                        <td className="py-3 px-4">
+                          <Input type="number" min={0} value={d.price} disabled={!d.selected} onChange={(e) => update(m.id, { price: e.target.value })} className="h-8 rounded-lg border-slate-200 text-center text-xs font-semibold" />
+                        </td>
+                        <td className="py-3 px-4">
+                          <Input type="number" min={0} value={d.gst} disabled={!d.selected} onChange={(e) => update(m.id, { gst: e.target.value })} className="h-8 rounded-lg border-slate-200 text-center text-xs font-semibold" />
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-slate-800 font-mono">
+                          {d.selected ? money(lineTotal) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => onOpenChange(false)} disabled={isGenerating}>Cancel</Button>
-          <Button onClick={handleGenerate} disabled={isGenerating || selectedCount === 0} className="bg-primary hover:bg-primary-dark text-white rounded-xl">
-            {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-            Generate PDF ({selectedCount})
-          </Button>
-        </DialogFooter>
+        <div className="p-6 border-t border-slate-100 bg-white flex items-center justify-between gap-4">
+          <div className="text-xs">
+            <span className="text-slate-400 font-bold uppercase tracking-wider block leading-none">Order Grand Total</span>
+            <span className="text-lg font-black text-violet-600 block mt-1 leading-none font-mono">{money(grandTotal)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="rounded-xl border-slate-200 font-bold" onClick={() => onOpenChange(false)} disabled={isGenerating}>Cancel</Button>
+            <Button onClick={handleGenerate} disabled={isGenerating || selectedCount === 0} className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold">
+              {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Generate PDF ({selectedCount})
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

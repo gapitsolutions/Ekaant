@@ -895,7 +895,8 @@ export async function getSupplier(supplierId: string): Promise<Supplier> {
 // ── Supplier payables ledger (admin-only) ──
 export interface SupplierLedgerRow {
   id: string;
-  date: string;
+  date: string; // payment_date for payments, else posting time
+  payment_date: string | null;
   entry_type: "invoice" | "payment" | "adjustment";
   credit: string; // invoice booked (+payable)
   debit: string; // payment made (−payable)
@@ -930,6 +931,7 @@ export interface SupplierPaymentPayload {
   payment_mode?: "cash" | "online" | "bank";
   reference?: string;
   note?: string;
+  payment_date?: string; // YYYY-MM-DD; defaults to today server-side
 }
 
 export async function recordSupplierPayment(
