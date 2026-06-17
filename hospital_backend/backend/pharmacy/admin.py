@@ -1,4 +1,8 @@
+import csv
+
 from django.contrib import admin
+from django.http import StreamingHttpResponse
+from django.utils import timezone
 
 from .models import (
     DispenseInvoice,
@@ -13,6 +17,47 @@ from .models import (
     Supplier,
     SupplierLedgerEntry,
 )
+
+
+class _CsvEcho:
+    """File-like object whose ``write`` just returns the value — lets
+    ``csv.writer`` feed a ``StreamingHttpResponse`` generator row by row
+    instead of buffering the whole export in memory (Django docs pattern)."""
+
+    def write(self, value):
+        return value
+
+
+class ExportCsvMixin:
+    """Adds an admin action that streams the *currently filtered/searched*
+    changelist queryset to CSV.
+
+    The action receives the queryset Django already narrowed by the active
+    search box, list filters and date hierarchy — so ticking "select all N
+    that match" exports exactly that search, not just the visible page.
+    Subclasses declare ``csv_export_columns`` as ``(header, accessor)`` pairs.
+    """
+
+    # tuple[ tuple[str, Callable[[Model], object]] , ... ]
+    csv_export_columns: tuple = ()
+    csv_filename_prefix = "export"
+
+    @admin.action(description="Export to CSV (current search & filters)")
+    def export_as_csv(self, request, queryset):
+        headers = [header for header, _ in self.csv_export_columns]
+        accessors = [accessor for _, accessor in self.csv_export_columns]
+        writer = csv.writer(_CsvEcho())
+
+        def stream():
+            yield writer.writerow(headers)
+            for obj in queryset.iterator():
+                yield writer.writerow([accessor(obj) for accessor in accessors])
+
+        stamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
+        filename = f"{self.csv_filename_prefix}-{stamp}.csv"
+        response = StreamingHttpResponse(stream(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 class SupplierLedgerEntryInline(admin.TabularInline):
@@ -317,8 +362,8 @@ class StockAuditRemovalAdmin(admin.ModelAdmin):
 
 
 @admin.register(StockMovement)
-class StockMovementAdmin(admin.ModelAdmin):
-    """Append-only ledger — fully read-only in admin."""
+class StockMovementAdmin(ExportCsvMixin, admin.ModelAdmin):
+    """Append-only ledger — fully read-only in admin, exportable to CSV."""
 
     list_display = (
         "performed_at",
@@ -340,6 +385,33 @@ class StockMovementAdmin(admin.ModelAdmin):
     date_hierarchy = "performed_at"
     ordering = ("-performed_at",)
     list_select_related = ("medicine", "batch", "performed_by")
+
+    actions = ("export_as_csv",)
+    csv_filename_prefix = "stock-movement-ledger"
+    csv_export_columns = (
+        # performed_at is stored UTC (auto_now_add + USE_TZ); export IST so the
+        # spreadsheet matches the admin list and the rest of the app.
+        ("Performed At (IST)", lambda o: timezone.localtime(o.performed_at).strftime("%Y-%m-%d %H:%M:%S")),
+        ("Movement Type", lambda o: o.get_movement_type_display()),
+        ("Medicine", lambda o: o.medicine.name if o.medicine_id else ""),
+        ("Salt", lambda o: o.medicine.salt if o.medicine_id else ""),
+        ("Category", lambda o: o.medicine.category if o.medicine_id else ""),
+        ("Batch", lambda o: o.batch.batch_number if o.batch_id else ""),
+        ("Quantity Change", lambda o: o.quantity_change),
+        ("Quantity Before", lambda o: o.quantity_before),
+        ("Quantity After", lambda o: o.quantity_after),
+        ("Reference Type", lambda o: o.reference_type),
+        ("Reference ID", lambda o: str(o.reference_id) if o.reference_id else ""),
+        ("Performed By", lambda o: o.performed_by.full_name if o.performed_by_id else ""),
+        ("Notes", lambda o: o.notes),
+    )
+
+    def get_queryset(self, request):
+        # Ensure the FK columns in the CSV don't trigger N+1 during the
+        # streamed export (the action's queryset derives from this).
+        return super().get_queryset(request).select_related(
+            "medicine", "batch", "performed_by"
+        )
 
     def has_add_permission(self, request):
         return False
