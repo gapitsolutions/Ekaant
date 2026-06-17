@@ -746,7 +746,10 @@ class DispenseInvoiceListItemSerializer(serializers.Serializer):
             "amount_paid": invoice.amount_paid,
             "outstanding": invoice.invoice_outstanding,
             "date": invoice.dispense_date,
-            "time": invoice.dispense_time.strftime("%I:%M %p"),
+            # ``dispense_time`` is stored UTC (auto_now_add + USE_TZ); convert
+            # to the active timezone (Asia/Kolkata) before formatting so the
+            # displayed clock matches the Django admin / IST, not UTC.
+            "time": timezone.localtime(invoice.dispense_time).strftime("%I:%M %p"),
             "pharmacist": invoice.dispensed_by.full_name
             if invoice.dispensed_by_id
             else "",

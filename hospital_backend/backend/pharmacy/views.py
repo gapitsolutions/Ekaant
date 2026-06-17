@@ -657,8 +657,9 @@ class ProductDispenseHistoryView(APIView):
                 # The earlier ``dispense_date`` field was a pure ``date``
                 # which made every row render the same midnight time on
                 # the frontend. Callers needing the date alone can derive
-                # it from this datetime.
-                "dispense_time": item.dispense_invoice.dispense_time,
+                # it from this datetime. Stored UTC (auto_now_add); emitted
+                # in the active tz (+05:30) so the displayed clock is IST.
+                "dispense_time": timezone.localtime(item.dispense_invoice.dispense_time),
                 "patient_name": item.dispense_invoice.patient.full_name,
                 # Human-facing identifier; replaces the previous
                 # ``patient_id`` (UUID) which leaked the internal PK into
@@ -757,7 +758,9 @@ class DispenseCreateView(APIView):
                 "cash_amount": invoice.cash_amount,
                 "online_amount": invoice.online_amount,
                 "item_count": invoice.items.count(),
-                "dispensed_at": invoice.dispense_time,
+                # Stored UTC (auto_now_add); emit in the active tz so the ISO
+                # offset reads +05:30 (matches Django admin / blueprint §7.13).
+                "dispensed_at": timezone.localtime(invoice.dispense_time),
                 "dispensed_by": invoice.dispensed_by.full_name,
                 "current_stage": VisitStage.COMPLETED,
                 "status": invoice.status,
@@ -786,7 +789,7 @@ def _dispense_invoice_detail_payload(invoice: DispenseInvoice) -> dict:
     ]
     amendments = [
         {
-            "amended_at": amendment.amended_at,
+            "amended_at": timezone.localtime(amendment.amended_at),
             "amended_by_name": (
                 amendment.amended_by.full_name if amendment.amended_by_id else ""
             ),
@@ -801,7 +804,9 @@ def _dispense_invoice_detail_payload(invoice: DispenseInvoice) -> dict:
         "patient_id": str(invoice.patient_id),
         "patient_name": invoice.patient.full_name if invoice.patient_id else "",
         "dispense_date": invoice.dispense_date,
-        "dispense_time": invoice.dispense_time,
+        # Stored UTC (auto_now_add); emit in the active tz (+05:30) so clients
+        # that string-slice the ISO see the IST date/clock, not UTC.
+        "dispense_time": timezone.localtime(invoice.dispense_time),
         "subtotal": str(invoice.subtotal),
         "consultation_fee": str(invoice.consultation_fee),
         "discount_percentage": str(invoice.discount_percentage),
