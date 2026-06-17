@@ -137,3 +137,5 @@ Changes affecting these modules require:
 - verification of related reports and dashboards
 
 Do not treat them as isolated CRUD operations.
+
+Read the ENGINEERING_PATTERNS.md file to understand how to code.
