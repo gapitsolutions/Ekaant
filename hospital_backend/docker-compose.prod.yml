@@ -57,6 +57,10 @@ services:
       - backend
     environment:
       DOMAIN_NAME: ${DOMAIN_NAME:-api.example.com}
+      # Log timestamps in local time. nginx:alpine ships no tzdata, so the
+      # zoneinfo file is shared from the host (see the /etc/localtime mount)
+      # rather than resolved from this name — keep the host on the same TZ.
+      TZ: ${TZ:-Asia/Kolkata}
     ports:
       - "80:80"
       - "443:443"
@@ -64,6 +68,9 @@ services:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ${LETSENCRYPT_PATH:-/srv/hospital/letsencrypt}:/etc/letsencrypt
       - ${CERTBOT_WWW_PATH:-/srv/hospital/certbot-www}:/var/www/certbot
+      # Host is IST (timedatectl); share its zoneinfo so access-log
+      # timestamps read +0530 instead of UTC. Read-only.
+      - /etc/localtime:/etc/localtime:ro
 
   certbot:
     image: certbot/certbot:latest
