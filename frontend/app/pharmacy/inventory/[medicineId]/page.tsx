@@ -20,7 +20,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Activity, AlertTriangle, ArrowLeft, Calendar, Download, Loader2, Package, Pill } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeft, Calendar, Download, Loader2, Package, Pill, RotateCcw } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { navigate } from "@/lib/navigation";
 import {
   getMedicineById,
@@ -28,6 +35,12 @@ import {
   type Medicine,
   type ProductDispenseHistoryItem,
 } from "@/lib/pharmacy-api";
+import {
+  generateProductDispenseHistoryCsv,
+  PRODUCT_DISPENSE_HISTORY_COLUMNS,
+  DEFAULT_DISPENSE_HISTORY_COLUMNS,
+  type ProductDispenseHistoryColumnKey,
+} from "@/lib/export/generateProductDispenseHistoryCsv";
 
 type FilterMode = "month" | "day";
 
@@ -47,6 +60,11 @@ export default function MedicineDetailPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  // Columns chosen for CSV export — initialised to the helper's defaults.
+  const [exportColumns, setExportColumns] = useState<
+    ProductDispenseHistoryColumnKey[]
+  >(DEFAULT_DISPENSE_HISTORY_COLUMNS);
 
   const loadHistory = useCallback(() => {
     if (!medicineId) return Promise.resolve();
@@ -88,43 +106,21 @@ export default function MedicineDetailPage() {
     return medicine.batches?.reduce((s, b) => s + (b.quantity || 0), 0) || 0;
   }, [medicine]);
 
+  const toggleExportColumn = (key: ProductDispenseHistoryColumnKey) => {
+    setExportColumns((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
   const handleExportCSV = () => {
-    if (items.length === 0) return;
-    const header = [
-      "Date",
-      "Time",
-      "Patient Name",
-      "File Number",
-      "Batch Number",
-      "Expiry Date",
-      "Quantity",
-      "Total Price",
-    ];
-    const rows = items.map((it) => {
-      const dt = new Date(it.dispense_time);
-      return [
-        dt.toLocaleDateString("en-IN"),
-        dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-        it.patient_name,
-        it.file_number || "",
-        it.batch_number,
-        it.expiry_date,
-        it.quantity,
-        it.total_price,
-      ];
-    });
-    const csv = [header, ...rows]
-      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${medicine?.name || "medicine"}_dispense_history.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (items.length === 0 || exportColumns.length === 0) return;
+    generateProductDispenseHistoryCsv(
+      items,
+      medicine,
+      exportColumns,
+      medicine?.name,
+    );
+    setExportOpen(false);
   };
 
   const isLowStock = medicine ? currentStock <= medicine.reorder_level : false;
@@ -240,16 +236,64 @@ export default function MedicineDetailPage() {
                   />
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleExportCSV}
-                disabled={items.length === 0}
-                className="h-10 w-10 rounded-lg border-slate-200 bg-white hover:bg-slate-50"
-                title="Download CSV"
-              >
-                <Download className="h-4 w-4 text-slate-500" />
-              </Button>
+              <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={items.length === 0}
+                    className="h-10 rounded-lg border-slate-200 bg-white hover:bg-slate-50 gap-2 font-medium text-slate-600"
+                    title="Export CSV"
+                  >
+                    <Download className="h-4 w-4 text-slate-500" />
+                    Export CSV
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-0 rounded-xl">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Columns to export
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExportColumns(DEFAULT_DISPENSE_HISTORY_COLUMNS)
+                      }
+                      className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                      title="Reset to default selection"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Defaults
+                    </button>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto px-4 py-2 space-y-0.5">
+                    {PRODUCT_DISPENSE_HISTORY_COLUMNS.map((col) => (
+                      <label
+                        key={col.key}
+                        className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none"
+                      >
+                        <Checkbox
+                          checked={exportColumns.includes(col.key)}
+                          onCheckedChange={() => toggleExportColumn(col.key)}
+                        />
+                        <span className="text-sm font-medium text-slate-700">
+                          {col.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <Separator />
+                  <div className="px-4 py-3">
+                    <Button
+                      onClick={handleExportCSV}
+                      disabled={exportColumns.length === 0 || items.length === 0}
+                      className="w-full h-9 rounded-lg gap-2 font-semibold"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export {exportColumns.length} field
+                      {exportColumns.length === 1 ? "" : "s"}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </CardHeader>
