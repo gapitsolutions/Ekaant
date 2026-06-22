@@ -24,8 +24,12 @@ STAMP="$(date +%Y-%m-%d_%H-%M-%S)"
 OUT_FILE="$BACKUP_DIR/hospital_db_$STAMP.sql.gz"
 
 echo "Creating backup: $OUT_FILE"
+# --clean --if-exists makes the dump self-contained: each object is dropped
+# (IF EXISTS, so it's a harmless no-op on a fresh/empty database) before being
+# recreated. Restore therefore works both into an empty DB and over an existing
+# one, so restore order no longer matters. See docs/SERVER_MIGRATION.md.
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T postgres \
-  pg_dump -U "$DB_USER" -d "$DB_NAME" | gzip > "$OUT_FILE"
+  pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists | gzip > "$OUT_FILE"
 
 echo "Removing backups older than $RETENTION_DAYS days"
 find "$BACKUP_DIR" -type f -name "hospital_db_*.sql.gz" -mtime "+$RETENTION_DAYS" -delete
