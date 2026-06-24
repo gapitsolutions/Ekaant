@@ -45,12 +45,14 @@ import {
   Pencil,
   Plus,
   Trash2,
+  History,
 } from "lucide-react";
 import {
   amendDispense,
   getDispenseHistory,
   getDispenseInvoiceBySession,
   getInventoryMedicines,
+  type DispenseAmendmentInfo,
   type DispenseHistoryItem,
   type DispenseHistoryStats,
   type DispenseInvoiceDetail,
@@ -61,6 +63,7 @@ import {
 } from "@/lib/pharmacy-api";
 import { toastApiError } from "@/lib/api-errors";
 import { generateInvoicePdf } from "@/lib/export/generateInvoicePdf";
+import { AmendmentHistoryDialog } from "@/components/pharmacy/amendment-history-dialog";
 
 type ActiveInvoice = {
   sessionId: string;
@@ -96,6 +99,9 @@ export default function InvoiceHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | DispenseStatus>(
     "all",
   );
+  const [amendedFilter, setAmendedFilter] = useState<
+    "all" | "amended" | "not_amended"
+  >("all");
   // Default the range to today so the page opens scoped to today's
   // dispenses; the three header cards describe today by default and
   // update as the user widens / clears the range. ``toLocaleDateString``
@@ -131,6 +137,16 @@ export default function InvoiceHistoryPage() {
   const [amendTarget, setAmendTarget] = useState<DispenseHistoryItem | null>(
     null,
   );
+  // "Previous versions" dialog state (amendment snapshots).
+  const [prevVersionsOpen, setPrevVersionsOpen] = useState(false);
+  const [prevVersionsInvoice, setPrevVersionsInvoice] = useState<{
+    invoiceNumber: string;
+    patientName: string;
+  } | null>(null);
+  const [prevVersionsAmendments, setPrevVersionsAmendments] = useState<
+    DispenseAmendmentInfo[]
+  >([]);
+  const [loadingPrevId, setLoadingPrevId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -150,6 +166,8 @@ export default function InvoiceHistoryPage() {
       status: statusFilter === "all" ? undefined : statusFilter,
       start_date: startDate || undefined,
       end_date: endDate || undefined,
+      amended:
+        amendedFilter === "all" ? undefined : amendedFilter === "amended",
     })
       .then((data) => {
         setItems(data.items || []);
@@ -172,7 +190,7 @@ export default function InvoiceHistoryPage() {
         );
       })
       .finally(() => setIsLoading(false));
-  }, [debouncedSearch, page, pageSize, statusFilter, startDate, endDate]);
+  }, [debouncedSearch, page, pageSize, statusFilter, amendedFilter, startDate, endDate]);
 
   useEffect(() => {
     loadHistory();
@@ -302,13 +320,61 @@ export default function InvoiceHistoryPage() {
     }
   };
 
+  const handleViewPreviousVersions = async (item: DispenseHistoryItem) => {
+    if (!item.session_id) {
+      toast.error("Invoice session reference is missing for this row.");
+      return;
+    }
+    setLoadingPrevId(item.session_id);
+    try {
+      // Reuses the cached detail (amendments now carry their previous_state).
+      const detail = await fetchInvoiceDetail(item.session_id);
+      setPrevVersionsAmendments(detail.amendments || []);
+      setPrevVersionsInvoice({
+        invoiceNumber: detail.invoice_number,
+        patientName: item.patient,
+      });
+      setPrevVersionsOpen(true);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to load previous versions.";
+      toast.error(message);
+    } finally {
+      setLoadingPrevId(null);
+    }
+  };
+
   const renderActions = (item: DispenseHistoryItem) => {
     const hasSession = Boolean(item.session_id);
     const isViewing = viewingSessionId === item.session_id;
     const isDownloading = downloadingSessionId === item.session_id;
+    const isLoadingPrev = loadingPrevId === item.session_id;
 
     return (
       <div className="flex items-center gap-2 sm:justify-end">
+        {item.is_amended && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg border-amber-200 text-amber-700 font-semibold hover:bg-amber-50 hover:text-amber-800"
+            onClick={() => void handleViewPreviousVersions(item)}
+            disabled={!hasSession || isViewing || isDownloading || isLoadingPrev}
+            title={
+              !hasSession
+                ? "Session reference unavailable"
+                : "View this invoice's previous versions (amendment history)"
+            }
+          >
+            {isLoadingPrev ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <History className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Previous versions
+          </Button>
+        )}
         {item.status === "success" && (
           <Button
             variant="outline"
@@ -468,7 +534,7 @@ export default function InvoiceHistoryPage() {
           <CardContent className="space-y-3 p-6">
             {/* "Today Only" dropdown removed — redundant with the date
                 range below, which now defaults to today. */}
-            <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_160px_140px]">
+            <div className="grid gap-3 md:grid-cols-[minmax(200px,1fr)_150px_150px_130px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -492,6 +558,22 @@ export default function InvoiceHistoryPage() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="success">Success</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={amendedFilter}
+                onValueChange={(v) => {
+                  setPage(1);
+                  setAmendedFilter(v as "all" | "amended" | "not_amended");
+                }}
+              >
+                <SelectTrigger className="h-10 bg-slate-50 border-slate-200 rounded-xl text-sm font-medium">
+                  <SelectValue placeholder="Amendment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Invoices</SelectItem>
+                  <SelectItem value="amended">Amended Only</SelectItem>
+                  <SelectItem value="not_amended">Not Amended</SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -541,6 +623,7 @@ export default function InvoiceHistoryPage() {
                   setSearchQuery("");
                   setDebouncedSearch("");
                   setStatusFilter("all");
+                  setAmendedFilter("all");
                   setStartDate("");
                   setEndDate("");
                 }}
@@ -793,6 +876,17 @@ export default function InvoiceHistoryPage() {
           setAmendTarget(null);
           void loadHistory();
         }}
+      />
+
+      <AmendmentHistoryDialog
+        open={prevVersionsOpen}
+        onOpenChange={(open) => {
+          setPrevVersionsOpen(open);
+          if (!open) setPrevVersionsInvoice(null);
+        }}
+        invoiceNumber={prevVersionsInvoice?.invoiceNumber || ""}
+        patientName={prevVersionsInvoice?.patientName || ""}
+        amendments={prevVersionsAmendments}
       />
     </>
   );

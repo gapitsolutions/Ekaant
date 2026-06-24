@@ -515,6 +515,9 @@ export async function getDispenseHistory(options?: {
   end_date?: string;
   status?: DispenseStatus;
   today_only?: boolean;
+  // ``true`` → only amended invoices, ``false`` → only never-amended,
+  // ``undefined`` → no filter (all).
+  amended?: boolean;
 }): Promise<DispenseHistoryResponse> {
   const params = new URLSearchParams();
   if (options?.q) params.set("q", options.q);
@@ -524,6 +527,9 @@ export async function getDispenseHistory(options?: {
   if (options?.end_date) params.set("end_date", options.end_date);
   if (options?.status) params.set("status", options.status);
   if (options?.today_only) params.set("today_only", "true");
+  if (options?.amended !== undefined) {
+    params.set("amended", options.amended ? "true" : "false");
+  }
   return apiRequest<DispenseHistoryResponse>(
     `/api/v1/pharmacy/dispense-history/?${params.toString()}`,
     {},
@@ -546,13 +552,46 @@ export interface DispenseInvoiceLineItem {
   total: string;
 }
 
-// One row per post-dispense correction, newest first. The full
-// pre-amendment snapshot lives server-side (DispenseInvoiceAmendment);
-// the API exposes only what the UI shows.
+// Snapshot of the invoice exactly as it was BEFORE an amendment. Mirrors
+// the backend ``_amendment_snapshot`` shape. All money fields are decimal
+// strings; dates are ISO strings.
+export interface DispenseInvoicePreviousStateItem {
+  medicine_id: string;
+  medicine_name: string;
+  salt: string;
+  category: string;
+  batch_number: string;
+  expiry_date: string;
+  dose: string;
+  days: number;
+  quantity: number;
+  unit_price: string;
+  total: string;
+}
+
+export interface DispenseInvoicePreviousState {
+  items: DispenseInvoicePreviousStateItem[];
+  subtotal: string;
+  consultation_fee: string;
+  discount_percentage: string;
+  discount_amount: string;
+  net_payable: string;
+  amount_paid: string;
+  payment_method: PaymentMethod | string;
+  cash_amount: string;
+  online_amount: string;
+  notes: string;
+  next_followup_date: string | null;
+}
+
+// One row per post-dispense correction, newest first. ``previous_state`` is
+// the full snapshot of the invoice immediately before that correction, so
+// the UI can render every prior version of the invoice.
 export interface DispenseAmendmentInfo {
   amended_at: string;
   amended_by_name: string;
   reason: string;
+  previous_state: DispenseInvoicePreviousState;
 }
 
 export interface DispenseInvoiceDetail {

@@ -1,6 +1,6 @@
 # Hospital Backend API Blueprint (Django)
 
-> **Last Updated:** 2026-06-16 (IST) — supplier console enhancement: supplier payments now accept an optional `payment_date` (stored on `SupplierLedgerEntry.payment_date`, surfaced as the ledger row `date`; display/record only — running balance still follows posting order). Earlier same day — post-audit remediations: staff profile photos now served via a gated admin-only `GET /staff/<id>/photo/` view (not raw `/media/`); new lightweight `GET /staff/attendance/today-status/`; supplier list invoice/product counts switched to correlated **Subquery** counts (no multiplicative join); supplier-ledger running-balance/summary moved into `pharmacy.services.supplier_ledger`; daily-submit race hardened to 409 via `get_or_create`. Frontend: list pagination UI (Suppliers + Staff), lazy-loaded supplier detail tabs, searchable global add-invoice supplier picker. Earlier: reception daily attendance: the staff attendance roster (`GET|POST /staff/attendance/`) is now **reception+admin**. Reception may mark **today only**, **once** — the day locks via the new `AttendanceDaySubmission` model (records `submitted_by` + `submitted_by_role` snapshot); a second submit returns 409 and editing after submit is an admin-only correction. Roster GET now returns `submission` + `can_submit`. A "Mark Attendance" button was added to the reception dashboard. Earlier: staff console UI integration: new `GET /staff/summary/` directory KPI aggregate (total/active/inactive + by-designation, from aggregate queries); staff create/update now accept optional `photo_base64`/`photo_mime_type` (JSON base64, mirrors patient-photo contract → `Staff.photo`/`photo_url`); staff detail rebuilt as a modal console (Profile/Attendance/Salary/Salary-Records). Earlier: supplier console UI integration: new `GET /pharmacy/suppliers/summary/` directory KPI aggregate (counts by category + outstanding total, from aggregate queries not the page); supplier list/detail now expose `product_count` (active mapped medicines) and the list accepts `has_dues=true`; historical purchase invoices backfilled into the supplier payables ledger (migration `0013`) so the Ledger tab shows invoices + payments. Staff phase 5: payroll + stored, regenerable **payslips** — admin-only `GET /staff/<id>/payroll/` (preview, no persistence) and `GET|POST /staff/<id>/payslips/` (snapshot history + generate). Transparent deduction model (`per_day × unpaid_absent`, paid-leave allowance offsets first N absences); regeneration appends a new snapshot row; payslip PDF rendered client-side from the stored snapshot. Phase 4: `StaffAttendance` (one mark per staff/day, present/absent/half_day) — admin-only daily roster + bulk mark (`/staff/attendance/`) and per-staff monthly calendar/stats (`/staff/<id>/attendance/`). Phase 3: new **`staff`** app — standalone admin-only HR directory (`Staff` + dynamic `Designation`), masked sensitive fields, soft-delete. Earlier: supplier/vendor console (phase 2): supplier accounts-payable ledger (`SupplierLedgerEntry`) + cached `Supplier.outstanding_payable`; booking a purchase invoice auto-posts a payable; new admin-only `GET /suppliers/<id>/ledger/` and `POST /suppliers/<id>/payments/`. Phase 1: purchase invoices gain a `form6` flag (set on create, toggled via new `PATCH /inventory/invoices/<id>/`); `GET /inventory/invoices/?supplier=` lists a supplier's invoice history with line items; medicine list accepts `?supplier=` (M2M filter). Earlier same day — follow-up calling: new `do_not_call` outcome + `wrong_number` is now terminal (no callback date); both set patient flags (`do_not_call`, `phone_number_invalid`) that exclude the patient from automated follow-up ticket generation; editing the phone number clears `phone_number_invalid`; calling report gains a `do_not_call` bucket/column. Earlier: patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
+> **Last Updated:** 2026-06-23 (IST) — dispense detail (`GET /pharmacy/dispense/<session_id>/`) amendment entries now include `previous_state`, the full pre-amendment invoice snapshot (line items + money fields + notes), so the invoice-history "Previous versions" UI can render every prior version of an amended invoice. Also: dispense timestamps (`time` in dispense-history, `dispense_time`/`dispensed_at`/`amended_at` in detail/create) are now emitted in the active timezone (IST, +05:30) instead of UTC. Earlier — supplier console enhancement: supplier payments now accept an optional `payment_date` (stored on `SupplierLedgerEntry.payment_date`, surfaced as the ledger row `date`; display/record only — running balance still follows posting order). Earlier same day — post-audit remediations: staff profile photos now served via a gated admin-only `GET /staff/<id>/photo/` view (not raw `/media/`); new lightweight `GET /staff/attendance/today-status/`; supplier list invoice/product counts switched to correlated **Subquery** counts (no multiplicative join); supplier-ledger running-balance/summary moved into `pharmacy.services.supplier_ledger`; daily-submit race hardened to 409 via `get_or_create`. Frontend: list pagination UI (Suppliers + Staff), lazy-loaded supplier detail tabs, searchable global add-invoice supplier picker. Earlier: reception daily attendance: the staff attendance roster (`GET|POST /staff/attendance/`) is now **reception+admin**. Reception may mark **today only**, **once** — the day locks via the new `AttendanceDaySubmission` model (records `submitted_by` + `submitted_by_role` snapshot); a second submit returns 409 and editing after submit is an admin-only correction. Roster GET now returns `submission` + `can_submit`. A "Mark Attendance" button was added to the reception dashboard. Earlier: staff console UI integration: new `GET /staff/summary/` directory KPI aggregate (total/active/inactive + by-designation, from aggregate queries); staff create/update now accept optional `photo_base64`/`photo_mime_type` (JSON base64, mirrors patient-photo contract → `Staff.photo`/`photo_url`); staff detail rebuilt as a modal console (Profile/Attendance/Salary/Salary-Records). Earlier: supplier console UI integration: new `GET /pharmacy/suppliers/summary/` directory KPI aggregate (counts by category + outstanding total, from aggregate queries not the page); supplier list/detail now expose `product_count` (active mapped medicines) and the list accepts `has_dues=true`; historical purchase invoices backfilled into the supplier payables ledger (migration `0013`) so the Ledger tab shows invoices + payments. Staff phase 5: payroll + stored, regenerable **payslips** — admin-only `GET /staff/<id>/payroll/` (preview, no persistence) and `GET|POST /staff/<id>/payslips/` (snapshot history + generate). Transparent deduction model (`per_day × unpaid_absent`, paid-leave allowance offsets first N absences); regeneration appends a new snapshot row; payslip PDF rendered client-side from the stored snapshot. Phase 4: `StaffAttendance` (one mark per staff/day, present/absent/half_day) — admin-only daily roster + bulk mark (`/staff/attendance/`) and per-staff monthly calendar/stats (`/staff/<id>/attendance/`). Phase 3: new **`staff`** app — standalone admin-only HR directory (`Staff` + dynamic `Designation`), masked sensitive fields, soft-delete. Earlier: supplier/vendor console (phase 2): supplier accounts-payable ledger (`SupplierLedgerEntry`) + cached `Supplier.outstanding_payable`; booking a purchase invoice auto-posts a payable; new admin-only `GET /suppliers/<id>/ledger/` and `POST /suppliers/<id>/payments/`. Phase 1: purchase invoices gain a `form6` flag (set on create, toggled via new `PATCH /inventory/invoices/<id>/`); `GET /inventory/invoices/?supplier=` lists a supplier's invoice history with line items; medicine list accepts `?supplier=` (M2M filter). Earlier same day — follow-up calling: new `do_not_call` outcome + `wrong_number` is now terminal (no callback date); both set patient flags (`do_not_call`, `phone_number_invalid`) that exclude the patient from automated follow-up ticket generation; editing the phone number clears `phone_number_invalid`; calling report gains a `do_not_call` bucket/column. Earlier: patient registration (`/patients/register/`) now accepts an optional `registration_date` (backdate historical patients; omitted → today, must not be future). Earlier: medicine CSV bulk-import now accepts per-row `supplier_ids` (assigned in the review grid via the shared supplier multi-select; no backend change — reuses `MedicineWriteSerializer`). Earlier: patient lookup (`/patients/lookup/`) field-scoped `search_fields` for the Check-In page advanced search. Earlier today: consultation fee + patient financial ledger (outstanding/recovery) in dispensing; billing settings singleton; partial payments; revenue vs collected split; single medicine create returns 409 on duplicates.
 > **Scope:** Full backend API surface — accounts, patients, visits, follow-ups, and the pharmacy module.
 
 ---
@@ -1392,7 +1392,35 @@ Permission: `IsReceptionAdminOrPharmacist`
     {
       "amended_at": "2026-06-11T11:20:00+05:30",
       "amended_by_name": "Dr. Pharmacist",
-      "reason": "Wrong quantity entered for Diazepam"
+      "reason": "Wrong quantity entered for Diazepam",
+      "previous_state": {
+        "items": [
+          {
+            "medicine_id": "<uuid>",
+            "medicine_name": "Diazepam 5mg",
+            "salt": "Diazepam",
+            "category": "Rx",
+            "batch_number": "B001",
+            "expiry_date": "2027-01-31",
+            "dose": "5mg",
+            "days": 7,
+            "quantity": 10,
+            "unit_price": "8.00",
+            "total": "80.00"
+          }
+        ],
+        "subtotal": "80.00",
+        "consultation_fee": "0.00",
+        "discount_percentage": "0.00",
+        "discount_amount": "0.00",
+        "net_payable": "80.00",
+        "amount_paid": "80.00",
+        "payment_method": "Cash",
+        "cash_amount": "80.00",
+        "online_amount": "0.00",
+        "notes": "",
+        "next_followup_date": null
+      }
     }
   ]
 }
@@ -1400,7 +1428,13 @@ Permission: `IsReceptionAdminOrPharmacist`
 
 `amendments` is ordered newest-first (empty list when the invoice was never
 amended). `medicine_id` is included so the amend dialog can rebuild the
-write payload from the read payload.
+write payload from the read payload. `previous_state` is the full snapshot of
+the invoice **immediately before** that amendment (line items + money fields +
+notes + follow-up date) — sourced verbatim from
+`DispenseInvoiceAmendment.previous_state`. It lets the UI render every prior
+version of the invoice (the oldest amendment's snapshot is the original
+invoice; each newer one is the version before that edit). Money fields are
+decimal strings; dates are ISO strings.
 
 **Errors:**
 - 404: no dispense invoice found for the given session

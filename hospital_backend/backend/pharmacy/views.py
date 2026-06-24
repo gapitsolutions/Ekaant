@@ -9,7 +9,16 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError
-from django.db.models import Count, F, IntegerField, OuterRef, Q, Subquery, Sum
+from django.db.models import (
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+)
 from django.db.models.functions import Coalesce, TruncDate
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -32,6 +41,7 @@ from visits.models import VisitSession, VisitStage, VisitStatus
 from . import services
 from .models import (
     DispenseInvoice,
+    DispenseInvoiceAmendment,
     DispenseInvoiceItem,
     DispenseStatus,
     Medicine,
@@ -794,6 +804,10 @@ def _dispense_invoice_detail_payload(invoice: DispenseInvoice) -> dict:
                 amendment.amended_by.full_name if amendment.amended_by_id else ""
             ),
             "reason": amendment.reason,
+            # Full snapshot of the invoice as it was BEFORE this amendment
+            # (line items + money fields + notes). Lets the UI render each
+            # prior version of the invoice. See ``_amendment_snapshot``.
+            "previous_state": amendment.previous_state,
         }
         for amendment in invoice.amendments.select_related("amended_by")
     ]
@@ -902,15 +916,13 @@ class DispenseHistoryListView(APIView):
     permission_classes = [IsReceptionAdminOrPharmacist]
 
     def get(self, request):
-        # ``amendment_count`` powers the "Amended" badge in the history
-        # table without an N+1 ``exists()`` per row.
-        queryset = (
-            DispenseInvoice.objects.select_related(
-                "patient", "dispensed_by", "visit_session"
-            )
-            .annotate(amendment_count=Count("amendments"))
-            .order_by("-dispense_time")
-        )
+        # Base filtered queryset — NO ``amendment_count`` annotation here, so
+        # the stats aggregate below cannot be inflated by the amendments join
+        # (a multiply-amended invoice must still count its net_payable once).
+        # The annotation is added later, only for the paginated list rows.
+        queryset = DispenseInvoice.objects.select_related(
+            "patient", "dispensed_by", "visit_session"
+        ).order_by("-dispense_time")
 
         q = (request.query_params.get("q") or "").strip()
         start_date = (request.query_params.get("start_date") or "").strip()
@@ -920,6 +932,10 @@ class DispenseHistoryListView(APIView):
             (request.query_params.get("today_only") or "").strip().lower()
             in {"1", "true", "yes"}
         )
+        # ``amended``: ``true`` → only amended invoices, ``false`` → only
+        # never-amended; absent/other → no filter. Uses a correlated EXISTS
+        # (not a join) so it composes cleanly with the stats aggregate.
+        amended_filter = (request.query_params.get("amended") or "").strip().lower()
 
         if q:
             queryset = queryset.filter(
@@ -935,6 +951,14 @@ class DispenseHistoryListView(APIView):
             queryset = queryset.filter(status=status_filter)
         if today_only:
             queryset = queryset.filter(dispense_date=timezone.localdate())
+        if amended_filter in {"1", "true", "yes"}:
+            queryset = queryset.filter(
+                Exists(DispenseInvoiceAmendment.objects.filter(invoice=OuterRef("pk")))
+            )
+        elif amended_filter in {"0", "false", "no"}:
+            queryset = queryset.filter(
+                ~Exists(DispenseInvoiceAmendment.objects.filter(invoice=OuterRef("pk")))
+            )
 
         try:
             page = int(request.query_params.get("page", 1))
@@ -943,12 +967,11 @@ class DispenseHistoryListView(APIView):
             page, page_size = 1, 50
 
         # Aggregate KPIs for the three cards on the invoice history page.
-        # Computed over the same filtered queryset as the list, so the
-        # numbers describe the matched set — independent of pagination
-        # and consistent with what ``pagination.total`` would report.
-        # Cancelled invoices have ``net_payable = 0`` so they contribute
-        # zero to revenue regardless of whether the status filter
-        # includes them.
+        # Computed over the filtered queryset, so the numbers describe the
+        # matched set — independent of pagination and consistent with what
+        # ``pagination.total`` would report. Cancelled invoices have
+        # ``net_payable = 0`` so they contribute zero to revenue regardless
+        # of whether the status filter includes them.
         stats_agg = queryset.aggregate(
             unique_patients=Count("patient_id", distinct=True),
             total_revenue=Coalesce(Sum("net_payable"), Decimal("0")),
@@ -965,7 +988,10 @@ class DispenseHistoryListView(APIView):
             "total_records": stats_agg["total_records"] or 0,
         }
 
-        paginated, pagination = paginate_queryset(queryset, page, page_size)
+        # ``amendment_count`` powers the "Amended" badge in the history table
+        # without an N+1 ``exists()`` per row. Added only to the list query.
+        list_qs = queryset.annotate(amendment_count=Count("amendments"))
+        paginated, pagination = paginate_queryset(list_qs, page, page_size)
         items = [
             DispenseInvoiceListItemSerializer.from_invoice(inv) for inv in paginated
         ]

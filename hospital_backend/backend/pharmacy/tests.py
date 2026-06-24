@@ -18,6 +18,9 @@ from rest_framework.test import APIClient
 
 from pharmacy import services
 from pharmacy.models import (
+    DispenseInvoice,
+    DispenseInvoiceItem,
+    DispenseStatus,
     Medicine,
     MedicineBatch,
     MedicineCategory,
@@ -594,6 +597,199 @@ class DispenseFinancialTests(TestCase):
         self.assertEqual(inv.amount_paid, Decimal("0.00"))
         # Ledger nets back to zero (charge + payment + reversal adjustment).
         self.assertEqual(self._balance(), Decimal("0.00"))
+
+
+class AmendProductHistoryTests(TestCase):
+    """Reproduces the reported bug: after a pharmacist AMENDS a dispense, does
+    the product dispense-history page (``ProductDispenseHistoryView``) report
+    the amended quantity, or does it still surface the stale pre-amend rows?
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="rx@example.com", password="x", role="pharmacist"
+        )
+        self.patient = Patient.objects.create(
+            patient_category="deaddiction",
+            full_name="Amend Patient",
+            date_of_birth=timezone.localdate().replace(year=1990, month=1, day=1),
+            sex="male",
+            phone_number="9999999999",
+            address_line1="Somewhere",
+        )
+        self.medicine = Medicine.objects.create(
+            name="Paracetamol 500mg",
+            salt="Paracetamol",
+            category=MedicineCategory.NRX,
+            manufacturer="Cipla",
+            mrp=Decimal("60.00"),
+            selling_price=Decimal("50.00"),
+        )
+        self.batch = MedicineBatch.objects.create(
+            medicine=self.medicine,
+            batch_number="P001",
+            expiry_date=timezone.localdate() + timedelta(days=400),
+            quantity=200,
+            initial_quantity=200,
+            purchase_price=Decimal("30.00"),
+        )
+        BillingSettings.load()
+
+    def _session(self):
+        return VisitSession.objects.create(
+            visit_uid=VisitSession.generate_visit_uid(),
+            patient=self.patient,
+            checked_in_by=self.user,
+            current_stage=VisitStage.PHARMACY,
+            status=VisitStatus.IN_PROGRESS,
+        )
+
+    def _dispense(self, *, qty, unit_price="50.00", cash):
+        data = {
+            "session_id": self._session().id,
+            "line_items": [
+                {
+                    "medicine_id": self.medicine.id,
+                    "batch_number": "P001",
+                    "dose": "-",
+                    "days": 1,
+                    "qty": qty,
+                    "unit_price": Decimal(unit_price),
+                }
+            ],
+            "payment": {
+                "payment_method": "Cash",
+                "cash_amount": Decimal(cash),
+                "online_amount": Decimal("0"),
+                "discount": Decimal("0"),
+                "notes": "",
+            },
+        }
+        return services.process_dispense(data=data, user=self.user)
+
+    def _amend(self, *, session_id, qty, unit_price="50.00", cash="1000.00"):
+        data = {
+            "amend_reason": "wrong quantity entered",
+            "line_items": [
+                {
+                    "medicine_id": self.medicine.id,
+                    "batch_number": "P001",
+                    "dose": "-",
+                    "days": 1,
+                    "qty": qty,
+                    "unit_price": Decimal(unit_price),
+                }
+            ],
+            "payment": {
+                "payment_method": "Cash",
+                "cash_amount": Decimal(cash),
+                "online_amount": Decimal("0"),
+                "discount": Decimal("0"),
+                "notes": "",
+            },
+        }
+        return services.amend_dispense_for_session(
+            session_id=session_id, data=data, user=self.user
+        )
+
+    def _history_total(self):
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        url = reverse(
+            "pharmacy-medicine-dispense-history",
+            kwargs={"pk": self.medicine.id},
+        )
+        # No month/date filter → all SUCCESS items, matching the bug report's
+        # "Total Dispensed" headline.
+        resp = client.get(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        return resp.data["data"]
+
+    def test_amend_reduce_updates_product_history_total(self):
+        inv = self._dispense(qty=30, unit_price="50.00", cash="1500.00")
+        # Pre-amend sanity: 30 dispensed.
+        self.assertEqual(
+            DispenseInvoiceItem.objects.filter(medicine=self.medicine).count(), 1
+        )
+
+        self._amend(session_id=inv.visit_session_id, qty=20, cash="1000.00")
+
+        # DATA LAYER: stale 30-row must be gone; only the amended 20 remains.
+        items = DispenseInvoiceItem.objects.filter(medicine=self.medicine)
+        self.assertEqual(items.count(), 1, "stale pre-amend line item not removed")
+        self.assertEqual(items.first().quantity, 20)
+
+        # VIEW LAYER: the headline total the user is looking at.
+        payload = self._history_total()
+        self.assertEqual(
+            payload["total_quantity"],
+            20,
+            "product history total still reflects the pre-amend quantity",
+        )
+        self.assertEqual(len(payload["items"]), 1)
+
+        # STOCK: net out = 20 (the figure the user says is correct).
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.quantity, 180)
+
+        # DETAIL ENDPOINT: amendments carry the pre-amend snapshot so the
+        # "Previous versions" UI can render the original (30-qty) invoice.
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        detail = client.get(
+            reverse(
+                "pharmacy-dispense-detail",
+                kwargs={"session_id": inv.visit_session_id},
+            )
+        )
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        amendments = detail.data["data"]["amendments"]
+        self.assertEqual(len(amendments), 1)
+        prev = amendments[0]["previous_state"]
+        self.assertEqual(prev["items"][0]["quantity"], 30)
+        self.assertEqual(prev["net_payable"], "1500.00")
+
+    def test_amend_increase_updates_product_history_total(self):
+        inv = self._dispense(qty=20, unit_price="50.00", cash="1000.00")
+        self._amend(session_id=inv.visit_session_id, qty=30, cash="1500.00")
+
+        payload = self._history_total()
+        self.assertEqual(payload["total_quantity"], 30)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.quantity, 170)
+
+    def _dispense_history(self, **params):
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        resp = client.get(reverse("pharmacy-dispense-history"), params)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        return resp.data["data"]
+
+    def test_amended_filter_and_stats_not_inflated(self):
+        # One invoice amended TWICE (2 amendment rows) + one untouched invoice.
+        amended = self._dispense(qty=20, unit_price="50.00", cash="1000.00")
+        self._amend(session_id=amended.visit_session_id, qty=18, cash="900.00")
+        self._amend(session_id=amended.visit_session_id, qty=16, cash="800.00")
+        self._dispense(qty=4, unit_price="50.00", cash="200.00")  # never amended
+
+        # amended=true → only the amended invoice; stats describe just it.
+        only_amended = self._dispense_history(amended="true")
+        self.assertEqual(only_amended["pagination"]["total"], 1)
+        self.assertTrue(only_amended["items"][0]["is_amended"])
+        # Net payable counted ONCE (16×50=800), NOT multiplied by the 2
+        # amendment rows — guards the stats-inflation regression.
+        self.assertEqual(only_amended["stats"]["total_revenue"], "800.00")
+        self.assertEqual(only_amended["stats"]["total_records"], 1)
+
+        # amended=false → only the never-amended invoice.
+        not_amended = self._dispense_history(amended="false")
+        self.assertEqual(not_amended["pagination"]["total"], 1)
+        self.assertFalse(not_amended["items"][0]["is_amended"])
+
+        # No filter → both; revenue is the sum of each invoice once (800+200).
+        every = self._dispense_history()
+        self.assertEqual(every["pagination"]["total"], 2)
+        self.assertEqual(every["stats"]["total_revenue"], "1000.00")
 
 
 class SupplierPayableLedgerTests(TestCase):
