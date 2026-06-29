@@ -44,6 +44,7 @@ import {
   Calendar,
   ShieldCheck,
   Activity,
+  Search,
 } from "lucide-react";
 import { navigate } from "@/lib/navigation";
 import { getPatientById, type PatientDetailResponse } from "@/lib/hms-api";
@@ -102,6 +103,9 @@ export default function DispenseWorkstationPage() {
   const [formSubcategory, setFormSubcategory] =
     useState<BupStrength>(DEFAULT_BUP_STRENGTH);
   const [formMedicineId, setFormMedicineId] = useState("");
+  // Searchable formulation picker (category+subcategory scoped, with search).
+  const [medicinePickerOpen, setMedicinePickerOpen] = useState(false);
+  const [medicineSearch, setMedicineSearch] = useState("");
   const [formBatchNumber, setFormBatchNumber] = useState("");
   const [formQty, setFormQty] = useState(0);
   const [formPrice, setFormPrice] = useState(0);
@@ -195,6 +199,17 @@ export default function DispenseWorkstationPage() {
       return m.is_active;
     });
   }, [medicines, formCategory, formSubcategory]);
+
+  // ``filteredMedicines`` is already scoped to the chosen category (+ BUP
+  // subcategory); narrow it further by the picker's search query (name/salt).
+  const pickerMedicines = useMemo(() => {
+    const q = medicineSearch.trim().toLowerCase();
+    if (!q) return filteredMedicines;
+    return filteredMedicines.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) || m.salt.toLowerCase().includes(q),
+    );
+  }, [filteredMedicines, medicineSearch]);
 
   const selectedMedicine = useMemo(
     () => medicines.find((m) => m.id === formMedicineId) || null,
@@ -693,35 +708,132 @@ export default function DispenseWorkstationPage() {
                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Predefined Formulation
                 </Label>
-                <Select
-                  value={formMedicineId}
-                  onValueChange={handleMedicineChange}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setMedicineSearch("");
+                    setMedicinePickerOpen(true);
+                  }}
+                  className="h-10 w-full rounded-xl bg-slate-50 border-slate-200 font-bold text-xs justify-between px-3 hover:bg-slate-100 hover:border-slate-300"
                 >
-                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 font-bold text-xs text-slate-700">
-                    <SelectValue
-                      placeholder={
-                        filteredMedicines.length === 0
-                          ? "No matched formulations"
-                          : "Select Formulation (Salt)"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 text-xs">
-                    {filteredMedicines.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-slate-400">
-                        No medicines available
-                      </div>
-                    ) : (
-                      filteredMedicines.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name} ({m.salt})
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                  <span
+                    className={`truncate ${
+                      selectedMedicine ? "text-slate-700" : "text-slate-400"
+                    }`}
+                  >
+                    {selectedMedicine
+                      ? `${selectedMedicine.name} (${selectedMedicine.salt})`
+                      : filteredMedicines.length === 0
+                        ? "No matched formulations"
+                        : "Search & select formulation"}
+                  </span>
+                  <Search className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
+                </Button>
               </div>
             </div>
+
+            {/* Searchable formulation picker — lists medicines in the chosen
+                category (+ BUP subcategory) with a search box for long lists. */}
+            <Dialog
+              open={medicinePickerOpen}
+              onOpenChange={(o) => {
+                if (!o) setMedicineSearch("");
+                setMedicinePickerOpen(o);
+              }}
+            >
+              <DialogContent className="sm:max-w-[560px] bg-white rounded-2xl border-slate-100 p-0 overflow-hidden shadow-2xl">
+                <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
+                  <DialogTitle className="text-lg font-black text-slate-800">
+                    Select Formulation
+                  </DialogTitle>
+                  <DialogDescription className="text-xs font-semibold text-slate-500">
+                    {formCategory}
+                    {formCategory === "BUP" ? ` · ${formSubcategory}` : ""} —
+                    pick a medicine to dispense.
+                  </DialogDescription>
+                  <div className="relative mt-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      value={medicineSearch}
+                      onChange={(e) => setMedicineSearch(e.target.value)}
+                      onFocus={(e) => e.currentTarget.select()}
+                      placeholder="Search by name or salt…"
+                      aria-label="Search formulations"
+                      autoFocus
+                      className="pl-9 h-10 rounded-xl bg-white border-slate-200 text-xs font-semibold text-slate-700"
+                    />
+                    {medicineSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setMedicineSearch("")}
+                        aria-label="Clear search"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </DialogHeader>
+                <div className="p-2 max-h-[350px] overflow-y-auto bg-slate-50/30">
+                  {filteredMedicines.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                      No medicines in {formCategory}
+                      {formCategory === "BUP" ? ` · ${formSubcategory}` : ""}.
+                    </div>
+                  ) : pickerMedicines.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                      No medicines match &ldquo;{medicineSearch}&rdquo;.
+                    </div>
+                  ) : (
+                    <div className="space-y-1 px-2 py-2">
+                      {pickerMedicines.map((m) => {
+                        const isSelected = m.id === formMedicineId;
+                        const inStock = (m.batches || []).reduce(
+                          (s, b) => s + (b.quantity || 0),
+                          0,
+                        );
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              handleMedicineChange(m.id);
+                              setMedicinePickerOpen(false);
+                              setMedicineSearch("");
+                            }}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl text-left border transition-all ${
+                              isSelected
+                                ? "border-primary bg-teal-50/50"
+                                : "border-transparent hover:border-slate-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-black text-slate-800 truncate">
+                                {m.name}
+                              </div>
+                              <div className="text-xs text-slate-500 truncate">
+                                {m.salt} · {m.category}
+                                {m.bup_category ? ` · ${m.bup_category}` : ""}
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold rounded-full px-2 py-0.5 whitespace-nowrap border ${
+                                inStock > 0
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                  : "bg-rose-50 text-rose-500 border-rose-100"
+                              }`}
+                            >
+                              {inStock > 0 ? `Stock ${inStock}` : "No stock"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* ROW 2: Batch / Expiry / Total Quantity / Price */}
             <div className="grid grid-cols-2 md:grid-cols-12 gap-4 items-end">
