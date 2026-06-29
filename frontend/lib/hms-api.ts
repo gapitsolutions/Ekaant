@@ -485,6 +485,9 @@ export interface ReportPatientSnapshot {
   gender: "male" | "female" | "other";
   phone: string;
   patient_category: PatientCategory;
+  // ISO date (YYYY-MM-DD). Used to classify today's visits as new patients
+  // (registered today) vs follow-ups (registered earlier).
+  registration_date?: string | null;
 }
 
 export interface ReportVisitItem {
@@ -599,6 +602,9 @@ export interface QueueItem {
   date_of_birth?: string;
   gender?: string;
   phone?: string;
+  // Populated only for the reception dashboard's today's-visits view (mapped
+  // from the daily report), to split new patients vs follow-ups. ISO date.
+  registration_date?: string | null;
 }
 
 export async function getQueueStatus(_token?: string) {

@@ -155,6 +155,9 @@ def _report_patient_payload(patient: Patient):
         "gender": patient.sex,
         "phone": patient.phone_number,
         "patient_category": patient.patient_category,
+        # Lets the reception dashboard split today's visits into new patients
+        # (registered today) vs follow-ups (registered earlier) on the client.
+        "registration_date": patient.registration_date,
     }
 
 

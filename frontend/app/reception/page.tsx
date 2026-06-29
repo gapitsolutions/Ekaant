@@ -40,6 +40,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   getAttendanceRoster,
@@ -88,6 +94,7 @@ export default function ReceptionDashboard() {
   );
   const [selectedStat, setSelectedStat] = useState<StatData | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [todaysVisitsOpen, setTodaysVisitsOpen] = useState(false);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   // Today's attendance submission/lock state (null = not yet submitted).
   const [todaySubmission, setTodaySubmission] =
@@ -137,6 +144,7 @@ export default function ReceptionDashboard() {
                 | "female"
                 | "other",
               phone: item.patient?.phone || "",
+              registration_date: item.patient?.registration_date || null,
             }))
           : [];
         setTodayVisitItems(items);
@@ -220,6 +228,12 @@ export default function ReceptionDashboard() {
   };
 
   const handleStatClick = (statType: string) => {
+    // Today's Visits opens a dedicated tabbed dialog (New patients vs
+    // Follow-ups); the other stat cards keep the generic detail sheet.
+    if (statType === "today_visits") {
+      setTodaysVisitsOpen(true);
+      return;
+    }
     const data = getStatData(statType);
     setSelectedStat(data);
     setSheetOpen(true);
@@ -638,6 +652,13 @@ export default function ReceptionDashboard() {
         </SheetContent>
       </Sheet>
 
+      <TodaysVisitsDialog
+        open={todaysVisitsOpen}
+        onOpenChange={setTodaysVisitsOpen}
+        items={todayVisitItems}
+        today={today}
+      />
+
       <ReceptionAttendanceDialog
         open={attendanceOpen}
         date={today}
@@ -645,6 +666,175 @@ export default function ReceptionDashboard() {
         onSubmitted={(submission) => setTodaySubmission(submission)}
       />
     </div>
+  );
+}
+
+// Reception dashboard → "Today's Visits" detail. Splits today's check-ins into
+// two tabs: Normal OPD (returning patients, registered earlier) and New
+// Patients (registered today). Classification is by ``registration_date`` vs
+// today's date — both ISO ``YYYY-MM-DD`` strings, so a plain compare is exact.
+function TodaysVisitsDialog({
+  open,
+  onOpenChange,
+  items,
+  today,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  items: DashboardVisitItem[];
+  today: string;
+}) {
+  const newPatients = items.filter((it) => it.registration_date === today);
+  const followUps = items.filter((it) => it.registration_date !== today);
+
+  const ageFromDob = (dob?: string) => {
+    if (!dob) return "—";
+    const birth = new Date(dob);
+    if (Number.isNaN(birth.getTime())) return "—";
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return `${age}`;
+  };
+
+  const stageBadgeClass = (stage: string) =>
+    stage === "completed"
+      ? "border-emerald-500 text-emerald-700 bg-emerald-50"
+      : stage === "counsellor"
+        ? "border-amber-500 text-amber-700 bg-amber-50"
+        : stage === "doctor"
+          ? "border-indigo-500 text-indigo-700 bg-indigo-50"
+          : stage === "pharmacy"
+            ? "border-rose-500 text-rose-700 bg-rose-50"
+            : "border-slate-300 text-slate-600 bg-slate-50";
+
+  const renderTable = (rows: DashboardVisitItem[], emptyLabel: string) => {
+    if (rows.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-3">
+            <Users className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground font-medium">{emptyLabel}</p>
+        </div>
+      );
+    }
+    return (
+      <ScrollArea className="h-[min(60vh,480px)]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>File No.</TableHead>
+              <TableHead>Patient Name</TableHead>
+              <TableHead>Age/Gender</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Checked In</TableHead>
+              <TableHead>Stage</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((it) => (
+              <TableRow key={it.session_id} className="hover:bg-muted/50">
+                <TableCell className="font-medium text-primary whitespace-nowrap">
+                  {it.file_number || "—"}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-semibold text-primary">
+                        {(it.patient_name || "?")
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)}
+                      </span>
+                    </div>
+                    <span className="font-medium">{it.patient_name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {ageFromDob(it.date_of_birth)}y /{" "}
+                  {it.gender === "male"
+                    ? "M"
+                    : it.gender === "female"
+                      ? "F"
+                      : "O"}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {it.phone || "—"}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {it.checked_in_at
+                    ? new Date(it.checked_in_at).toLocaleTimeString("en-IN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "—"}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={`capitalize ${stageBadgeClass(it.current_stage)}`}
+                  >
+                    {it.current_stage}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[96vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-[#1976d2]" />
+            Today&apos;s Visits
+            <Badge variant="secondary" className="ml-1">
+              {items.length}
+            </Badge>
+          </DialogTitle>
+          <DialogDescription>
+            All patients who checked in today, split by whether they registered
+            today or earlier.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs defaultValue="opd" className="mt-2">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="opd">
+              Normal OPD
+              <Badge variant="secondary" className="ml-2">
+                {followUps.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="new">
+              New Patients
+              <Badge variant="secondary" className="ml-2">
+                {newPatients.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="opd" className="mt-4">
+            <p className="text-xs text-muted-foreground mb-2">
+              Returning patients (registered earlier) who checked in today.
+            </p>
+            {renderTable(followUps, "No follow-up patients today")}
+          </TabsContent>
+          <TabsContent value="new" className="mt-4">
+            <p className="text-xs text-muted-foreground mb-2">
+              Patients registered today who also checked in today.
+            </p>
+            {renderTable(newPatients, "No new patients registered today")}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }
 
