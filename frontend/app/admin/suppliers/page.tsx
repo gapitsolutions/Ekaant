@@ -507,6 +507,7 @@ export default function SuppliersPage() {
                 noun="supplier"
                 onPrev={() => goToPage(page - 1)}
                 onNext={() => goToPage(page + 1)}
+                onJump={(p) => goToPage(p)}
               />
             </div>
           )}

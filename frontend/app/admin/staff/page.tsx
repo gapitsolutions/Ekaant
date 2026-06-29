@@ -420,6 +420,7 @@ export default function StaffManagementPage() {
                 noun="staff member"
                 onPrev={() => goToPage(page - 1)}
                 onNext={() => goToPage(page + 1)}
+                onJump={(p) => goToPage(p)}
               />
             </div>
           )}

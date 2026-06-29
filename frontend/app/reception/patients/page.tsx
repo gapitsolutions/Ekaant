@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -639,9 +640,6 @@ export default function PatientDataPage() {
   }, [patients, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(totalPatientsCount / listPageSize));
-  const pageStart =
-    totalPatientsCount === 0 ? 0 : (listPage - 1) * listPageSize + 1;
-  const pageEnd = Math.min(listPage * listPageSize, totalPatientsCount);
 
   // Export to Excel (CSV format that Excel can open)
   const exportToExcel = async () => {
@@ -3252,37 +3250,21 @@ export default function PatientDataPage() {
         )}
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination Controls — shared component with page-jump (number input
+          + Go) and First/Last. Server already supports any ``page``. */}
       <Card className="border-primary/20">
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {pageStart}-{pageEnd} of {totalPatientsCount}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setListPage((prev) => Math.max(1, prev - 1))}
-                disabled={listPage <= 1 || isLoadingPatients}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground px-2">
-                Page {listPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setListPage((prev) => Math.min(totalPages, prev + 1))
-                }
-                disabled={listPage >= totalPages || isLoadingPatients}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+        <CardContent className="py-3">
+          <ListPagination
+            page={listPage}
+            pageSize={listPageSize}
+            total={totalPatientsCount}
+            noun="patient"
+            onPrev={() => setListPage((prev) => Math.max(1, prev - 1))}
+            onNext={() =>
+              setListPage((prev) => Math.min(totalPages, prev + 1))
+            }
+            onJump={(p) => setListPage(p)}
+          />
         </CardContent>
       </Card>
     </div>
