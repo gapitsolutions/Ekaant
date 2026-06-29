@@ -40,6 +40,11 @@ const navigationByRole: Record<UserRole, NavItem[]> = {
     { title: "Suppliers", href: "/admin/suppliers", icon: Building2 },
     { title: "Staff", href: "/admin/staff", icon: Users },
     { title: "Billing Settings", href: "/admin/billing", icon: Wallet },
+    // Reception & pharmacy reports — both pages already allow the admin role
+    // (route guards + report APIs), so admin can open them directly. The
+    // admin sidebar stays in context since the layout renders nav by role.
+    { title: "Reception Reports", href: "/reception/reports", icon: BarChart3 },
+    { title: "Pharmacy Reports", href: "/pharmacy/reports", icon: Pill },
   ],
   reception: [
     {
